@@ -80,12 +80,24 @@ node server.js
 
 ### Настройка Turso (бесплатно)
 
+**Самый простой путь — через веб-панель**, без CLI:
+
+1. Открой <https://turso.tech> и зарегистрируйся (GitHub-аккаунт подойдёт).
+2. В консоли нажми **Create database**, выбери регион (например `fra`).
+3. Скопируй **URL** — он выглядит как `libsql://<имя>.turso.io`.
+4. В меню базы → **Tokens** → **Create token** → скопируй токен.
+
+Если хочешь пользоваться терминалом, CLI ставится не через npm:
+
 ```bash
-npm install -g @libsql/cli        # или npx @libsql/cli
-turso db create caser --location fra
-turso db show caser                # -> libsql://caser.turso.io
-turso db tokens create caser       # -> длинный токен
+# Linux / macOS / WSL
+curl -sSfL https://get.tur.so/install.sh | bash
+
+# или через Homebrew
+brew install tursodatabase/tap/turso
 ```
+
+> ⚠️ На **Windows без WSL** CLI не ставится — используй веб-панель.
 
 Затем в Render → сервис → **Environment** добавь
 `DATABASE_URL` и `DATABASE_AUTH_TOKEN`, либо запиши их в `.env`.
