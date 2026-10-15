@@ -8,17 +8,28 @@ services:
     # Render injects PORT automatically; the server binds 0.0.0.0:$PORT
     healthCheckPath: /healthz
     autoDeploy: true
+    buildCommand: npm install
+    startCommand: npm start
     envVars:
       - key: NODE_VERSION
         value: "22.11.0"
       - key: NODE_ENV
         value: production
-      # Where persistent state is kept.
-      # Free tier has an ephemeral filesystem, so this file is lost on every
-      # spin-down / redeploy unless a persistent disk is mounted at /var/data
+      # --- Database ----------------------------------------------------------
+      # Leave DATABASE_URL empty to use a local SQLite file. NOTE: on the Free
+      # plan the filesystem is ephemeral, so that file is lost on every
+      # spin-down / redeploy.
+      #
+      # For a database that survives, create a free Turso database
+      # (https://turso.tech) and paste the values here:
+      #   DATABASE_URL=libsql://<db-name>.turso.io
+      #   DATABASE_AUTH_TOKEN=<token>
+      - key: DATABASE_URL
+        value: ""
+      - key: DATABASE_AUTH_TOKEN
+        value: ""
       - key: DATA_DIR
         value: ./data
-      # Where case caches are read from / written to
       - key: CASES_CACHE_DIR
         value: ./cases_cache
       - key: REMOTE_CDN

@@ -10,7 +10,7 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "better-sqlite3": "^13.0.3",
+    "@libsql/client": "^0.18.0",
     "compression": "^1.8.2",
     "express": "^4.21.2",
     "ws": "^8.18.0"

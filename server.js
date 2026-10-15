@@ -22,16 +22,23 @@ const SITE_DIR = __dirname;
 const REMOTE_CDN = process.env.REMOTE_CDN || 'https://cdn.caser.day';
 const CACHE_DIR = process.env.CASES_CACHE_DIR || path.join(SITE_DIR, 'cases_cache');
 
-// Persistent storage (SQLite). Boots before any request is served.
-store.init();
-
 if (!fs.existsSync(CACHE_DIR)) {
   fs.mkdirSync(CACHE_DIR, { recursive: true });
 }
 
 app.use(express.json());
 
-// Sessions and balances live in SQLite now (see store.js); nothing is cached
+// Boot the storage layer, then start listening. Requests are not served until
+// the database is reachable (or the in-memory fallback is active).
+let storageReady = false;
+store
+  .init()
+  .catch((err) => console.error('[store] init failed:', err.message))
+  .finally(() => {
+    storageReady = true;
+  });
+
+// Sessions and balances live in the database (see store.js); nothing is cached
 // in module scope, so every request reads the current state.
 
 const DEFAULT_AVATARS = [
@@ -69,14 +76,14 @@ app.use((req, res, next) => {
 });
 
 // Health check (used by Render and by uptime monitors)
-app.get('/healthz', (req, res) => {
+app.get('/healthz', async (req, res) => {
   res.json({
     ok: true,
     uptime: Math.round(process.uptime()),
     cases: casesData.length,
     shopItems: SHOP_ITEMS.length,
     online: wss.clients.size,
-    storage: store.stats(),
+    storage: await store.stats(),
     time: new Date().toISOString()
   });
 });
@@ -292,7 +299,7 @@ app.get('/custom-auth.js', (req, res) => {
 // Resolves (and if needed provisions) the user for this request.
 // Identity comes from the session cookie / bearer token, so every browser gets
 // its own balance + inventory. Falls back to a freshly generated demo id.
-function resolveUser(req) {
+async function resolveUser(req) {
   const cookies = parseCookies(req);
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
@@ -303,13 +310,13 @@ function resolveUser(req) {
   ].filter(Boolean);
 
   for (const id of candidates) {
-    const existing = store.getUser(id);
+    const existing = await store.getUser(id);
     if (existing) return existing;
   }
 
   // No known identity yet: mint a stable demo account for this browser.
   const id = candidates[0] || store.newId('player');
-  const user = store.ensureUser({
+  const user = await store.ensureUser({
     id,
     nickname: 'CaserPlayer',
     image: DEFAULT_AVATARS[0],
@@ -329,11 +336,11 @@ function resolveUser(req) {
 // AUTH REST API Endpoints
 // ----------------------------------------------------
 
-app.post('/api/auth/session', (req, res) => {
+app.post('/api/auth/session', async (req, res) => {
   const incoming = req.body || {};
   if (!incoming.id) return res.status(400).json({ success: false, message: 'Invalid user data' });
 
-  const user = store.ensureUser({
+  const user = await store.ensureUser({
     id: incoming.id,
     nickname: incoming.nickname || 'CaserPlayer',
     image: incoming.image || DEFAULT_AVATARS[0],
@@ -347,9 +354,9 @@ app.post('/api/auth/session', (req, res) => {
   res.json({ success: true, data: { ...user, balance: user.balance } });
 });
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   const { username } = req.body || {};
-  const user = store.createUser({
+  const user = await store.createUser({
     id: store.newId('user'),
     nickname: username || 'Player',
     image: DEFAULT_AVATARS[0],
@@ -362,9 +369,9 @@ app.post('/api/auth/login', (req, res) => {
   res.json({ success: true, data: user, token: 'token_' + user.id });
 });
 
-app.post('/api/auth/register', (req, res) => {
+app.post('/api/auth/register', async (req, res) => {
   const { username, image, balance } = req.body || {};
-  const user = store.createUser({
+  const user = await store.createUser({
     id: store.newId('user'),
     nickname: username || 'ProGamer',
     image: image || DEFAULT_AVATARS[0],
@@ -377,10 +384,10 @@ app.post('/api/auth/register', (req, res) => {
   res.json({ success: true, data: user, token: 'token_' + user.id });
 });
 
-app.post('/api/users/balance/topup', (req, res) => {
-  const user = resolveUser(req);
+app.post('/api/users/balance/topup', async (req, res) => {
+  const user = await resolveUser(req);
   const amount = parseFloat(req.body && req.body.amount) || 5000;
-  const balance = store.addBalance(user.id, amount, 'topup', { amount }) ?? user.balance;
+  const balance = (await store.addBalance(user.id, amount, 'topup', { amount })) ?? user.balance;
   pushBalance({ ...user, balance });
   res.json({ success: true, balance });
 });
@@ -411,8 +418,8 @@ const handleSteamRedirect = (req, res) => {
 app.get('/api/users/auth/steam/redirect-url', handleSteamRedirect);
 app.get('/users/auth/steam/redirect-url', handleSteamRedirect);
 
-const handleRefresh = (req, res) => {
-  const user = resolveUser(req);
+const handleRefresh = async (req, res) => {
+  const user = await resolveUser(req);
   const token = user ? 'token_' + user.id : 'token_guest';
   res.json({
     token: token,
@@ -422,8 +429,8 @@ const handleRefresh = (req, res) => {
 app.post('/api/users/auth/refresh', handleRefresh);
 app.post('/users/auth/refresh', handleRefresh);
 
-const handleUsersMe = (req, res) => {
-  const user = resolveUser(req);
+const handleUsersMe = async (req, res) => {
+  const user = await resolveUser(req);
   if (!user) {
     return res.status(401).json({ message: 'Unauthorized' });
   }
@@ -536,24 +543,23 @@ app.get('/game/cases/:slug', handleGetCaseDetails);
 const handleOpenCase = async (req, res) => {
   const slug = req.params.slug;
   const count = Math.max(1, Math.min(6, parseInt(req.body?.count) || 1));
-  const user = resolveUser(req);
+  const user = await resolveUser(req);
 
   try {
     const caseData = await fetchCaseData(slug);
     const casePrice = parseFloat(caseData.case?.price || 100);
     const totalCost = casePrice * count;
 
-    // Not enough funds -> refuse before touching anything
-    if ((parseFloat(user.balance) || 0) < totalCost) {
+    // Atomic conditional debit: the WHERE guard is evaluated on the stored
+    // balance, so concurrent clicks can never overdraw an account.
+    const balance = await store.addBalance(user.id, -totalCost, 'case_open', { slug, count }, totalCost);
+    if (balance == null) {
       return res.status(400).json({
         success: false,
         message: 'Insufficient balance',
         balance: parseFloat(user.balance) || 0
       });
     }
-
-    // The price is taken the moment the roll starts, before the animation
-    let balance = store.addBalance(user.id, -totalCost, 'case_open', { slug, count }) ?? user.balance;
 
     const wonItems = [];
     const createdEntries = [];
@@ -597,7 +603,7 @@ const handleOpenCase = async (req, res) => {
       wonItems.push(itemInstance);
 
       // Add to this user's inventory
-      const entry = store.addInventoryItem(user.id, {
+      const entry = await store.addInventoryItem(user.id, {
         id: itemInstance.id,
         price: parseFloat(itemInstance.price),
         status: 'available',
@@ -608,7 +614,7 @@ const handleOpenCase = async (req, res) => {
       createdEntries.push(entry);
     }
 
-    store.recordCaseOpen(user.id, slug, totalCost, wonItems.map((w) => w.marketName));
+    await store.recordCaseOpen(user.id, slug, totalCost, wonItems.map((w) => w.marketName));
 
     // Tell the client about the new drops so the sell buttons light up and
     // the header balance refreshes without a reload
@@ -787,15 +793,15 @@ const inventoryBalancePayload = (user) => {
   return { ...payload, success: true, data: payload };
 };
 
-const handleInventory = (req, res) => {
-  const user = resolveUser(req);
+const handleInventory = async (req, res) => {
+  const user = await resolveUser(req);
   const q = req.query || {};
   const limit = Math.min(200, Math.max(1, parseInt(q.limit) || 28));
   const offset = Math.max(0, parseInt(q.offset) || 0);
   const status = q.status === 'available' ? 'available' : null;
 
-  const total = store.countInventory(user.id, status);
-  let page = store.listInventory(user.id, { limit, offset, status });
+  const total = await store.countInventory(user.id, status);
+  let page = await store.listInventory(user.id, { limit, offset, status });
 
   const dir = String(q.sortDirection || 'DESC').toUpperCase() === 'ASC' ? 1 : -1;
   if (String(q.sortBy || 'created_at') === 'price') {
@@ -812,34 +818,34 @@ const handleInventory = (req, res) => {
 app.get('/api/items/inventory', handleInventory);
 app.get('/items/inventory', handleInventory);
 
-const handleInventoryBalance = (req, res) => {
-  const user = resolveUser(req);
-  res.json(inventoryBalancePayload(store.getUser(user.id) || user));
+const handleInventoryBalance = async (req, res) => {
+  const user = await resolveUser(req);
+  res.json(inventoryBalancePayload((await store.getUser(user.id)) || user));
 };
 app.get('/api/items/inventory/balance', handleInventoryBalance);
 app.get('/items/inventory/balance', handleInventoryBalance);
 
 // Preview for the "sell all" confirmation modal
-const handleSellAllPreview = (req, res) => {
-  const user = resolveUser(req);
+const handleSellAllPreview = async (req, res) => {
+  const user = await resolveUser(req);
   const payload = {
-    itemsCount: store.countInventory(user.id, 'available'),
-    totalAmount: store.totalInventoryValue(user.id)
+    itemsCount: await store.countInventory(user.id, 'available'),
+    totalAmount: await store.totalInventoryValue(user.id)
   };
   res.json({ ...payload, success: true, data: payload });
 };
 app.get('/api/items/inventory/sell-all/preview', handleSellAllPreview);
 app.get('/items/inventory/sell-all/preview', handleSellAllPreview);
 
-// Deletes the entries from SQLite and credits the wallet
-function sellInventoryEntries(user, entries) {
+// Deletes the entries from the database and credits the wallet
+async function sellInventoryEntries(user, entries) {
   if (!entries.length) return { totalAmount: 0, balance: user.balance };
 
   const totalAmount = Number(
     entries.reduce((acc, e) => acc + (parseFloat(e.price) || 0), 0).toFixed(2)
   );
-  store.removeInventoryItems(user.id, entries.map((e) => e.id));
-  const balance = store.addBalance(user.id, totalAmount, 'sell', {
+  await store.removeInventoryItems(user.id, entries.map((e) => e.id));
+  const balance = await store.addBalance(user.id, totalAmount, 'sell', {
     items: entries.map((e) => e.item && e.item.marketName).filter(Boolean)
   });
 
@@ -847,21 +853,20 @@ function sellInventoryEntries(user, entries) {
 }
 
 // Sell the given items (or everything when no ids are supplied)
-const handleSell = (req, res) => {
-  const user = resolveUser(req);
+const handleSell = async (req, res) => {
+  const user = await resolveUser(req);
   const body = req.body || {};
   const ids = Array.isArray(body.inventoryItemIds) ? body.inventoryItemIds.map(String) : [];
 
   let entries;
   if (body.all === true || ids.length === 0) {
-    entries = store.listInventory(user.id, { limit: 500, status: 'available' });
+    entries = await store.listInventory(user.id, { limit: 500, status: 'available' });
   } else {
-    entries = ids
-      .map((id) => store.getInventoryEntry(user.id, id))
-      .filter((e) => e && e.status === 'available');
+    const found = await Promise.all(ids.map((id) => store.getInventoryEntry(user.id, id)));
+    entries = found.filter((e) => e && e.status === 'available');
   }
 
-  const { totalAmount, balance } = sellInventoryEntries(user, entries);
+  const { totalAmount, balance } = await sellInventoryEntries(user, entries);
   pushBalance({ ...user, balance });
 
   const payload = {
@@ -877,10 +882,10 @@ app.post('/api/items/inventory/sell', handleSell);
 app.post('/items/inventory/sell', handleSell);
 
 // "Sell everything" button on the inventory page
-const handleSellAll = (req, res) => {
-  const user = resolveUser(req);
-  const entries = store.listInventory(user.id, { limit: 500, status: 'available' });
-  const { totalAmount, balance } = sellInventoryEntries(user, entries);
+const handleSellAll = async (req, res) => {
+  const user = await resolveUser(req);
+  const entries = await store.listInventory(user.id, { limit: 500, status: 'available' });
+  const { totalAmount, balance } = await sellInventoryEntries(user, entries);
 
   pushBalance({ ...user, balance });
 
@@ -896,11 +901,12 @@ app.post('/api/items/inventory/sell-all', handleSellAll);
 app.post('/items/inventory/sell-all', handleSellAll);
 
 // Balance history (the header already has a modal for it)
-app.get('/api/users/balance/history', (req, res) => {
-  const user = resolveUser(req);
+app.get('/api/users/balance/history', async (req, res) => {
+  const user = await resolveUser(req);
   const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
   const offset = Math.max(0, parseInt(req.query.offset) || 0);
-  const rows = store.listTransactions(user.id, limit, offset).map((t) => ({
+  const tx = await store.listTransactions(user.id, limit, offset);
+  const rows = tx.map((t) => ({
     id: String(t.id),
     type: t.type,
     delta: Number(t.delta || 0),
@@ -926,7 +932,7 @@ const toBetItemPayload = (entry) => ({
   item: entry.item
 });
 
-const handleUpgradeBet = (req, res) => {
+const handleUpgradeBet = async (req, res) => {
   const body = req.body || {};
   const betInventoryItemIds = Array.isArray(body.betInventoryItemIds)
     ? body.betInventoryItemIds.map(String)
@@ -935,7 +941,7 @@ const handleUpgradeBet = (req, res) => {
   const addedBalance = Number.isFinite(rawAddedBalance) && rawAddedBalance > 0 ? rawAddedBalance : 0;
   const isMystery = !!body.isMystery;
 
-  const user = resolveUser(req);
+  const user = await resolveUser(req);
 
   // Target must exist in the full catalogue - never silently substitute another item
   let target = null;
@@ -948,28 +954,29 @@ const handleUpgradeBet = (req, res) => {
     if (!target) return res.status(400).json({ message: 'Unknown target item' });
   }
 
-  // Resolve (and consume) the real bet items from this user's inventory
-  const betEntries = betInventoryItemIds
-    .map((id) => store.getInventoryEntry(user.id, id))
-    .filter((e) => e && e.status === 'available');
+  // Resolve the real bet items belonging to this user
+  const found = await Promise.all(betInventoryItemIds.map((id) => store.getInventoryEntry(user.id, id)));
+  const betEntries = found.filter((e) => e && e.status === 'available');
 
-  const stake = betEntries.reduce((sum, i) => sum + (parseFloat(i.price) || 0), 0) + addedBalance;
+  const stake = Number(
+    betEntries.reduce((sum, i) => sum + (parseFloat(i.price) || 0), 0).toFixed(2)
+  ) + addedBalance;
 
-  const refund = () => {
-    for (const entry of betEntries) store.addInventoryItem(user.id, entry);
+  const refund = async () => {
+    for (const entry of betEntries) await store.addInventoryItem(user.id, entry);
   };
 
   if (!(stake > 0)) {
-    refund();
+    await refund();
     return res.status(400).json({ message: 'Nothing to bet' });
   }
   if ((parseFloat(user.balance) || 0) + 1e-9 < addedBalance) {
-    refund();
+    await refund();
     return res.status(400).json({ message: 'Insufficient balance' });
   }
 
   // Items leave the inventory for good once the bet is accepted
-  store.removeInventoryItems(user.id, betEntries.map((e) => e.id));
+  await store.removeInventoryItems(user.id, betEntries.map((e) => e.id));
 
   const targetVal = target ? parseFloat(target.price) || 0 : 0;
   // Chance = stake / targetPrice, matching the 1%..80% band the wheel UI accepts
@@ -980,16 +987,16 @@ const handleUpgradeBet = (req, res) => {
   // Cash only moves by the addedBalance part; inventory value moves via items
   let balance = user.balance;
   if (addedBalance > 0) {
-    balance = store.addBalance(user.id, -addedBalance, 'upgrade', {
+    balance = (await store.addBalance(user.id, -addedBalance, 'upgrade', {
       stake,
       target: target ? target.marketName : null
-    }) ?? user.balance;
+    })) ?? user.balance;
   }
 
   let wonEntry = null;
   if (isWin) {
     const prize = isMystery ? SHOP_ITEMS[crypto.randomInt(0, SHOP_ITEMS.length)] : target;
-    wonEntry = store.addInventoryItem(user.id, {
+    wonEntry = await store.addInventoryItem(user.id, {
       id: store.newId('inv'),
       price: parseFloat(prize.price) || 0,
       status: 'available',

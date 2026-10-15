@@ -30,9 +30,17 @@ caser-site/
 │       ├── icons/             # SVG иконки, оружие, флаги, платежные системы
 │       └── images/            # Фоны, текстуры верстака, логотипы, барабан
 ├── cases.json                 # Извлеченная база данных кейсов (151 шт.)
+├── cases_cache/               # Кэшированные предметы кейсов (4393 шт.)
+├── store.js                    # Слой хранения: SQLite (локально) или Turso (облако)
 ├── server.js                  # Сервер Node.js (Express + WebSocket + API)
-└── package.json               # Зависимости проекта (express, ws)
+├── render.yaml                 # Blueprint для деплоя на Render
+├── .env.example                # Переменные окружения (DATABASE_URL, ...)
+└── package.json               # Зависимости проекта (express, ws, @libsql/client)
 ```
+
+Драйвер БД: [`@libsql/client`](https://github.com/tursodatabase/libsql-client-js) — работает
+одинаково с локальным файлом (`file:`) и с Turso (`libsql://`), поэтому один и тот же
+код работает и локально, и в продакшене.
 
 ---
 
@@ -54,19 +62,38 @@ node server.js
 
 ## 💾 Хранение данных
 
-Баланс, инвентарь, история транзакций и лог открытий хранятся в **SQLite**
-(`store.js`, файл `data/caser.db`, путь настраивается через `DATA_DIR` / `DATABASE_PATH`).
+Баланс, инвентарь, история транзакций и лог открытий хранятся в **SQLite**.
+Драйвер — [`@libsql/client`](https://github.com/tursodatabase/libsql-client-js), который
+умеет два режима и поэтому один и тот же код работает локально и в облаке:
+
+| Режим | Конфигурация | Когда данные сохраняются |
+|---|---|---|
+| **Локальный файл** | `DATABASE_URL` не задан → `DATA_DIR/caser.db` | Пока жив инстанс (Free — обнуляется при спиддауне/редеплое) |
+| **Turso (облако)** | `DATABASE_URL=libsql://…` + `DATABASE_AUTH_TOKEN` | Всегда, независимо от перезапусков и деплоев |
 
 - **Аккаунт выдаётся на первый запрос** и привязывается к cookie `caser_user_id`,
   поэтому у каждого браузера **свой** баланс и **свой** инвентарь.
-- Если `better-sqlite3` не удалось загрузить — сервер автоматически падает обратно
-  в режим «в памяти» и продолжает работать.
+- Если база недоступна — сервер автоматически откатывается в режим «в памяти»
+  и продолжает работать (данные живут до рестарта).
 - Ледгер: каждое движение баланса пишется в `transactions`
   (`GET /api/users/balance/history`).
 
-> ⚠️ На Render **Free** файловая система эфемерная: база переживёт работу инстанса,
-> но **обнулится** при спиддауне (15 мин без трафика) и при каждом редеплое.
-> Для постоянного хранения нужен платный план + persistent disk на `/var/data`.
+### Настройка Turso (бесплатно)
+
+```bash
+npm install -g @libsql/cli        # или npx @libsql/cli
+turso db create caser --location fra
+turso db show caser                # -> libsql://caser.turso.io
+turso db tokens create caser       # -> длинный токен
+```
+
+Затем в Render → сервис → **Environment** добавь
+`DATABASE_URL` и `DATABASE_AUTH_TOKEN`, либо запиши их в `.env`.
+`store.js` сам определит режим по наличию `DATABASE_URL`.
+
+> ⚠️ На Render **Free** файловая система эфемерная: при локальном файле
+> база переживёт работу инстанса, но **обнулится** при спиддауне (15 мин без трафика)
+> и при каждом редеплое. Только внешняя база (Turso/Neon) решает это полностью.
 
 ---
 
@@ -80,8 +107,8 @@ node server.js
    - Health Check Path: `/healthz`
 3. Проверка после деплоя: `https://<твой-домен>.onrender.com/healthz`
 
-Переменные окружения (уже заданы в `render.yaml`):
-`PORT` (Render подставляет сам), `DATA_DIR`, `CASES_CACHE_DIR`, `REMOTE_CDN`, `NODE_VERSION`.
+Переменные окружения: `DATABASE_URL`, `DATABASE_AUTH_TOKEN` (Turso), `DATA_DIR`,
+`CASES_CACHE_DIR`, `REMOTE_CDN`, `NODE_VERSION`. Подробности — в `.env.example`.
 
 ---
 
