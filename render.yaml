@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: caser-clone
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: main
+    # Render injects PORT automatically; the server binds 0.0.0.0:$PORT
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22.11.0"
+      - key: NODE_ENV
+        value: production
+      # Where persistent state is kept.
+      # Free tier has an ephemeral filesystem, so this file is lost on every
+      # spin-down / redeploy unless a persistent disk is mounted at /var/data
+      - key: DATA_DIR
+        value: ./data
+      # Where case caches are read from / written to
+      - key: CASES_CACHE_DIR
+        value: ./cases_cache
+      - key: REMOTE_CDN
+        value: https://cdn.caser.day
+    # Uncomment once you move to a paid plan and attach a disk:
+    # disk:
+    #   name: caser-data
+    #   mountPath: /var/data
+    #   sizeGB: 1

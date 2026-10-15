@@ -1,0 +1,349 @@
+{
+  "case": {
+    "id": "17",
+    "title": "Desert Eagle",
+    "slug": "desert-eagle",
+    "image": "/cases/3b1684da1c025953e6c4677c18a13df0-69f234f0822ea.webp",
+    "label": null,
+    "section": {
+      "slug": "arsenal",
+      "name": "Арсенал",
+      "position": 70
+    },
+    "type": "paid",
+    "price": "149.000",
+    "prices": [
+      {
+        "count": 1,
+        "price": "149.000"
+      },
+      {
+        "count": 2,
+        "price": "298.000"
+      },
+      {
+        "count": 3,
+        "price": "447.000"
+      },
+      {
+        "count": 4,
+        "price": "596.000"
+      },
+      {
+        "count": 5,
+        "price": "745.000"
+      },
+      {
+        "count": 6,
+        "price": "894.000"
+      }
+    ],
+    "status": "active",
+    "total_opens": 724886,
+    "max_opens_at_once": 6,
+    "open_limit": null,
+    "opens_remaining": null,
+    "time_limit": null
+  },
+  "items": [
+    {
+      "id": "7064",
+      "appId": 730,
+      "marketName": "Desert Eagle | Naga (Minimal Wear)",
+      "price": "365.680",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyL1m5fn8Sdk7uORbKFsJ_yWMWmRxu9JvOhuRz39zEx06jjWm4n8Ii6WPFQhA5YjE7MJskPrwdTuZb7htlHbg9oTzCn2hjQJsHhQd9ynBw/360fx360f",
+      "weapon": "5",
+      "skin": "Naga",
+      "exterior": "4",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "16"
+    },
+    {
+      "id": "2411",
+      "appId": 730,
+      "marketName": "Desert Eagle | Light Rail (Minimal Wear)",
+      "price": "246.580",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyL1m5fn8Sdk6OGRbKFsJ_yWMWKIztF6ueZhW2fhlhlw6m-GnNyvIiiXOwQoDMR2QbZe5hi5k9KxN-vhtFbciN1FnyqskGoXuU4JtHUo/360fx360f",
+      "weapon": "5",
+      "skin": "Light Rail",
+      "exterior": "4",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "16"
+    },
+    {
+      "id": "8845",
+      "appId": 730,
+      "marketName": "Desert Eagle | Directive (Minimal Wear)",
+      "price": "619.810",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyL1m5fn8Sdk7uORbKF-JeKHMWKRxuJzj-JmQTqnlB8rtgKJk4jxNWXGPQ9yA8Z0R7FbtBi7w9S2M7_msgCIid1CmH6viH5I7ilr4-oEUKst5OSJ2LTZlHwR/360fx360f",
+      "weapon": "5",
+      "skin": "Directive",
+      "exterior": "4",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "16"
+    },
+    {
+      "id": "2211",
+      "appId": 730,
+      "marketName": "Desert Eagle | Trigger Discipline (Minimal Wear)",
+      "price": "168.580",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyL1m5fn8Sdk7OeRbKFsJ8-HHG6Xxutkj-VgXCq6hREuvTi6lob-KT-Ja1UlWMAkTOMCt0G9kIHlP77l5FbW344XxX_4iSJJv31r4bxRUKUn_rqX0V-d-rquYA/360fx360f",
+      "weapon": "5",
+      "skin": "Trigger Discipline",
+      "exterior": "4",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "16"
+    },
+    {
+      "id": "16982",
+      "appId": 730,
+      "marketName": "Desert Eagle | Serpent Strike (Factory New)",
+      "price": "141.740",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyL1m5fn8Sdk6_evb6hoH-OdD2yV_v53pPVsXSeMmRQguynLzdmsIHOVPVciXMN3QuVeuxexmtHuP77m7gDd34kRxXj_3ChKvS9p5fFCD_SJMmxOXA/360fx360f",
+      "weapon": "5",
+      "skin": "Serpent Strike",
+      "exterior": "2",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "16"
+    },
+    {
+      "id": "3325",
+      "appId": 730,
+      "marketName": "Desert Eagle | Night (Field-Tested)",
+      "price": "1055.100",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyL1m5fn8Sdk_P2RZq1qKOSsA2KUyPt7_rdoTXnkkEoi6muAzYr6eS6VawZzCpF1QeFb4BHqm9TvNL7iswGK2opbjXKpmEuT-qQ/360fx360f",
+      "weapon": "5",
+      "skin": "Night",
+      "exterior": "3",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "14"
+    },
+    {
+      "id": "2404",
+      "appId": 730,
+      "marketName": "Desert Eagle | Tilted (Factory New)",
+      "price": "131.680",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyL1m5fn8Sdk7OeRZ7JoMuCSHXSvwP9jsd5tSii0mRgYvzSCkpu3cH-UOgV2D8RyQrMKsRW-mtWyPunr4VeNjIhMmX6ojigY7y9v5ehUA71lpPMO4MWI5A/360fx360f",
+      "weapon": "5",
+      "skin": "Tilted",
+      "exterior": "2",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "14"
+    },
+    {
+      "id": "2277",
+      "appId": 730,
+      "marketName": "Desert Eagle | Meteorite (Factory New)",
+      "price": "119.100",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyL1m5fn8Sdk7v-Ra7Z0M-SSAmuZ2-tyj-VoXSKMmRQguynLyN-qIH3Daw4mCZR3EeBbsUO-l4a2Prvm7gzWg4MXnymq2H8Yui9usfFCD_RyA7Mmlw/360fx360f",
+      "weapon": "5",
+      "skin": "Meteorite",
+      "exterior": "2",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "15"
+    },
+    {
+      "id": "9241",
+      "appId": 730,
+      "marketName": "Desert Eagle | Oxide Blaze (Factory New)",
+      "price": "83.870",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyL1m5fn8Sdk7OeRbKF-JeKHMWKRxuJzj-JmXTu8kRgpjDGMnYftb32UPwJxDJokRuUIsRi_lNPhM7izsgXZi49GySiq2nxNuCdttbtUB_A7uvqAjSk2l_c/360fx360f",
+      "weapon": "5",
+      "skin": "Oxide Blaze",
+      "exterior": "2",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "15"
+    },
+    {
+      "id": "6586",
+      "appId": 730,
+      "marketName": "Desert Eagle | Crimson Web (Field-Tested)",
+      "price": "980.460",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyL1m5fn8Sdk5-uRf6FvM8-XD3WbxPxJveRtRjy-2xh15zmGm9r6IHKTOFJ0DZIkQOFfuhnsk9PnMe_ls1Ha34hHznr5jC5XrnE8TAPhH1w/360fx360f",
+      "weapon": "5",
+      "skin": "Crimson Web",
+      "exterior": "3",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "16"
+    },
+    {
+      "id": "3516",
+      "appId": 730,
+      "marketName": "Desert Eagle | Kumicho Dragon (Battle-Scarred)",
+      "price": "1585.170",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyL1m5fn8Sdk7uORbKF-JeKHC2aXzetJu_RkRiq7mhk1sjqKlLDxJCrRJxgoApp4R-QKtkK7xIC1PrjgtAeI3tlDmyj53CMb7S9rt-cFVfIgqPXUkUifZqyZ0uIN/360fx360f",
+      "weapon": "5",
+      "skin": "Kumicho Dragon",
+      "exterior": "1",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "12"
+    },
+    {
+      "id": "2726",
+      "appId": 730,
+      "marketName": "Desert Eagle | Heat Treated (Minimal Wear)",
+      "price": "256.650",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyL1m5fn8Sdk7uORbKFsJ_yWMWSR0utJuOB7Syy9kBkY4QKJk4jxNWXGbQZ0CZpyTeBf4xO4m9y1Nuy05wHYg4lNySWr3C1Luyhu4LkKA6As5OSJ2JAJXn6j/360fx360f",
+      "weapon": "5",
+      "skin": "Heat Treated",
+      "exterior": "4",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "12"
+    },
+    {
+      "id": "1104",
+      "appId": 730,
+      "marketName": "Souvenir Desert Eagle | Urban DDPAT (Field-Tested)",
+      "price": "125.810",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyL1m5fn8Sdk5-uRbKB9IeSsG3WS_uNztOh8QmfmwU13sGqAwtv9cniQOFQpD5VyEOFetEWwx9blP-6341PX2tkRnyj7kGoXuY47kocH/360fx360f",
+      "weapon": "5",
+      "skin": "Urban DDPAT",
+      "exterior": "3",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "14"
+    },
+    {
+      "id": "988",
+      "appId": 730,
+      "marketName": "Desert Eagle | Bronze Deco (Minimal Wear)",
+      "price": "36.900",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyL1m5fn8Sdk7v-RarZiLuqWMXSAwPx9vORWQyC0nQlp4zzdydqtJXuTOgZzW5F4QbNZ4UK7l9e1N-Pq5AeNj9hHmH783S9J6zErvbgcMfnnyA/360fx360f",
+      "weapon": "5",
+      "skin": "Bronze Deco",
+      "exterior": "4",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "15"
+    },
+    {
+      "id": "1450",
+      "appId": 730,
+      "marketName": "Desert Eagle | Calligraffiti (Minimal Wear)",
+      "price": "50.320",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyL1m5fn8Sdk6_evb6hoH_OSAmuZxvx3tudWQyC0nQlp52rQmNv_IC7DaFR0ApB4QbMKs0W8k9zuPr6xtAGMjoITmymohyMa6jErvbhrxmEjWA/360fx360f",
+      "weapon": "5",
+      "skin": "Calligraffiti",
+      "exterior": "4",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "15"
+    },
+    {
+      "id": "11042",
+      "appId": 730,
+      "marketName": "Desert Eagle | Mecha Industries (Minimal Wear)",
+      "price": "787.550",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyL1m5fn8Sdk6OGRbKFsJ_yWMWqVwuZ3j-1gSCGn20h042vSyY2tdyjCZwIlXJBxQeNe4EWxxoHkMOq0sQGIid5Fnyr42HtXrnE8p4gbgvE/360fx360f",
+      "weapon": "5",
+      "skin": "Mecha Industries",
+      "exterior": "4",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "12"
+    },
+    {
+      "id": "5076",
+      "appId": 730,
+      "marketName": "Desert Eagle | Heirloom (Field-Tested)",
+      "price": "718.780",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyL1m5fn8Sdk7uORbapqMvGFC2Ovxet3t-1scCS2kRQyvnPRno79cHzGaVclCpJ0E7IK4EW8xtbhMO7q4VeK2Y0RmCn8hiMYunxs_a9cBiCne5lf/360fx360f",
+      "weapon": "5",
+      "skin": "Heirloom",
+      "exterior": "3",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "16"
+    },
+    {
+      "id": "12903",
+      "appId": 730,
+      "marketName": "Desert Eagle | The Bronze (Minimal Wear)",
+      "price": "220.580",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyL1m5fn8Sdk7v-RZrFgIvWBHViS0-F4quRWQyC0nQlp4muHzt78cXqXbQInCZFzTbEO4xS4lYKzMOnqtQTf3osQm36v3SJMujErvbh3QIzNUw/360fx360f",
+      "weapon": "5",
+      "skin": "The Bronze",
+      "exterior": "4",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "14"
+    },
+    {
+      "id": "14053",
+      "appId": 730,
+      "marketName": "Desert Eagle | Sputnik (Battle-Scarred)",
+      "price": "178.650",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyL1m5fn8Sdk_OKRe7RsI_WBD2SV_ux6peRWRyyygwRp5GrUytz7JS2TZwNxD5shRuQJ4UTql4DiZbvgtFTc34tNynqojitO7zErvbihEnfrtA/360fx360f",
+      "weapon": "5",
+      "skin": "Sputnik",
+      "exterior": "1",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "15"
+    },
+    {
+      "id": "3470",
+      "appId": 730,
+      "marketName": "Desert Eagle | Midnight Storm (Field-Tested)",
+      "price": "1106.270",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyL1m5fn8Sdk7v-Re6FsM-ScHGqvzOtyufRkASzrlBhx5jyByNuodnKSPFQmD8AjF-9etBDsldTgNbjhtQHe3dhDmyrgznQetvSvchw/360fx360f",
+      "weapon": "5",
+      "skin": "Midnight Storm",
+      "exterior": "3",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "14"
+    },
+    {
+      "id": "3698",
+      "appId": 730,
+      "marketName": "Desert Eagle | Printstream (Battle-Scarred)",
+      "price": "3405.180",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyL1m5fn8Sdk7OeRbKFsJ8-DHG6e1f1iouRoQha7kBwxqnPQnNmqcSrCPVVzDJB3ROVZ5xLpkIbvY-qws1CLgo5Dny783HtK6yts_a9cBrhYI1Ka/360fx360f",
+      "weapon": "5",
+      "skin": "Printstream",
+      "exterior": "1",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "10"
+    },
+    {
+      "id": "3758",
+      "appId": 730,
+      "marketName": "Desert Eagle | Code Red (Battle-Scarred)",
+      "price": "4160.030",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyL1m5fn8Sdk6OGRbKFsJ_yWMWaXxvxzo_JmXRa7kBwxqnPVn9atdXiTPAMhX8NxQeED4EPqltPvZe-2tgzcg4kRxX-rjyhP7Hs6_a9cBsae4mjc/360fx360f",
+      "weapon": "5",
+      "skin": "Code Red",
+      "exterior": "1",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "10"
+    },
+    {
+      "id": "12470",
+      "appId": 730,
+      "marketName": "Desert Eagle | Blue Ply (Factory New)",
+      "price": "331.290",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyL1m5fn8Sdk7OeRbKFsJ_yWMXWV0eJ_s-BWQyC0nQlpsjzdwtqgIHqfZgAgDZBwROBbtRDsm4HiM7zislfYitpBniz6iy5K7DErvbjLUTqBnA/360fx360f",
+      "weapon": "5",
+      "skin": "Blue Ply",
+      "exterior": "2",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "15"
+    }
+  ]
+}

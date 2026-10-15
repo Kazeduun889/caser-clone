@@ -1,0 +1,428 @@
+/* Custom Caser Auth Modal & User Bar Styling */
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Sofia+Sans:wght@400;500;600;700&display=swap');
+
+.caser-auth-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s ease, visibility 0.25s ease;
+  font-family: 'Sofia Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.caser-auth-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.caser-auth-modal {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  background: #151515;
+  border: 1px solid #474747;
+  border-radius: 4px;
+  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(68, 201, 135, 0.15);
+  overflow: hidden;
+  transform: scale(0.94) translateY(10px);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  color: #ffffff;
+}
+
+.caser-auth-overlay.active .caser-auth-modal {
+  transform: scale(1) translateY(0);
+}
+
+.caser-auth-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  background: #202020;
+  border-bottom: 1px solid #333333;
+}
+
+.caser-auth-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.caser-auth-title-icon {
+  width: 24px;
+  height: 24px;
+  color: #44C987;
+}
+
+.caser-auth-close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px;
+  transition: color 0.2s, transform 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.caser-auth-close:hover {
+  color: #ffffff;
+  transform: rotate(90deg);
+}
+
+.caser-auth-tabs {
+  display: flex;
+  background: #191919;
+  border-bottom: 1px solid #2e2e2e;
+}
+
+.caser-auth-tab {
+  flex: 1;
+  padding: 14px 10px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: rgba(255, 255, 255, 0.55);
+  font-family: 'Oswald', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.caser-auth-tab.active {
+  color: #44C987;
+  border-bottom-color: #44C987;
+  background: rgba(68, 201, 135, 0.06);
+}
+
+.caser-auth-body {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.caser-quick-login-banner {
+  background: linear-gradient(135deg, rgba(68, 201, 135, 0.12) 0%, rgba(19, 67, 44, 0.25) 100%);
+  border: 1px solid rgba(68, 201, 135, 0.35);
+  border-radius: 4px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: center;
+}
+
+.caser-quick-login-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 17px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #44C987;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.caser-quick-login-desc {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.35;
+}
+
+.caser-auth-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.caser-auth-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.caser-auth-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: #0f0f0f;
+  border: 1px solid #333333;
+  border-radius: 3px;
+  padding: 12px 14px;
+  color: #ffffff;
+  font-size: 15px;
+  font-family: 'Sofia Sans', sans-serif;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.caser-auth-input:focus {
+  border-color: #44C987;
+  box-shadow: 0 0 10px rgba(68, 201, 135, 0.2);
+}
+
+.caser-auth-avatars {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.caser-avatar-option {
+  width: 44px;
+  height: 44px;
+  border-radius: 4px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.2s, transform 0.2s;
+  background: #202020;
+}
+
+.caser-avatar-option.selected {
+  border-color: #44C987;
+  transform: scale(1.08);
+}
+
+.caser-avatar-option img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.caser-btn-primary {
+  width: 100%;
+  padding: 14px 20px;
+  background: linear-gradient(180deg, #13432C 0%, #13432C 100%);
+  border: 1px solid #44C987;
+  border-radius: 3px;
+  color: #44C987;
+  font-family: 'Oswald', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  box-shadow: inset 0 0 1.66rem rgba(68, 201, 135, 0.45);
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.caser-btn-primary:hover {
+  background: linear-gradient(180deg, #1D5A3A 0%, #1D5A3A 100%);
+  box-shadow: inset 0 0 1.66rem rgba(68, 201, 135, 0.75);
+  transform: translateY(-1px);
+}
+
+.caser-btn-demo {
+  width: 100%;
+  padding: 12px 18px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  color: #ffffff;
+  font-family: 'Oswald', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.caser-btn-demo:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.caser-auth-footer-text {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* User Header Pill & Dropdown */
+.caser-user-pill-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  z-index: 100;
+}
+
+.caser-user-balance-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(270deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.1) 100%);
+  border: 1px solid rgba(68, 201, 135, 0.5);
+  border-radius: 3px;
+  padding: 6px 14px;
+  height: 38px;
+  box-sizing: border-box;
+}
+
+.caser-user-balance-value {
+  font-family: 'Oswald', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: #44C987;
+  letter-spacing: 0.02em;
+}
+
+.caser-user-topup-btn {
+  background: linear-gradient(180deg, #13432C 0%, #13432C 100%);
+  border: 1px solid #44C987;
+  color: #44C987;
+  width: 32px;
+  height: 32px;
+  border-radius: 3px;
+  font-size: 20px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  box-shadow: inset 0 0 10px rgba(68, 201, 135, 0.3);
+}
+
+.caser-user-topup-btn:hover {
+  background: linear-gradient(180deg, #1D5A3A 0%, #1D5A3A 100%);
+  transform: scale(1.05);
+}
+
+.caser-user-avatar-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 3px;
+  border: 2px solid #44C987;
+  background: #111;
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s, transform 0.2s;
+}
+
+.caser-user-avatar-btn:hover {
+  transform: scale(1.05);
+}
+
+.caser-user-avatar-btn img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.caser-user-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 220px;
+  background: #1c1c1c;
+  border: 1px solid #3d3d3d;
+  border-radius: 4px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 10000;
+  animation: caserFadeIn 0.15s ease;
+}
+
+.caser-user-dropdown.show {
+  display: flex;
+}
+
+@keyframes caserFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.caser-dropdown-header {
+  padding: 12px 14px;
+  background: #242424;
+  border-bottom: 1px solid #333333;
+}
+
+.caser-dropdown-name {
+  font-family: 'Oswald', sans-serif;
+  font-size: 16px;
+  color: #ffffff;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.caser-dropdown-sub {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 2px;
+}
+
+.caser-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  color: rgba(255, 255, 255, 0.85);
+  background: none;
+  border: none;
+  text-decoration: none;
+  font-size: 14px;
+  font-family: 'Sofia Sans', sans-serif;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  text-align: left;
+}
+
+.caser-dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #44C987;
+}
+
+.caser-dropdown-item.danger {
+  color: #ff5252;
+  border-top: 1px solid #2e2e2e;
+}
+
+.caser-dropdown-item.danger:hover {
+  background: rgba(255, 82, 82, 0.1);
+  color: #ff7676;
+}

@@ -1,0 +1,1259 @@
+const express = require('express');
+const http = require('http');
+const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
+const { WebSocketServer, WebSocket } = require('ws');
+const https = require('https');
+const store = require('./store');
+
+const app = express();
+try {
+  const compression = require('compression');
+  app.use(compression());
+} catch (e) {
+  // Compression optional
+}
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server, path: '/api/ws' });
+
+const PORT = process.env.PORT || 3000;
+const SITE_DIR = __dirname;
+const REMOTE_CDN = process.env.REMOTE_CDN || 'https://cdn.caser.day';
+const CACHE_DIR = process.env.CASES_CACHE_DIR || path.join(SITE_DIR, 'cases_cache');
+
+// Persistent storage (SQLite). Boots before any request is served.
+store.init();
+
+if (!fs.existsSync(CACHE_DIR)) {
+  fs.mkdirSync(CACHE_DIR, { recursive: true });
+}
+
+app.use(express.json());
+
+// Sessions and balances live in SQLite now (see store.js); nothing is cached
+// in module scope, so every request reads the current state.
+
+const DEFAULT_AVATARS = [
+  'https://avatars.steamstatic.com/6ee7f3e3312c196dbdb6bdd754a4e021abc16885_full.jpg',
+  'https://avatars.steamstatic.com/b62474de115ac86b1f76c65ee7821bc3a33aebcd_full.jpg',
+  'https://avatars.steamstatic.com/f4c7e12795942db02bf89508924f93f92ee40895_full.jpg',
+  'https://avatars.steamstatic.com/a91903aaf5442d0b774b9a85239914555d3d1614_full.jpg',
+  'https://avatars.steamstatic.com/fd5be41c9a765b8ccc16726ee7686d391031be40_full.jpg'
+];
+
+function parseCookies(req) {
+  const list = {};
+  const cookieHeader = req.headers.cookie;
+  if (!cookieHeader) return list;
+  cookieHeader.split(';').forEach(cookie => {
+    let [name, ...rest] = cookie.split('=');
+    name = name?.trim();
+    if (!name) return;
+    const value = rest.join('=').trim();
+    list[name] = decodeURIComponent(value);
+  });
+  return list;
+}
+
+// CORS & Headers
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.removeHeader('X-Frame-Options');
+  res.setHeader('Content-Security-Policy', "frame-ancestors *;");
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
+
+// Health check (used by Render and by uptime monitors)
+app.get('/healthz', (req, res) => {
+  res.json({
+    ok: true,
+    uptime: Math.round(process.uptime()),
+    cases: casesData.length,
+    shopItems: SHOP_ITEMS.length,
+    online: wss.clients.size,
+    storage: store.stats(),
+    time: new Date().toISOString()
+  });
+});
+
+// Load cases list
+let casesData = [];
+try {
+  const rawCases = fs.readFileSync(path.join(SITE_DIR, 'cases.json'), 'utf8');
+  casesData = JSON.parse(rawCases).data.cases;
+} catch (e) {
+  console.warn('Could not read cases.json:', e.message);
+}
+
+// Sample skin pool with Steam CDN images
+const SAMPLE_SKINS = [
+  {
+    id: "s1",
+    appId: 730,
+    marketName: "StatTrak™ AK-47 | Ice Coaled (Field-Tested)",
+    price: 2890.00,
+    image: "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLwlcK3wiFO0POlPPNSI_-UGm-Zz-llj-xsSyCmmFMi5GrcwtivdnnCOgd2DsNxTeIJuxbqk9XuN-_i5gKI3d1BxH35iy1P8G81tKMOXOY4/360fx360f",
+    rarity: "14",
+    exterior: "3",
+    weapon: "1",
+    skin: "Ice Coaled"
+  },
+  {
+    id: "s2",
+    appId: 730,
+    marketName: "AWP | Elite Build (Field-Tested)",
+    price: 3450.00,
+    image: "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLwiYbf_jdk7uW-V6lsM-SWHH6vzOtyufRkAXnjzRx15WrWmd37JC7FZgEoCsFzFOQM4UHqm4a0YrnrtAXWg4IUmyTgznQe9p8sU8k/360fx360f",
+    rarity: "15",
+    exterior: "3",
+    weapon: "3",
+    skin: "Elite Build"
+  },
+  {
+    id: "s3",
+    appId: 730,
+    marketName: "StatTrak™ Zeus x27 | Olympus (Factory New)",
+    price: 1420.00,
+    image: "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLln4Xl7x1B6ue9V7BlNf6XC3WvxuFyj-1gSCGn2xl2sm7XnI6hdC-XPAcmXsF2RLIP4xbslty2NLvqswePjYlEySn33S9XrnE8cYTqlUY/360fx360f",
+    rarity: "15",
+    exterior: "2",
+    weapon: "20",
+    skin: "Olympus"
+  },
+  {
+    id: "s4",
+    appId: 730,
+    marketName: "★ Falchion Knife | Marble Fade (Factory New)",
+    price: 48500.00,
+    image: "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyL6kJ_m-B1d7v6tYK1iLs-SA1idwPx0vORWSSi3kCIrujqNjsGqdXrFbFIlA8QjTO8Lu0O7m921ZLy05gfXj99Aziz_2nscuic6sr4AT-N7rSTjmXt5/360fx360f",
+    rarity: "12",
+    exterior: "2",
+    weapon: "512",
+    skin: "Marble Fade"
+  },
+  {
+    id: "s5",
+    appId: 730,
+    marketName: "MAC-10 | Disco Tech (Battle-Scarred)",
+    price: 680.00,
+    image: "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyL8n5WxrR1Y-s2jaac8cM-dD2SCxNF-teB_Vme1wx5ysWiEmYv6JXPCagAlCJNyTbEJtxi_kN3vYuPr4g3Y2IhHzyyqkGoXuZENuRkn/360fx360f",
+    rarity: "15",
+    exterior: "1",
+    weapon: "15",
+    skin: "Disco Tech"
+  },
+  {
+    id: "s6",
+    appId: 730,
+    marketName: "USP-S | Stainless (Minimal Wear)",
+    price: 1200.00,
+    image: "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLkjYbf7itX6vytbbZSIeGsG3SA_v1isehnQyyghiIrujqNjsGqcHuVa1VxCcciR7MP50a5ktLuP-rr5ATXioJNyij93y0a7nlstboAT-N7rU1N1uE6/360fx360f",
+    rarity: "16",
+    exterior: "4",
+    weapon: "32",
+    skin: "Stainless"
+  },
+  {
+    id: "s7",
+    appId: 730,
+    marketName: "Glock-18 | Gamma Doppler (Well-Worn)",
+    price: 3100.00,
+    image: "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyL2kpnj9h1a4s2paalgIc-XAXeAzetkj_FhTjq2xiIgvzKGkbD0JC_OK1s-CptwReUJshXtwNeyZb605ATZ3owTziz_iiIa735pt70HBKVx-KPV3haBb-PioPG43g/360fx360f",
+    rarity: "14",
+    exterior: "5",
+    weapon: "4",
+    skin: "Gamma Doppler"
+  },
+  {
+    id: "s8",
+    appId: 730,
+    marketName: "StatTrak™ MP7 | Just Smile (Factory New)",
+    price: 2500.00,
+    image: "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyL8jsHf8DIM0Pi7e7BSM_2aAmKvzedxuPUnHXrkzU4i4z-Dno6sci3BaQApDpN4R-cCthnqx4W2MunhtgCI3d0QmzK-0H0MYFOvtA/360fx360f",
+    rarity: "15",
+    exterior: "2",
+    weapon: "19",
+    skin: "Just Smile"
+  }
+];
+
+// Starting balance of a freshly provisioned player
+const START_BALANCE = 2043.31;
+
+// Builds the full catalogue of distinct skins from every cached case so that
+// ANY skin can be picked as an upgrade target / shop item.
+function buildShopCatalogue() {
+  const byMarketName = new Map();
+
+  const add = (item) => {
+    if (!item || typeof item.image !== 'string' || !item.image) return;
+    const marketName = item.marketName || item.name;
+    if (!marketName) return;
+    const price = parseFloat(item.price);
+    if (!Number.isFinite(price)) return;
+    const key = marketName.trim().toLowerCase();
+    const existing = byMarketName.get(key);
+    // Keep the cheapest listing of the same skin
+    if (existing && existing.price <= price) return;
+    byMarketName.set(key, {
+      id: String(item.id ?? key),
+      appId: item.appId ?? 730,
+      marketName,
+      price,
+      image: item.image,
+      weapon: item.weapon ?? null,
+      skin: item.skin ?? null,
+      exterior: item.exterior ?? null,
+      stattrak: item.stattrak ?? false,
+      type: item.type ?? null,
+      rarity: item.rarity ?? null
+    });
+  };
+
+  // 1) Sample skins (always present)
+  SAMPLE_SKINS.forEach(add);
+
+  // 2) Every item of every cached case
+  let cacheDir = CACHE_DIR;
+  try {
+    if (fs.existsSync(cacheDir) && fs.statSync(cacheDir).isDirectory()) {
+      for (const file of fs.readdirSync(cacheDir)) {
+        if (!file.endsWith('.json')) continue;
+        try {
+          const data = JSON.parse(fs.readFileSync(path.join(cacheDir, file), 'utf8'));
+          (data.items || []).forEach(add);
+        } catch (e) { /* skip malformed cache file */ }
+      }
+    }
+  } catch (e) {
+    console.warn('Could not build item catalogue:', e.message);
+  }
+
+  const list = [...byMarketName.values()];
+  // Stable ordering: cheap -> expensive, then by name
+  list.sort((a, b) => a.price - b.price || a.marketName.localeCompare(b.marketName));
+  return list;
+}
+
+// Inventory now lives in SQLite and is scoped per user (see store.js)
+
+const NICKNAMES = [
+  'you.scared016', "It's Dadudik <3", 'Отчимус Прайм', 'Dildos', 'beltoS1K7!',
+  'detriss', 'err0r то', 'Fuzya', 'NpOpS', 'shamelless', 'HOMELANDER',
+  'Fygooood', 'Zhenya', 'qwe', 'KOT', 'zxcVolodya2004', 'sinexx221', 'Kray'
+];
+
+const AVATARS = [
+  'https://avatars.steamstatic.com/6ee7f3e3312c196dbdb6bdd754a4e021abc16885_full.jpg',
+  'https://avatars.steamstatic.com/b62474de115ac86b1f76c65ee7821bc3a33aebcd_full.jpg',
+  'https://avatars.steamstatic.com/f4c7e12795942db02bf89508924f93f92ee40895_full.jpg',
+  'https://avatars.steamstatic.com/a91903aaf5442d0b774b9a85239914555d3d1614_full.jpg',
+  'https://avatars.steamstatic.com/fd5be41c9a765b8ccc16726ee7686d391031be40_full.jpg'
+];
+
+function generateDrop(id) {
+  const skin = SAMPLE_SKINS[Math.floor(Math.random() * SAMPLE_SKINS.length)];
+  const nick = NICKNAMES[Math.floor(Math.random() * NICKNAMES.length)];
+  const avatar = AVATARS[Math.floor(Math.random() * AVATARS.length)];
+  return {
+    id: String(id || Date.now() + Math.floor(Math.random() * 10000)),
+    item: {
+      id: skin.id,
+      marketName: skin.marketName,
+      price: skin.price,
+      image: skin.image,
+      rarity: skin.rarity === '14' ? 'covert' : 'classified',
+      exterior: 'FT'
+    },
+    user: {
+      id: String(Math.floor(Math.random() * 900000) + 100000),
+      nickname: nick,
+      image: avatar
+    }
+  };
+}
+
+let liveDropsList = Array.from({ length: 20 }, (_, i) => generateDrop(1000 + i));
+
+// Serve Custom Auth CSS & JS directly
+app.get('/custom-auth.css', (req, res) => {
+  res.sendFile(path.join(SITE_DIR, 'custom-auth.css'));
+});
+
+app.get('/custom-auth.js', (req, res) => {
+  res.sendFile(path.join(SITE_DIR, 'custom-auth.js'));
+});
+
+// Resolves (and if needed provisions) the user for this request.
+// Identity comes from the session cookie / bearer token, so every browser gets
+// its own balance + inventory. Falls back to a freshly generated demo id.
+function resolveUser(req) {
+  const cookies = parseCookies(req);
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
+  const candidates = [
+    cookies['caser_user_id'],
+    token ? token.replace(/^token_/, '') : null
+  ].filter(Boolean);
+
+  for (const id of candidates) {
+    const existing = store.getUser(id);
+    if (existing) return existing;
+  }
+
+  // No known identity yet: mint a stable demo account for this browser.
+  const id = candidates[0] || store.newId('player');
+  const user = store.ensureUser({
+    id,
+    nickname: 'CaserPlayer',
+    image: DEFAULT_AVATARS[0],
+    balance: START_BALANCE,
+    tradeUrl: 'https://steamcommunity.com/tradeoffer/new/?partner=12345678',
+    role: 'user'
+  });
+
+  if (req.res && typeof req.res.cookie === 'function') {
+    req.res.cookie('caser_user_id', user.id, { maxAge: 31536000000, path: '/' });
+    req.res.cookie('auth_flag', '1', { maxAge: 31536000000, path: '/' });
+  }
+  return user;
+}
+
+// ----------------------------------------------------
+// AUTH REST API Endpoints
+// ----------------------------------------------------
+
+app.post('/api/auth/session', (req, res) => {
+  const incoming = req.body || {};
+  if (!incoming.id) return res.status(400).json({ success: false, message: 'Invalid user data' });
+
+  const user = store.ensureUser({
+    id: incoming.id,
+    nickname: incoming.nickname || 'CaserPlayer',
+    image: incoming.image || DEFAULT_AVATARS[0],
+    // The client-sent balance is only honoured when the account is brand new
+    balance: incoming.balance ?? START_BALANCE,
+    tradeUrl: incoming.tradeUrl || null,
+    role: incoming.role || 'user'
+  });
+  res.cookie('caser_user_id', user.id, { maxAge: 31536000000, path: '/' });
+  res.cookie('auth_flag', '1', { maxAge: 31536000000, path: '/' });
+  res.json({ success: true, data: { ...user, balance: user.balance } });
+});
+
+app.post('/api/auth/login', (req, res) => {
+  const { username } = req.body || {};
+  const user = store.createUser({
+    id: store.newId('user'),
+    nickname: username || 'Player',
+    image: DEFAULT_AVATARS[0],
+    balance: START_BALANCE,
+    tradeUrl: 'https://steamcommunity.com/tradeoffer/new/?partner=12345678',
+    role: 'user'
+  });
+  res.cookie('caser_user_id', user.id, { maxAge: 31536000000, path: '/' });
+  res.cookie('auth_flag', '1', { maxAge: 31536000000, path: '/' });
+  res.json({ success: true, data: user, token: 'token_' + user.id });
+});
+
+app.post('/api/auth/register', (req, res) => {
+  const { username, image, balance } = req.body || {};
+  const user = store.createUser({
+    id: store.newId('user'),
+    nickname: username || 'ProGamer',
+    image: image || DEFAULT_AVATARS[0],
+    balance: parseFloat(balance) || START_BALANCE,
+    tradeUrl: 'https://steamcommunity.com/tradeoffer/new/?partner=12345678',
+    role: 'user'
+  });
+  res.cookie('caser_user_id', user.id, { maxAge: 31536000000, path: '/' });
+  res.cookie('auth_flag', '1', { maxAge: 31536000000, path: '/' });
+  res.json({ success: true, data: user, token: 'token_' + user.id });
+});
+
+app.post('/api/users/balance/topup', (req, res) => {
+  const user = resolveUser(req);
+  const amount = parseFloat(req.body && req.body.amount) || 5000;
+  const balance = store.addBalance(user.id, amount, 'topup', { amount }) ?? user.balance;
+  pushBalance({ ...user, balance });
+  res.json({ success: true, balance });
+});
+
+const handleLogout = (req, res) => {
+  res.clearCookie('caser_user_id');
+  res.clearCookie('auth_flag');
+  res.json({ success: true });
+};
+app.post('/api/auth/logout', handleLogout);
+app.post('/users/auth/logout', handleLogout);
+app.post('/api/users/auth/logout', handleLogout);
+
+const handleSteamRedirect = (req, res) => {
+  const demoToken = 'token_demo_' + Date.now().toString(36);
+  const demoUser = {
+    id: 'user_demo',
+    nickname: 'CaserPlayer',
+    image: DEFAULT_AVATARS[0],
+    balance: START_BALANCE,
+    role: 'user'
+  };
+  const b64Token = Buffer.from(demoToken).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  res.json({
+    redirect: `/ru?auth=${b64Token}`
+  });
+};
+app.get('/api/users/auth/steam/redirect-url', handleSteamRedirect);
+app.get('/users/auth/steam/redirect-url', handleSteamRedirect);
+
+const handleRefresh = (req, res) => {
+  const user = resolveUser(req);
+  const token = user ? 'token_' + user.id : 'token_guest';
+  res.json({
+    token: token,
+    refreshToken: 'refresh_' + token
+  });
+};
+app.post('/api/users/auth/refresh', handleRefresh);
+app.post('/users/auth/refresh', handleRefresh);
+
+const handleUsersMe = (req, res) => {
+  const user = resolveUser(req);
+  if (!user) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+  res.json({
+    id: user.id,
+    nickname: user.nickname,
+    image: user.image || DEFAULT_AVATARS[0],
+    balance: String(user.balance ?? START_BALANCE),
+    tradeUrl: user.tradeUrl || 'https://steamcommunity.com/tradeoffer/new/?partner=12345678',
+    role: user.role || 'user'
+  });
+};
+app.get('/api/users/me', handleUsersMe);
+app.get('/users/me', handleUsersMe);
+
+app.post('/api/users/pwa-installed', (req, res) => res.json({ success: true }));
+app.post('/users/pwa-installed', (req, res) => res.json({ success: true }));
+
+// ----------------------------------------------------
+// CASE DETAILS & OPENING REST API Endpoints
+// ----------------------------------------------------
+
+async function fetchCaseData(slug) {
+  const cachePath = path.join(CACHE_DIR, `${slug}.json`);
+  if (fs.existsSync(cachePath)) {
+    try {
+      return JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+    } catch (e) {}
+  }
+
+  // Try fetching from remote CDN
+  try {
+    const data = await new Promise((resolve, reject) => {
+      https.get(`${REMOTE_CDN}/api/game/cases/${slug}`, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (resp) => {
+        if (resp.statusCode === 200) {
+          let body = '';
+          resp.on('data', chunk => body += chunk);
+          resp.on('end', () => {
+            try { resolve(JSON.parse(body)); } catch (err) { reject(err); }
+          });
+        } else {
+          reject(new Error('Status ' + resp.statusCode));
+        }
+      }).on('error', reject);
+    });
+
+    if (data && data.case) {
+      fs.writeFileSync(cachePath, JSON.stringify(data, null, 2));
+      return data;
+    }
+  } catch (err) {
+    console.warn(`Could not fetch remote case ${slug}:`, err.message);
+  }
+
+  // Fallback synthesis from cases.json
+  const foundCase = casesData.find(c => c.slug === slug) || {
+    id: '999',
+    title: slug.charAt(0).toUpperCase() + slug.slice(1),
+    slug: slug,
+    price: '100.000',
+    image: '/cases/1611ed2e67dfcd18662d9d574b77a45e-6ab6460cd5709.webp'
+  };
+
+  const synthesized = {
+    case: {
+      ...foundCase,
+      type: 'paid',
+      prices: [
+        { count: 1, price: foundCase.price },
+        { count: 2, price: String(parseFloat(foundCase.price) * 2) },
+        { count: 3, price: String(parseFloat(foundCase.price) * 3) }
+      ],
+      status: 'active',
+      total_opens: 9740506,
+      max_opens_at_once: 6
+    },
+    items: SAMPLE_SKINS.map((s, idx) => ({
+      id: String(100 + idx),
+      appId: 730,
+      marketName: s.marketName,
+      price: String(s.price),
+      image: s.image,
+      weapon: s.weapon,
+      skin: s.skin,
+      exterior: s.exterior,
+      stattrak: false,
+      type: "16",
+      rarity: s.rarity
+    }))
+  };
+
+  fs.writeFileSync(cachePath, JSON.stringify(synthesized, null, 2));
+  return synthesized;
+}
+
+const handleGetCaseDetails = async (req, res) => {
+  const slug = req.params.slug;
+  try {
+    const data = await fetchCaseData(slug);
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load case data' });
+  }
+};
+
+app.get('/api/game/cases/:slug', handleGetCaseDetails);
+app.get('/game/cases/:slug', handleGetCaseDetails);
+
+// Case Opening Handler
+const handleOpenCase = async (req, res) => {
+  const slug = req.params.slug;
+  const count = Math.max(1, Math.min(6, parseInt(req.body?.count) || 1));
+  const user = resolveUser(req);
+
+  try {
+    const caseData = await fetchCaseData(slug);
+    const casePrice = parseFloat(caseData.case?.price || 100);
+    const totalCost = casePrice * count;
+
+    // Not enough funds -> refuse before touching anything
+    if ((parseFloat(user.balance) || 0) < totalCost) {
+      return res.status(400).json({
+        success: false,
+        message: 'Insufficient balance',
+        balance: parseFloat(user.balance) || 0
+      });
+    }
+
+    // The price is taken the moment the roll starts, before the animation
+    let balance = store.addBalance(user.id, -totalCost, 'case_open', { slug, count }) ?? user.balance;
+
+    const wonItems = [];
+    const createdEntries = [];
+    // Only roll items that actually have a picture, otherwise the roulette
+    // and the reveal card would fall back to the generic logo placeholder.
+    const caseItems = Array.isArray(caseData.items) ? caseData.items : [];
+    const drawableItems = caseItems.filter((it) => it && typeof it.image === 'string' && it.image.trim());
+    const dropPool = drawableItems.length ? drawableItems : SAMPLE_SKINS;
+
+    for (let i = 0; i < count; i++) {
+      // Pick item from case pool
+      const won = dropPool[crypto.randomInt(0, dropPool.length)];
+      const marketName = won.marketName || won.name || 'AK-47 | Redline';
+      const price = String(won.price ?? 1500);
+
+      // Flat item payload: the client renders the roulette winner card and the
+      // "you won" card straight from these fields (image / marketName / rarity).
+      const flatItem = {
+        id: String(won.id ?? ''),
+        appId: 730,
+        marketName,
+        name: marketName,
+        price,
+        image: won.image,
+        weapon: won.weapon ?? null,
+        skin: won.skin ?? null,
+        exterior: won.exterior ?? null,
+        stattrak: won.stattrak ?? false,
+        type: won.type ?? null,
+        chance: won.chance ?? null,
+        rarity: won.rarity || '14'
+      };
+
+      const itemInstance = {
+        ...flatItem,
+        id: store.newId('won'),
+        price,
+        item: flatItem
+      };
+
+      wonItems.push(itemInstance);
+
+      // Add to this user's inventory
+      const entry = store.addInventoryItem(user.id, {
+        id: itemInstance.id,
+        price: parseFloat(itemInstance.price),
+        status: 'available',
+        canSell: true,
+        canUpgrade: true,
+        item: flatItem
+      });
+      createdEntries.push(entry);
+    }
+
+    store.recordCaseOpen(user.id, slug, totalCost, wonItems.map((w) => w.marketName));
+
+    // Tell the client about the new drops so the sell buttons light up and
+    // the header balance refreshes without a reload
+    pushNewItems(createdEntries);
+    pushBalance({ ...user, balance });
+
+    res.json({
+      items: wonItems,
+      balance,
+      case_stats: {
+        total_opens: (caseData.case?.total_opens || 9740506) + count
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to open case: ' + err.message });
+  }
+};
+
+app.post('/api/game/cases/:slug/open', handleOpenCase);
+app.post('/game/cases/:slug/open', handleOpenCase);
+
+// ----------------------------------------------------
+// GAME & CONTENT REST API Endpoints
+// ----------------------------------------------------
+
+app.get('/api/statistics', (req, res) => {
+  const online = 3850 + Math.floor(Math.sin(Date.now() / 20000) * 35) + Math.floor(Math.random() * 10);
+  res.json({
+    online: online,
+    users_count: 412589,
+    cases_opened: 1542380,
+    upgrader_count: 894120
+  });
+});
+
+app.get('/api/live-drops', (req, res) => {
+  res.json({
+    liveDrops: liveDropsList,
+    hotDrops: liveDropsList.filter(d => d.item.rarity === 'covert' || d.item.rarity === 'extraordinary')
+  });
+});
+
+app.get('/api/game/cases', (req, res) => {
+  res.json({
+    cases: casesData
+  });
+});
+app.get('/game/cases', (req, res) => {
+  res.json({
+    cases: casesData
+  });
+});
+
+app.get('/api/game/free-cases', (req, res) => res.json({ cases: [] }));
+app.get('/game/free-cases', (req, res) => res.json({ cases: [] }));
+
+app.get('/api/game/giveaways/winners', (req, res) => res.json({ winners: [] }));
+app.get('/game/giveaways/winners', (req, res) => res.json({ winners: [] }));
+
+// Shop catalogue = every distinct skin known to the server (all cached cases + samples)
+const SHOP_ITEMS = buildShopCatalogue();
+
+const toShopPayload = (s) => {
+  const rarity = Number(s.rarity);
+  const type = Number(s.type);
+  const exterior = Number(s.exterior);
+  const weapon = Number(s.weapon);
+  const extra = {};
+  if (Number.isFinite(rarity)) extra.r = rarity;
+  if (Number.isFinite(type)) extra.t = type;
+  if (Number.isFinite(exterior)) extra.e = exterior;
+  if (Number.isFinite(weapon)) extra.g = weapon;
+  if (typeof s.stattrak === 'boolean') extra.st = s.stattrak;
+  if (s.skin) extra.n = s.skin;
+
+  return {
+    id: String(s.id),
+    appId: s.appId ?? 730,
+    marketName: s.marketName,
+    price: parseFloat(s.price) || 0,
+    image: s.image,
+    rarity: s.rarity ?? null,
+    type: s.type ?? null,
+    exterior: s.exterior ?? null,
+    weapon: s.weapon ?? null,
+    stattrak: s.stattrak ?? null,
+    skin: s.skin ?? null,
+    status: 'available',
+    item: {
+      id: String(s.id),
+      appId: s.appId ?? 730,
+      marketName: s.marketName,
+      price: parseFloat(s.price) || 0,
+      image: s.image,
+      extra
+    }
+  };
+};
+
+// Paginated / filtered / sorted shop endpoint (used by the upgrade target picker)
+function handleShop(req, res) {
+  const q = req.query || {};
+  const limit = Math.min(200, Math.max(1, parseInt(q.limit) || 16));
+  const offset = Math.max(0, parseInt(q.offset) || 0);
+
+  const priceFrom = parseFloat(q.priceFrom);
+  const priceTo = parseFloat(q.priceTo);
+  const search = typeof q.marketName === 'string' ? q.marketName.trim().toLowerCase() : '';
+  const status = typeof q.status === 'string' ? q.status : '';
+
+  let list = SHOP_ITEMS;
+  if (Number.isFinite(priceFrom)) list = list.filter((i) => i.price >= priceFrom);
+  if (Number.isFinite(priceTo)) list = list.filter((i) => i.price <= priceTo);
+  if (search) list = list.filter((i) => i.marketName.toLowerCase().includes(search));
+  if (status === 'available') list = list.filter(() => true);
+
+  const dir = String(q.sortDirection || 'ASC').toUpperCase() === 'DESC' ? -1 : 1;
+  const sortBy = String(q.sortBy || 'price');
+  list = [...list].sort((a, b) => {
+    if (sortBy === 'marketName' || sortBy === 'name') return dir * a.marketName.localeCompare(b.marketName);
+    if (sortBy === 'rarity') return dir * ((Number(a.rarity) || 0) - (Number(b.rarity) || 0));
+    return dir * (a.price - b.price);
+  });
+
+  const page = list.slice(offset, offset + limit);
+  res.json({
+    items: page.map(toShopPayload),
+    total: list.length,
+    hasMore: offset + page.length < list.length
+  });
+}
+
+app.get('/api/items/shop', handleShop);
+app.get('/items/shop', handleShop);
+app.get('/api/game/items/shop', handleShop);
+
+// Upgrade target picker: same catalogue, but the client only ever fetches
+// /items/shop, so expose an explicit alias too.
+app.get('/api/items/shop/list', handleShop);
+app.get('/api/upgrade/shop', handleShop);
+
+// ---------------------------------------------------------
+// WEBSOCKET BROADCAST HELPERS
+// The client listens for these native events, so the UI updates
+// without a page reload:
+//   users.update_balance          -> header balance
+//   users.update_inventory_balance-> inventory balance widget
+//   inventory.new_items           -> "just dropped" items (sell buttons)
+// ---------------------------------------------------------
+function wsBroadcast(event, data) {
+  const payload = JSON.stringify({ event, data });
+  for (const client of wss.clients) {
+    if (client.readyState === WebSocket.OPEN) {
+      try { client.send(payload); } catch (e) { /* ignore */ }
+    }
+  }
+}
+
+function pushBalance(user) {
+  if (!user) return;
+  const amount = parseFloat(user.balance) || 0;
+  wsBroadcast('users.update_balance', amount);
+  wsBroadcast('users.update_inventory_balance', { amount: amount.toFixed(2) });
+}
+
+function pushNewItems(items) {
+  if (!Array.isArray(items) || !items.length) return;
+  wsBroadcast('inventory.new_items', { items: items.map((i) => ({ id: String(i.id) })) });
+}
+
+const inventoryBalancePayload = (user) => {
+  const amount = parseFloat((user && user.balance) || START_BALANCE) || 0;
+  const payload = { amount: amount.toFixed(2), balance: amount.toFixed(2), defuses: amount };
+  // The api client exposes the raw body as `res.data`, and the client reads
+  // `res.data.amount` -> the value must sit at the TOP level of the response.
+  return { ...payload, success: true, data: payload };
+};
+
+const handleInventory = (req, res) => {
+  const user = resolveUser(req);
+  const q = req.query || {};
+  const limit = Math.min(200, Math.max(1, parseInt(q.limit) || 28));
+  const offset = Math.max(0, parseInt(q.offset) || 0);
+  const status = q.status === 'available' ? 'available' : null;
+
+  const total = store.countInventory(user.id, status);
+  let page = store.listInventory(user.id, { limit, offset, status });
+
+  const dir = String(q.sortDirection || 'DESC').toUpperCase() === 'ASC' ? 1 : -1;
+  if (String(q.sortBy || 'created_at') === 'price') {
+    page = [...page].sort((a, b) => dir * ((parseFloat(a.price) || 0) - (parseFloat(b.price) || 0)));
+  }
+
+  res.json({
+    items: page,
+    total,
+    hasMore: offset + page.length < total,
+    nextOffset: offset + page.length
+  });
+};
+app.get('/api/items/inventory', handleInventory);
+app.get('/items/inventory', handleInventory);
+
+const handleInventoryBalance = (req, res) => {
+  const user = resolveUser(req);
+  res.json(inventoryBalancePayload(store.getUser(user.id) || user));
+};
+app.get('/api/items/inventory/balance', handleInventoryBalance);
+app.get('/items/inventory/balance', handleInventoryBalance);
+
+// Preview for the "sell all" confirmation modal
+const handleSellAllPreview = (req, res) => {
+  const user = resolveUser(req);
+  const payload = {
+    itemsCount: store.countInventory(user.id, 'available'),
+    totalAmount: store.totalInventoryValue(user.id)
+  };
+  res.json({ ...payload, success: true, data: payload });
+};
+app.get('/api/items/inventory/sell-all/preview', handleSellAllPreview);
+app.get('/items/inventory/sell-all/preview', handleSellAllPreview);
+
+// Deletes the entries from SQLite and credits the wallet
+function sellInventoryEntries(user, entries) {
+  if (!entries.length) return { totalAmount: 0, balance: user.balance };
+
+  const totalAmount = Number(
+    entries.reduce((acc, e) => acc + (parseFloat(e.price) || 0), 0).toFixed(2)
+  );
+  store.removeInventoryItems(user.id, entries.map((e) => e.id));
+  const balance = store.addBalance(user.id, totalAmount, 'sell', {
+    items: entries.map((e) => e.item && e.item.marketName).filter(Boolean)
+  });
+
+  return { totalAmount, balance: balance ?? user.balance };
+}
+
+// Sell the given items (or everything when no ids are supplied)
+const handleSell = (req, res) => {
+  const user = resolveUser(req);
+  const body = req.body || {};
+  const ids = Array.isArray(body.inventoryItemIds) ? body.inventoryItemIds.map(String) : [];
+
+  let entries;
+  if (body.all === true || ids.length === 0) {
+    entries = store.listInventory(user.id, { limit: 500, status: 'available' });
+  } else {
+    entries = ids
+      .map((id) => store.getInventoryEntry(user.id, id))
+      .filter((e) => e && e.status === 'available');
+  }
+
+  const { totalAmount, balance } = sellInventoryEntries(user, entries);
+  pushBalance({ ...user, balance });
+
+  const payload = {
+    totalAmount,
+    itemsCount: entries.length,
+    soldIds: entries.map((i) => String(i.id)),
+    balance
+  };
+  // `totalAmount` must be top level: the client reads `res.data.totalAmount`
+  res.json({ ...payload, success: true, data: payload });
+};
+app.post('/api/items/inventory/sell', handleSell);
+app.post('/items/inventory/sell', handleSell);
+
+// "Sell everything" button on the inventory page
+const handleSellAll = (req, res) => {
+  const user = resolveUser(req);
+  const entries = store.listInventory(user.id, { limit: 500, status: 'available' });
+  const { totalAmount, balance } = sellInventoryEntries(user, entries);
+
+  pushBalance({ ...user, balance });
+
+  const payload = {
+    totalAmount,
+    itemsCount: entries.length,
+    soldIds: entries.map((i) => String(i.id)),
+    balance
+  };
+  res.json({ ...payload, success: true, data: payload });
+};
+app.post('/api/items/inventory/sell-all', handleSellAll);
+app.post('/items/inventory/sell-all', handleSellAll);
+
+// Balance history (the header already has a modal for it)
+app.get('/api/users/balance/history', (req, res) => {
+  const user = resolveUser(req);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+  const offset = Math.max(0, parseInt(req.query.offset) || 0);
+  const rows = store.listTransactions(user.id, limit, offset).map((t) => ({
+    id: String(t.id),
+    type: t.type,
+    delta: Number(t.delta || 0),
+    balanceAfter: Number(t.balance_after || 0),
+    createdAt: t.created_at
+  }));
+  res.json({ items: rows, total: rows.length, hasMore: rows.length === limit });
+});
+
+// Cryptographically-seeded uniform float in [0, 1)
+function randomUnit() {
+  return crypto.randomInt(0, 1e9) / 1e9;
+}
+
+// Shape expected by the client (useUpgradeBet in 2mwsxxmwyqhg9.js):
+//   { bet: { id, status: 'won'|'lost', wonItem/targetItem, betItems, isMystery, superDrop }, balance }
+const toBetItemPayload = (entry) => ({
+  id: String(entry.id),
+  price: entry.price,
+  status: entry.status || 'available',
+  canSell: entry.canSell !== false,
+  canUpgrade: entry.canUpgrade !== false,
+  item: entry.item
+});
+
+const handleUpgradeBet = (req, res) => {
+  const body = req.body || {};
+  const betInventoryItemIds = Array.isArray(body.betInventoryItemIds)
+    ? body.betInventoryItemIds.map(String)
+    : [];
+  const rawAddedBalance = Number(body.addedBalance);
+  const addedBalance = Number.isFinite(rawAddedBalance) && rawAddedBalance > 0 ? rawAddedBalance : 0;
+  const isMystery = !!body.isMystery;
+
+  const user = resolveUser(req);
+
+  // Target must exist in the full catalogue - never silently substitute another item
+  let target = null;
+  if (!isMystery) {
+    const wantedId = String(body.targetItemId ?? '');
+    target =
+      SHOP_ITEMS.find((s) => String(s.id) === wantedId) ||
+      SAMPLE_SKINS.find((s) => String(s.id) === wantedId) ||
+      null;
+    if (!target) return res.status(400).json({ message: 'Unknown target item' });
+  }
+
+  // Resolve (and consume) the real bet items from this user's inventory
+  const betEntries = betInventoryItemIds
+    .map((id) => store.getInventoryEntry(user.id, id))
+    .filter((e) => e && e.status === 'available');
+
+  const stake = betEntries.reduce((sum, i) => sum + (parseFloat(i.price) || 0), 0) + addedBalance;
+
+  const refund = () => {
+    for (const entry of betEntries) store.addInventoryItem(user.id, entry);
+  };
+
+  if (!(stake > 0)) {
+    refund();
+    return res.status(400).json({ message: 'Nothing to bet' });
+  }
+  if ((parseFloat(user.balance) || 0) + 1e-9 < addedBalance) {
+    refund();
+    return res.status(400).json({ message: 'Insufficient balance' });
+  }
+
+  // Items leave the inventory for good once the bet is accepted
+  store.removeInventoryItems(user.id, betEntries.map((e) => e.id));
+
+  const targetVal = target ? parseFloat(target.price) || 0 : 0;
+  // Chance = stake / targetPrice, matching the 1%..80% band the wheel UI accepts
+  const winChance = targetVal > 0 ? Math.min(0.8, Math.max(0.01, stake / targetVal)) : 0.5;
+  const roll = randomUnit();
+  const isWin = roll < winChance;
+
+  // Cash only moves by the addedBalance part; inventory value moves via items
+  let balance = user.balance;
+  if (addedBalance > 0) {
+    balance = store.addBalance(user.id, -addedBalance, 'upgrade', {
+      stake,
+      target: target ? target.marketName : null
+    }) ?? user.balance;
+  }
+
+  let wonEntry = null;
+  if (isWin) {
+    const prize = isMystery ? SHOP_ITEMS[crypto.randomInt(0, SHOP_ITEMS.length)] : target;
+    wonEntry = store.addInventoryItem(user.id, {
+      id: store.newId('inv'),
+      price: parseFloat(prize.price) || 0,
+      status: 'available',
+      canSell: true,
+      canUpgrade: true,
+      item: {
+        id: String(prize.id),
+        appId: prize.appId ?? 730,
+        marketName: prize.marketName,
+        price: parseFloat(prize.price) || 0,
+        image: prize.image,
+        weapon: prize.weapon ?? null,
+        skin: prize.skin ?? null,
+        exterior: prize.exterior ?? null,
+        stattrak: prize.stattrak ?? false,
+        type: prize.type ?? null,
+        rarity: prize.rarity ?? '14'
+      }
+    });
+  }
+
+  // Live UI updates: balance + the freshly won item
+  pushBalance({ ...user, balance });
+  if (wonEntry) pushNewItems([wonEntry]);
+
+  const bet = {
+    id: store.newId('bet'),
+    status: isWin ? 'won' : 'lost',
+    isMystery,
+    superDrop: null,
+    targetItem: target,
+    wonItem: wonEntry ? wonEntry.item : null,
+    betItems: betEntries.map(toBetItemPayload),
+    stake,
+    addedBalance,
+    winChance: winChance * 100,
+    roll: roll * 100
+  };
+
+  res.json({ bet, balance });
+};
+app.post('/api/game/upgrade/bet', handleUpgradeBet);
+app.post('/game/upgrade/bet', handleUpgradeBet);
+
+app.get('/api/users/notifications/unread/count', (req, res) => res.json({ count: 0 }));
+app.post('/api/handshake', (req, res) => res.json({ status: 'ok' }));
+
+app.get('/api/game/giveaways', (req, res) => {
+  res.json([
+    { id: '1', cadence: 'hourly', prize: SAMPLE_SKINS[0], minDeposit: 600, participants: 38 },
+    { id: '2', cadence: 'daily', prize: SAMPLE_SKINS[3], minDeposit: 2000, participants: 417 },
+    { id: '3', cadence: 'weekly', prize: SAMPLE_SKINS[1], minDeposit: 5000, participants: 6621 }
+  ]);
+});
+
+app.get('/api/game/weekly-drops/current', (req, res) => res.json({ drops: [] }));
+app.get('/api/game/weekly-drops/top-feed', (req, res) => res.json({ feed: [] }));
+app.get('/api/payments/categories', (req, res) => res.json([]));
+app.get('/api/fingerprint-pro/required', (req, res) => res.json({ required: false }));
+
+// Proxy helper for missing remote assets
+function proxyFromOrigin(reqPath, res) {
+  const remoteUrl = REMOTE_CDN + reqPath;
+  https.get(remoteUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (proxyRes) => {
+    if (proxyRes.statusCode === 200) {
+      res.writeHead(200, {
+        'Content-Type': proxyRes.headers['content-type'] || 'application/octet-stream',
+        'Cache-Control': 'public, max-age=86400'
+      });
+      const localFile = path.join(SITE_DIR, reqPath.replace(/^\//, '').split('?')[0]);
+      try {
+        fs.mkdirSync(path.dirname(localFile), { recursive: true });
+        const fileStream = fs.createWriteStream(localFile);
+        proxyRes.pipe(fileStream);
+      } catch (err) {}
+      proxyRes.pipe(res);
+    } else {
+      res.status(proxyRes.statusCode || 404).send('Not found');
+    }
+  }).on('error', () => {
+    res.status(404).send('Asset not found');
+  });
+}
+
+// Serve HTML with custom authentication injected
+function sendInjectedHtml(filePath, res, slug) {
+  try {
+    let content = fs.readFileSync(filePath, 'utf8');
+    if (slug) {
+      content = content.split('egg').join(slug);
+      content = content.split('Egg').join(slug.charAt(0).toUpperCase() + slug.slice(1));
+    }
+    const injection = `
+<!-- Caser Custom Auth & UI Enhancement -->
+<script>
+(function() {
+  try {
+    if (!localStorage.getItem("caser_user") || !localStorage.getItem("user")) {
+      // Every browser gets its own account so balances and inventories
+      // are not shared between visitors.
+      var uid = "player_" + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+      var u = {
+        id: uid,
+        nickname: "CaserPlayer",
+        image: "https://avatars.steamstatic.com/6ee7f3e3312c196dbdb6bdd754a4e021abc16885_full.jpg",
+        balance: ${START_BALANCE},
+        tradeUrl: "https://steamcommunity.com/tradeoffer/new/?partner=12345678",
+        role: "user"
+      };
+      localStorage.setItem("cookieConsent", "accepted");
+      localStorage.setItem("caser_user", JSON.stringify(u));
+      localStorage.setItem("auth_token", "token_" + u.id);
+      localStorage.setItem("refresh_token", "refresh_" + u.id);
+      localStorage.setItem("user", JSON.stringify({
+        state: {
+          user: u,
+          token: "token_" + u.id,
+          refreshToken: "refresh_" + u.id,
+          isAuthenticated: true,
+          isLoading: false
+        },
+        version: 0
+      }));
+      document.cookie = "auth_flag=1; path=/; max-age=31536000";
+      document.cookie = "caser_user_id=" + u.id + "; path=/; max-age=31536000";
+    }
+  } catch(e) {}
+})();
+</script>
+<link rel="stylesheet" href="/custom-auth.css">
+<script src="/custom-auth.js" defer></script>
+</head>`;
+    content = content.replace('</head>', injection);
+    res.type('html').send(content);
+  } catch (err) {
+    res.status(500).send('Error loading page: ' + err.message);
+  }
+}
+
+// Static asset handler with automatic fallback proxy
+app.use((req, res, next) => {
+  const cleanPath = req.path.split('?')[0];
+
+  // 1. Exact file candidate (images, webp, js chunks, css, fonts) - Serve first!
+  const fileCandidate = path.join(SITE_DIR, cleanPath.replace(/^\//, ''));
+  if (fs.existsSync(fileCandidate) && fs.statSync(fileCandidate).isFile()) {
+    if (fileCandidate.endsWith('.html')) {
+      return sendInjectedHtml(fileCandidate, res);
+    }
+    // High-performance cache headers
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    return res.sendFile(fileCandidate);
+  }
+
+  // 2. Alternative static location (/cdn/fa/...)
+  const cdnFaCandidate = path.join(SITE_DIR, 'cdn/fa', cleanPath.replace(/^\//, ''));
+  if (fs.existsSync(cdnFaCandidate) && fs.statSync(cdnFaCandidate).isFile()) {
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    return res.sendFile(cdnFaCandidate);
+  }
+
+  // 3. Specific Case dynamic HTML page (only non-file slugs without dots!)
+  const caseMatch = cleanPath.match(/^\/(?:ru|en)?\/?cases?\/([^\/]+)$/);
+  if (caseMatch && !caseMatch[1].includes('.')) {
+    const slug = caseMatch[1];
+    const caseTemplatePath = path.join(SITE_DIR, 'case_template.html');
+    if (fs.existsSync(caseTemplatePath)) {
+      return sendInjectedHtml(caseTemplatePath, res, slug);
+    }
+  }
+
+  // 4. Page routes
+  if (cleanPath === '/' || cleanPath === '/ru') {
+    return sendInjectedHtml(path.join(SITE_DIR, 'ru/index.html'), res);
+  }
+  if (cleanPath === '/en') {
+    return sendInjectedHtml(path.join(SITE_DIR, 'en/index.html'), res);
+  }
+  if (cleanPath === '/ru/cases' || cleanPath === '/cases' || cleanPath === '/ru/case' || cleanPath === '/case') {
+    return sendInjectedHtml(path.join(SITE_DIR, 'ru/cases/index.html'), res);
+  }
+  if (cleanPath === '/ru/inventory' || cleanPath === '/inventory') {
+    return sendInjectedHtml(path.join(SITE_DIR, 'ru/inventory/index.html'), res);
+  }
+  if (cleanPath === '/ru/rewards' || cleanPath === '/rewards') {
+    return sendInjectedHtml(path.join(SITE_DIR, 'ru/rewards/index.html'), res);
+  }
+
+  const pageCandidate = path.join(SITE_DIR, cleanPath.replace(/^\//, ''), 'index.html');
+  if (fs.existsSync(pageCandidate)) {
+    return sendInjectedHtml(pageCandidate, res);
+  }
+
+  // If path looks like an asset and not on disk, proxy and cache
+  if (cleanPath.startsWith('/_next/') || cleanPath.startsWith('/cdn/') || cleanPath.startsWith('/icons/') || cleanPath.startsWith('/images/') || cleanPath.startsWith('/cases/')) {
+    return proxyFromOrigin(cleanPath, res);
+  }
+
+  next();
+});
+
+// Fallback to ru/index.html
+app.use((req, res) => {
+  sendInjectedHtml(path.join(SITE_DIR, 'ru/index.html'), res);
+});
+
+// WebSocket Server for live drops & online counters
+wss.on('connection', (ws) => {
+  // Send initial counters
+  ws.send(JSON.stringify({
+    event: 'statistics.counters',
+    data: {
+      online: 3867 + Math.floor(Math.random() * 15),
+      users_count: 412589,
+      cases_opened: 1542380,
+      upgrader_count: 894120
+    }
+  }));
+
+  // Handle incoming messages
+  ws.on('message', (msg) => {
+    try {
+      const parsed = JSON.parse(msg.toString());
+      if (parsed.event === 'ping') {
+        ws.send(JSON.stringify({ event: 'pong' }));
+      }
+    } catch (e) {}
+  });
+
+  // Push new drops every 3 seconds
+  const dropInterval = setInterval(() => {
+    if (ws.readyState === WebSocket.OPEN) {
+      const newDrop = generateDrop();
+      liveDropsList.unshift(newDrop);
+      if (liveDropsList.length > 30) liveDropsList.pop();
+
+      ws.send(JSON.stringify({
+        event: 'live_drops.new',
+        data: newDrop
+      }));
+
+      // Fluctuate online
+      const currentOnline = 3850 + Math.floor(Math.sin(Date.now() / 20000) * 35) + Math.floor(Math.random() * 8);
+      ws.send(JSON.stringify({
+        event: 'statistics.counters',
+        data: {
+          online: currentOnline,
+          users_count: 412589 + Math.floor(Math.random() * 2),
+          cases_opened: 1542380 + Math.floor(Math.random() * 5),
+          upgrader_count: 894120 + Math.floor(Math.random() * 3)
+        }
+      }));
+    }
+  }, 3000);
+
+  ws.on('close', () => {
+    clearInterval(dropInterval);
+  });
+});
+
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`\n====================================================`);
+  console.log(`  Сайт успешно запущен и работает!`);
+  console.log(`  Откройте в браузере: http://localhost:${PORT}`);
+  console.log(`  Каталог кейсов:      http://localhost:${PORT}/ru/cases`);
+  console.log(`====================================================\n`);
+});

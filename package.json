@@ -1,0 +1,18 @@
+{
+  "name": "caser-clone",
+  "version": "1.0.0",
+  "description": "1-in-1 clone of caser.one with cases, upgrade wheel, inventory and custom auth",
+  "main": "server.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "compression": "^1.8.2",
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  }
+}

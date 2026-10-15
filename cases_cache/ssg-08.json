@@ -1,0 +1,362 @@
+{
+  "case": {
+    "id": "66",
+    "title": "SSG 08",
+    "slug": "ssg-08",
+    "image": "/cases/6bffbe8e5ec6f565363323e23d403ca2-69f239aae1c9b.webp",
+    "label": null,
+    "section": {
+      "slug": "arsenal",
+      "name": "Арсенал",
+      "position": 70
+    },
+    "type": "paid",
+    "price": "129.000",
+    "prices": [
+      {
+        "count": 1,
+        "price": "129.000"
+      },
+      {
+        "count": 2,
+        "price": "258.000"
+      },
+      {
+        "count": 3,
+        "price": "387.000"
+      },
+      {
+        "count": 4,
+        "price": "516.000"
+      },
+      {
+        "count": 5,
+        "price": "645.000"
+      },
+      {
+        "count": 6,
+        "price": "774.000"
+      }
+    ],
+    "status": "active",
+    "total_opens": 139700,
+    "max_opens_at_once": 6,
+    "open_limit": null,
+    "opens_remaining": null,
+    "time_limit": null
+  },
+  "items": [
+    {
+      "id": "4588",
+      "appId": 730,
+      "marketName": "SSG 08 | Lichen Dashed (Field-Tested)",
+      "price": "247.420",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLijZGwpR1I_829YKt_NM-HD3eV_uNztOh8QmflwEtx5zmGz9etcS-RaFUjXMAhQbUJt0HqlNfkP7y3sgXaiYhFyC2vkGoXuaCF8Zrv/360fx360f",
+      "weapon": "30",
+      "skin": "Lichen Dashed",
+      "exterior": "3",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "13"
+    },
+    {
+      "id": "3531",
+      "appId": 730,
+      "marketName": "SSG 08 | Turbo Peek (Field-Tested)",
+      "price": "1547.430",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLijZGwpR1Y-s29e6NSL-aWHHORyutJveRtRjy-20pz5DzRnoqucy-ePAR0CMAjRrYOsRe6wYLgMevh4wKL3o0TxC2s3H5XrnE8_hLO63A/360fx360f",
+      "weapon": "30",
+      "skin": "Turbo Peek",
+      "exterior": "3",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "12"
+    },
+    {
+      "id": "8129",
+      "appId": 730,
+      "marketName": "SSG 08 | Necropos (Minimal Wear)",
+      "price": "114.900",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLijZGwpR1Y-s29e6M9eM-dC2SCzv55o95lRi67gVN26m_VnomsdiqTZwB0W5R5E7UCuxe6lICyMO3i7lDWjt4XyHj_iypB8G81tA-y21Aw/360fx360f",
+      "weapon": "30",
+      "skin": "Necropos",
+      "exterior": "4",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "15"
+    },
+    {
+      "id": "2271",
+      "appId": 730,
+      "marketName": "SSG 08 | Ghost Crusader (Minimal Wear)",
+      "price": "209.680",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLijZGwpR1c_M29e6M9eM-SHGqRwuFktd5lRi67gVN_6jnQzYmhc3jFbgUoA5J3ReYIsRO8ktGyM-iz4AaMi4hDzyqsiSJJ8G81tKe_wmAg/360fx360f",
+      "weapon": "30",
+      "skin": "Ghost Crusader",
+      "exterior": "4",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "16"
+    },
+    {
+      "id": "2608",
+      "appId": 730,
+      "marketName": "SSG 08 | Rapid Transit (Minimal Wear)",
+      "price": "355.620",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLijZGwpR1I_PX-MJt5MvGdHW6E_vl-ufVscCW6khUz_WTSw479d3vDalIkCJNzFuIN4RHqw9K2P7nktQHf340Wyn-vh3wY7Sd1o7FV_lj0Yvg/360fx360f",
+      "weapon": "30",
+      "skin": "Rapid Transit",
+      "exterior": "4",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "16"
+    },
+    {
+      "id": "6035",
+      "appId": 730,
+      "marketName": "SSG 08 | Slashed (Field-Tested)",
+      "price": "114.900",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLijZGwpR1Y-s29e6M9eM-aA2qf0_p3vN5kSi26gBBp62XXyon_eHKXagYoC5ZwFLQNska7lIfiY-rgtVCN2IxExX_9h34buDErvbiGjEi-fQ/360fx360f",
+      "weapon": "30",
+      "skin": "Slashed",
+      "exterior": "3",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "15"
+    },
+    {
+      "id": "2701",
+      "appId": 730,
+      "marketName": "SSG 08 | Parallax (Field-Tested)",
+      "price": "332.130",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLijZGwpR1Y-s29e6M9eM-QBnWfzO9iueJWQiy3nAgq_W6Ewtr9IH2SO1UmDMB2TbNZtxa6xtLkNePlsgOMi4xHnyX3jC0bvX51o7FVIGQ4rk8/360fx360f",
+      "weapon": "30",
+      "skin": "Parallax",
+      "exterior": "3",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "16"
+    },
+    {
+      "id": "1537",
+      "appId": 730,
+      "marketName": "SSG 08 | Abyss (Minimal Wear)",
+      "price": "92.260",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLijZGwpR1a_s2ibbJkIeSbD2mvzedxuPUnH3_jzE1y4TvQyIr9JyieZlckCsRxF-8K50bsxN3gZOzktAzc2IJEzDK-0H1XlSI8xg/360fx360f",
+      "weapon": "30",
+      "skin": "Abyss",
+      "exterior": "4",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "15"
+    },
+    {
+      "id": "4764",
+      "appId": 730,
+      "marketName": "SSG 08 | Mayan Dreams (Field-Tested)",
+      "price": "572.840",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLijZGwpR1T9s2jab1sLs-XHGKRzP1JsvNoWSaMmBgjuiiI1NeuIimTZw4kCsR3TLIKsBXrmt21Numx4gPY2YlFyi__jyNNunpr6uwcEf1ypckCip0/360fx360f",
+      "weapon": "30",
+      "skin": "Mayan Dreams",
+      "exterior": "3",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "14"
+    },
+    {
+      "id": "1660",
+      "appId": 730,
+      "marketName": "SSG 08 | Acid Fade (Factory New)",
+      "price": "62.060",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLijZGwpR1a7s2oaaBoH_eBD3SDze94tN5lRi67gVN05G3QzI6pIn2UOAYhDJMjEeANsBbtlYC2ZbvltA2P2I5FyHmq2Hka8G81tCngBDgW/360fx360f",
+      "weapon": "30",
+      "skin": "Acid Fade",
+      "exterior": "2",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "15"
+    },
+    {
+      "id": "10766",
+      "appId": 730,
+      "marketName": "SSG 08 | Hand Brake (Field-Tested)",
+      "price": "48.650",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLijZGwpR1c_M29e6M9eM-QBmKTyutkj-xsSyCmmFNx4GzcmIqtJC7Fag4pWJYjROAN5BG8wIKyZuq3sgSIj4JFziqo2C1J8G81tOO_GNa2/360fx360f",
+      "weapon": "30",
+      "skin": "Hand Brake",
+      "exterior": "3",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "15"
+    },
+    {
+      "id": "12805",
+      "appId": 730,
+      "marketName": "SSG 08 | Mainframe 001 (Factory New)",
+      "price": "62.060",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLijZGwpR1Y-s29e6M9eM-eD26ex_x3veRWQyC0nQlptzjSntqgJS6Wbg5xDZVwTbUN5EO5ldWxYem04waP2IsUyX_5in4c6zErvbh54g-58w/360fx360f",
+      "weapon": "30",
+      "skin": "Mainframe 001",
+      "exterior": "2",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "15"
+    },
+    {
+      "id": "11924",
+      "appId": 730,
+      "marketName": "SSG 08 | Bloodshot (Field-Tested)",
+      "price": "1866.140",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLijZGwpR1Y-s29e6M9eM-HB2Sbzetkj-xsSyCmmFMk6mSBzYqudynGawYkDZsiFONbthbpkd3vNe_i7waK2I0QmCWs3y8a8G81tMKgh-SW/360fx360f",
+      "weapon": "30",
+      "skin": "Bloodshot",
+      "exterior": "3",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "12"
+    },
+    {
+      "id": "13981",
+      "appId": 730,
+      "marketName": "SSG 08 | Carbon Fiber (Minimal Wear)",
+      "price": "318.710",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLijZGwpR1a4s2tabZvL_6sCG6SxPxJvOhuRz39kU9y4GvVyYygdniXaVd0DMckQ-dZtRK-moe0Murl5lHZgosUzSuv2DQJsHj4wzVBbg/360fx360f",
+      "weapon": "30",
+      "skin": "Carbon Fiber",
+      "exterior": "4",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "14"
+    },
+    {
+      "id": "13773",
+      "appId": 730,
+      "marketName": "SSG 08 | Prey (Factory New)",
+      "price": "52.840",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLijZGwpR1I_820baZ_IfOSA1iCxOpJvOhuRz39zBwmt2mAyI6rInrGaVd1X5N0Re8OshO5mtbvMr7q5wGIg95BmSX5ijQJsHiun1hzCg/360fx360f",
+      "weapon": "30",
+      "skin": "Prey",
+      "exterior": "2",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "13"
+    },
+    {
+      "id": "15959",
+      "appId": 730,
+      "marketName": "Souvenir SSG 08 | Azure Glyph (Factory New)",
+      "price": "310.320",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLijZGwpR1c_M29e6M9eM-SAHKSyP1JvOhuRz39xERwsT_Sn4r6eHmeOAAlCZBxFrEP4BbpxtyxYbji7g3dg4lAnH372jQJsHi7hX5I-w/360fx360f",
+      "weapon": "30",
+      "skin": "Azure Glyph",
+      "exterior": "2",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "14"
+    },
+    {
+      "id": "1976",
+      "appId": 730,
+      "marketName": "SSG 08 | Spring Twilly (Field-Tested)",
+      "price": "151.810",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLijZGwpR1T9s26eqVkLvGBDW-Z1et1pN5uXSy2myIqtjmMj4K3J3KVPVUoCccjFuZe40O6l9HjP76051SIjoNBzn_82yoYv31j4ekCB71lpPPeEH9LBA/360fx360f",
+      "weapon": "30",
+      "skin": "Spring Twilly",
+      "exterior": "3",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "15"
+    },
+    {
+      "id": "12039",
+      "appId": 730,
+      "marketName": "SSG 08 | Orange Filigree (Field-Tested)",
+      "price": "1956.720",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLijZGwpR1T9s28bapSL-KSAGCV_uNztOh8Qmfnx0xz4Tzdzt6sc3PCbw90C5JxRLYMtRTpwdXhPrmz41PZjo8TmC-qkGoXuZn0zTTN/360fx360f",
+      "weapon": "30",
+      "skin": "Orange Filigree",
+      "exterior": "3",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "15"
+    },
+    {
+      "id": "1083",
+      "appId": 730,
+      "marketName": "SSG 08 | Zeno (Well-Worn)",
+      "price": "29.360",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLijZGwpR1c_PGmV75oLv-sHXSXkbZJveRtRjy-20104jnWm4ygeX6WPFJzXJMjR-UJ5xHpkN2yM77itlTXjthAnH38iH5XrnE8WiTvpu4/360fx360f",
+      "weapon": "30",
+      "skin": "Zeno",
+      "exterior": "5",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "15"
+    },
+    {
+      "id": "12389",
+      "appId": 730,
+      "marketName": "SSG 08 | Red Stone (Battle-Scarred)",
+      "price": "526.710",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLijZGwpR1I4M28fapoH-OHAWmV_uZzsfdwAXrlzBgjsGmHmIv8eX-Ta1dxXMMlQu8OtRntkdS1P-_rsweMi99Gn37gznQeLlgnsmA/360fx360f",
+      "weapon": "30",
+      "skin": "Red Stone",
+      "exterior": "1",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "13"
+    },
+    {
+      "id": "12520",
+      "appId": 730,
+      "marketName": "SSG 08 | Fever Dream (Factory New)",
+      "price": "330.450",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLijZGwpR1Y-s29e6M9eM-VC3GV09FyouRoQha_nBovp3PTmYmqJHmeb1N1CpJyFOZftkO8x9ezNOOztg2MjYwRyyWsjn4d7n1q_a9cBq7gpQcW/360fx360f",
+      "weapon": "30",
+      "skin": "Fever Dream",
+      "exterior": "2",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "16"
+    },
+    {
+      "id": "5437",
+      "appId": 730,
+      "marketName": "Souvenir SSG 08 | Tropical Storm (Field-Tested)",
+      "price": "1298.330",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLijZGwpR1I_82-aahgH-ObD2Of1tF7teVgWiT9wU935WuEzYuvciqQZg50WMAiRrIPtEK9lNGzMOjm4gzYjY8TxX2r3DQJsHh1uecplw/360fx360f",
+      "weapon": "30",
+      "skin": "Tropical Storm",
+      "exterior": "3",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "14"
+    },
+    {
+      "id": "2502",
+      "appId": 730,
+      "marketName": "SSG 08 | Dark Water (Field-Tested)",
+      "price": "351.420",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLijZGwpR1a4s20baZ_Ic-XD3Wb_uNztOh8Qme2zU5xsW3cytj9dnLEPQEhApQhF7Fc4BSwl4ezNuy07wHZg90Rn3j_kGoXubOr6m8C/360fx360f",
+      "weapon": "30",
+      "skin": "Dark Water",
+      "exterior": "3",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "15"
+    },
+    {
+      "id": "17004",
+      "appId": 730,
+      "marketName": "SSG 08 | Memorial (Factory New)",
+      "price": "85.550",
+      "image": "https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGIGz3UqlXOLrxM-vMGmW8VNxu5Dx60noTyLijZGwpR1I_PX-MJtvMuWHD2uZ0vpJvOhuRz39x0UlsWmEnt37IHyfaFAkWZR5RuALtRKxlYKxMLnn4leL3t5FmSv9ijQJsHj6GwByAQ/360fx360f",
+      "weapon": "30",
+      "skin": "Memorial",
+      "exterior": "2",
+      "stattrak": false,
+      "type": "16",
+      "rarity": "15"
+    }
+  ]
+}

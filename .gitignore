@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Local SQLite database (state lives here - never commit it)
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# Local env / secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Temp / local artifacts
+_tmp*
+*.out
+
+# ---------------------------------------------------------------------------
+# NOTE: do NOT ignore the static site payload.
+# cdn/, icons/, images/, cases/, fonts/, videos/, _next/, ru/, en/, cases_cache/,
+# index.html and case_template.html ARE the site and must be committed.
+# Render clones the repo and serves these files directly.
+# ---------------------------------------------------------------------------

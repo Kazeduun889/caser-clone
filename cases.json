@@ -1,0 +1,3027 @@
+{
+  "success": true,
+  "data": {
+    "cases": [
+      {
+        "id": "36",
+        "title": "Штык-нож M9",
+        "slug": "m9-bayonet",
+        "image": "/cases/48761f0f5caa82b7fe9fedb70181196d-69f2367b114a6.webp",
+        "label": null,
+        "section": {
+          "slug": "knife-case",
+          "name": "Ножевые",
+          "position": 60
+        },
+        "type": "paid",
+        "price": "79999.000",
+        "status": "active",
+        "total_opens": 1117,
+        "max_opens_at_once": 3,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "29",
+        "title": "Керамбит",
+        "slug": "karambit",
+        "image": "/cases/2c1e591d837487e13d005fc5bf39db7a-69f23610ce01a.webp",
+        "label": null,
+        "section": {
+          "slug": "knife-case",
+          "name": "Ножевые",
+          "position": 60
+        },
+        "type": "paid",
+        "price": "89999.000",
+        "status": "active",
+        "total_opens": 1342,
+        "max_opens_at_once": 3,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "62",
+        "title": "Скелетный нож",
+        "slug": "skeleton-knife",
+        "image": "/cases/ca442d2f03568f0594fa258b6e7d30d5-69f239941c9df.webp",
+        "label": null,
+        "section": {
+          "slug": "knife-case",
+          "name": "Ножевые",
+          "position": 60
+        },
+        "type": "paid",
+        "price": "27999.000",
+        "status": "active",
+        "total_opens": 3912,
+        "max_opens_at_once": 3,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "67",
+        "title": "Стилет",
+        "slug": "stiletto-knife",
+        "image": "/cases/567d08ad5cbbcb5f9ba825559a864beb-69f23a0f60270.webp",
+        "label": null,
+        "section": {
+          "slug": "knife-case",
+          "name": "Ножевые",
+          "position": 60
+        },
+        "type": "paid",
+        "price": "27999.000",
+        "status": "active",
+        "total_opens": 2758,
+        "max_opens_at_once": 3,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "11",
+        "title": "Нож-бабочка",
+        "slug": "butterfly-knife",
+        "image": "/cases/158a0a5aa7d2526049db9474852b21f2-69f2335465efd.webp",
+        "label": null,
+        "section": {
+          "slug": "knife-case",
+          "name": "Ножевые",
+          "position": 60
+        },
+        "type": "paid",
+        "price": "99999.000",
+        "status": "active",
+        "total_opens": 6239,
+        "max_opens_at_once": 3,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "94",
+        "title": "USP-S",
+        "slug": "usp-s",
+        "image": "/cases/04e86a66872c09afd0e09b18df9b6c90-69f23baf27777.webp",
+        "label": null,
+        "section": {
+          "slug": "arsenal",
+          "name": "Арсенал",
+          "position": 70
+        },
+        "type": "paid",
+        "price": "129.000",
+        "status": "active",
+        "total_opens": 731470,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "97",
+        "title": "Брелоки",
+        "slug": "charm",
+        "image": "/cases/dbb0ed9f0a27a5f0ab09124107bc4c58-69f2323b68792.webp",
+        "label": null,
+        "section": {
+          "slug": "arsenal",
+          "name": "Арсенал",
+          "position": 70
+        },
+        "type": "paid",
+        "price": "29.000",
+        "status": "active",
+        "total_opens": 4902878,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "3",
+        "title": "AK-47",
+        "slug": "ak-47",
+        "image": "/cases/9303cd477cfbd3ed268ea25ced90f667-69f232c387eb2.webp",
+        "label": null,
+        "section": {
+          "slug": "arsenal",
+          "name": "Арсенал",
+          "position": 70
+        },
+        "type": "paid",
+        "price": "279.000",
+        "status": "active",
+        "total_opens": 1256135,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "46",
+        "title": "P90",
+        "slug": "p90",
+        "image": "/cases/24e56d094e2ee3a140026ddb22428fed-69f2381b811c1.webp",
+        "label": null,
+        "section": {
+          "slug": "arsenal",
+          "name": "Арсенал",
+          "position": 70
+        },
+        "type": "paid",
+        "price": "99.000",
+        "status": "active",
+        "total_opens": 211993,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "17",
+        "title": "Desert Eagle",
+        "slug": "desert-eagle",
+        "image": "/cases/3b1684da1c025953e6c4677c18a13df0-69f234f0822ea.webp",
+        "label": null,
+        "section": {
+          "slug": "arsenal",
+          "name": "Арсенал",
+          "position": 70
+        },
+        "type": "paid",
+        "price": "149.000",
+        "status": "active",
+        "total_opens": 721203,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "4",
+        "title": "AWP",
+        "slug": "awp",
+        "image": "/cases/96f9926e17a26a01726883a799edb055-69f23338d2adb.webp",
+        "label": null,
+        "section": {
+          "slug": "arsenal",
+          "name": "Арсенал",
+          "position": 70
+        },
+        "type": "paid",
+        "price": "249.000",
+        "status": "active",
+        "total_opens": 1050903,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "26",
+        "title": "Glock-18",
+        "slug": "glock-18",
+        "image": "/cases/6989c4768643eeb52a4e2bc82ca7d8e6-69f235c48e4a1.webp",
+        "label": null,
+        "section": {
+          "slug": "arsenal",
+          "name": "Арсенал",
+          "position": 70
+        },
+        "type": "paid",
+        "price": "129.000",
+        "status": "active",
+        "total_opens": 383596,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "39",
+        "title": "Музыкальный Набор",
+        "slug": "music-kit",
+        "image": "/cases/ee15440187fbaaac2210e9ddcdb7345b-69f23691db5ed.webp",
+        "label": null,
+        "section": {
+          "slug": "arsenal",
+          "name": "Арсенал",
+          "position": 70
+        },
+        "type": "paid",
+        "price": "139.000",
+        "status": "active",
+        "total_opens": 213350,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "38",
+        "title": "MP9",
+        "slug": "mp9",
+        "image": "/cases/868b8fdaf91e7fc045efe76c32808015-69f2368da4583.webp",
+        "label": null,
+        "section": {
+          "slug": "arsenal",
+          "name": "Арсенал",
+          "position": 70
+        },
+        "type": "paid",
+        "price": "89.000",
+        "status": "active",
+        "total_opens": 239293,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "66",
+        "title": "SSG 08",
+        "slug": "ssg-08",
+        "image": "/cases/6bffbe8e5ec6f565363323e23d403ca2-69f239aae1c9b.webp",
+        "label": null,
+        "section": {
+          "slug": "arsenal",
+          "name": "Арсенал",
+          "position": 70
+        },
+        "type": "paid",
+        "price": "129.000",
+        "status": "active",
+        "total_opens": 139224,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "35",
+        "title": "M4A4",
+        "slug": "m4a4",
+        "image": "/cases/bc93540a4ffce5c1ef1d54cfe547a39a-69f2362b84d4c.webp",
+        "label": null,
+        "section": {
+          "slug": "arsenal",
+          "name": "Арсенал",
+          "position": 70
+        },
+        "type": "paid",
+        "price": "199.000",
+        "status": "active",
+        "total_opens": 438672,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "34",
+        "title": "M4A1-S",
+        "slug": "m4a1-s",
+        "image": "/cases/e8d062327361623afcb980c3a4e9cae2-69f236261cf9a.webp",
+        "label": null,
+        "section": {
+          "slug": "arsenal",
+          "name": "Арсенал",
+          "position": 70
+        },
+        "type": "paid",
+        "price": "179.000",
+        "status": "active",
+        "total_opens": 573661,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "37",
+        "title": "MAC-10",
+        "slug": "mac-10",
+        "image": "/cases/fb22654aa3c52cbb071baea9a80f138a-69f23680b5b5f.webp",
+        "label": null,
+        "section": {
+          "slug": "arsenal",
+          "name": "Арсенал",
+          "position": 70
+        },
+        "type": "paid",
+        "price": "69.000",
+        "status": "active",
+        "total_opens": 390900,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "2",
+        "title": "Агент",
+        "slug": "agent",
+        "image": "/cases/f99ad0d2b1db80443bfe97a12793559a-69f2329fb905d.webp",
+        "label": null,
+        "section": {
+          "slug": "arsenal",
+          "name": "Арсенал",
+          "position": 70
+        },
+        "type": "paid",
+        "price": "1799.000",
+        "status": "active",
+        "total_opens": 71045,
+        "max_opens_at_once": 4,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "27",
+        "title": "Перчаточный",
+        "slug": "gloves",
+        "image": "/cases/6a26f96b3db50d9e54063e66e94de104-69f235c7882a9.webp",
+        "label": null,
+        "section": {
+          "slug": "arsenal",
+          "name": "Арсенал",
+          "position": 70
+        },
+        "type": "paid",
+        "price": "13999.000",
+        "status": "active",
+        "total_opens": 3991,
+        "max_opens_at_once": 4,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "96",
+        "title": "Желтый",
+        "slug": "yellow",
+        "image": "/cases/79064f3139f208b1ef400db6c9255e49-69f235315a943.webp",
+        "label": null,
+        "section": {
+          "slug": "tsvetnaya-kollektsiya",
+          "name": "Цветная коллекция",
+          "position": 5
+        },
+        "type": "paid",
+        "price": "999.000",
+        "status": "active",
+        "total_opens": 1050407,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "32",
+        "title": "Красный",
+        "slug": "red",
+        "image": "/cases/f79c558f4e2a8ab0e6e7fe227d70d935-69f237b06945d.webp",
+        "label": null,
+        "section": {
+          "slug": "tsvetnaya-kollektsiya",
+          "name": "Цветная коллекция",
+          "position": 5
+        },
+        "type": "paid",
+        "price": "1999.000",
+        "status": "active",
+        "total_opens": 1022350,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "95",
+        "title": "Зеленый",
+        "slug": "green",
+        "image": "/cases/eabd3469fd7ec5bc96eb5f62d5c7bebd-69f2388edc437.webp",
+        "label": null,
+        "section": {
+          "slug": "tsvetnaya-kollektsiya",
+          "name": "Цветная коллекция",
+          "position": 5
+        },
+        "type": "paid",
+        "price": "799.000",
+        "status": "active",
+        "total_opens": 871329,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "12",
+        "title": "Черно-Белый",
+        "slug": "black-and-white",
+        "image": "/cases/65b6906326d6ca3fe91b7787945e6fca-69f2344781428.webp",
+        "label": null,
+        "section": {
+          "slug": "tsvetnaya-kollektsiya",
+          "name": "Цветная коллекция",
+          "position": 5
+        },
+        "type": "paid",
+        "price": "479.000",
+        "status": "active",
+        "total_opens": 1938774,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "61",
+        "title": "Синий",
+        "slug": "blue",
+        "image": "/cases/e1cf81011cdc5d8f318268b167fc0744-69f235527b7b2.webp",
+        "label": null,
+        "section": {
+          "slug": "tsvetnaya-kollektsiya",
+          "name": "Цветная коллекция",
+          "position": 5
+        },
+        "type": "paid",
+        "price": "1399.000",
+        "status": "active",
+        "total_opens": 864879,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "69",
+        "title": "Про-лига 2013",
+        "slug": "pro-league-2013",
+        "image": "/cases/46b96ae39571f212d0c2d8b22ad01d46-69f2388a9d172.webp",
+        "label": null,
+        "section": {
+          "slug": "special-series",
+          "name": "Специальная коллекция",
+          "position": 15
+        },
+        "type": "paid",
+        "price": "200.000",
+        "status": "active",
+        "total_opens": 1601739,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "72",
+        "title": "Мегаватт",
+        "slug": "megawatt",
+        "image": "/cases/14cc666a1b65e7036e6348426dc2c872-69f23687b3b1a.webp",
+        "label": null,
+        "section": {
+          "slug": "special-series",
+          "name": "Специальная коллекция",
+          "position": 15
+        },
+        "type": "paid",
+        "price": "400.000",
+        "status": "active",
+        "total_opens": 620067,
+        "max_opens_at_once": 5,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "71",
+        "title": "Операция «Инферно»",
+        "slug": "operation-inferno-weapon",
+        "image": "/cases/6a311f747e6799a0dc7c55df07c14596-69f2374ab04d4.webp",
+        "label": "Горячее",
+        "section": {
+          "slug": "special-series",
+          "name": "Специальная коллекция",
+          "position": 15
+        },
+        "type": "paid",
+        "price": "500.000",
+        "status": "active",
+        "total_opens": 702900,
+        "max_opens_at_once": 5,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "70",
+        "title": "Операция «Железный коготь»",
+        "slug": "operation-iron-claw",
+        "image": "/cases/70b43bc24e9d11a3aa42aea8d501bff8-69f2375ecb49d.webp",
+        "label": null,
+        "section": {
+          "slug": "special-series",
+          "name": "Специальная коллекция",
+          "position": 15
+        },
+        "type": "paid",
+        "price": "300.000",
+        "status": "active",
+        "total_opens": 952858,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "68",
+        "title": "Раскол",
+        "slug": "rift",
+        "image": "/cases/bb3577aa38e07744fb68f9cdac06eee3-69f238f1c31e5.webp",
+        "label": null,
+        "section": {
+          "slug": "special-series",
+          "name": "Специальная коллекция",
+          "position": 15
+        },
+        "type": "paid",
+        "price": "100.000",
+        "status": "active",
+        "total_opens": 3911794,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "8",
+        "title": "Сигма 2",
+        "slug": "sigma-2",
+        "image": "/cases/fc3fef7ae51030853dc1519ffe67ce28-69f24294597de.webp",
+        "label": null,
+        "section": {
+          "slug": "bomzh-keysy",
+          "name": "Дешевые",
+          "position": 20
+        },
+        "type": "paid",
+        "price": "55.000",
+        "status": "active",
+        "total_opens": 5404152,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "7",
+        "title": "Тесак",
+        "slug": "cleaver",
+        "image": "/cases/1ffae148b49584b49aa27aa70d5b7835-69f234302cf04.webp",
+        "label": null,
+        "section": {
+          "slug": "bomzh-keysy",
+          "name": "Дешевые",
+          "position": 20
+        },
+        "type": "paid",
+        "price": "29.000",
+        "status": "active",
+        "total_opens": 12647627,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "10",
+        "title": "Затмение",
+        "slug": "eclipse",
+        "image": "/cases/d6d17111fa4221ab2b32e37000ce9744-69f23542aa3a7.webp",
+        "label": null,
+        "section": {
+          "slug": "bomzh-keysy",
+          "name": "Дешевые",
+          "position": 20
+        },
+        "type": "paid",
+        "price": "79.000",
+        "status": "active",
+        "total_opens": 3964420,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "6",
+        "title": "Ответный удар",
+        "slug": "blowback",
+        "image": "/cases/f7fda6c32a481975511bd6d3eef48db1-69f2334d1b42c.webp",
+        "label": null,
+        "section": {
+          "slug": "bomzh-keysy",
+          "name": "Дешевые",
+          "position": 20
+        },
+        "type": "paid",
+        "price": "35.000",
+        "status": "active",
+        "total_opens": 11760776,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "9",
+        "title": "Сигма",
+        "slug": "sigma",
+        "image": "/cases/595e7542a01ede4e576695684139608f-69f239718a76a.webp",
+        "label": null,
+        "section": {
+          "slug": "bomzh-keysy",
+          "name": "Дешевые",
+          "position": 20
+        },
+        "type": "paid",
+        "price": "59.000",
+        "status": "active",
+        "total_opens": 3960785,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "18",
+        "title": "Волны",
+        "slug": "doppler",
+        "image": "/cases/fea9d5a9d6ff20e3ee673ec18991e0ac-69f234f757f4c.webp",
+        "label": null,
+        "section": {
+          "slug": "luxe",
+          "name": "Люкс",
+          "position": 40
+        },
+        "type": "paid",
+        "price": "34999.000",
+        "status": "active",
+        "total_opens": 42628,
+        "max_opens_at_once": 4,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "173",
+        "title": "Королевский",
+        "slug": "royal",
+        "image": "/cases/51ba8d51e692285d2ec52cfa511362b4-6aabfa0c9493a.webp",
+        "label": "NEW",
+        "section": {
+          "slug": "luxe",
+          "name": "Люкс",
+          "position": 40
+        },
+        "type": "paid",
+        "price": "299999.000",
+        "status": "active",
+        "total_opens": 12234,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "21",
+        "title": "Изумруд",
+        "slug": "emerald",
+        "image": "/cases/ff5b90d302dd650aac5b47b0a74572c2-69f2354d7b4e9.webp",
+        "label": null,
+        "section": {
+          "slug": "luxe",
+          "name": "Люкс",
+          "position": 40
+        },
+        "type": "paid",
+        "price": "129999.000",
+        "status": "active",
+        "total_opens": 3116,
+        "max_opens_at_once": 4,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "178",
+        "title": "Поверхностная закалка",
+        "slug": "case-hardened",
+        "image": "/cases/132d52bde28f41ac2806bd635c8bf1b2-6ab6702a0f3c9.webp",
+        "label": "NEW",
+        "section": {
+          "slug": "luxe",
+          "name": "Люкс",
+          "position": 40
+        },
+        "type": "paid",
+        "price": "40999.000",
+        "status": "active",
+        "total_opens": 4930,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "5",
+        "title": "Черная Жемчужина",
+        "slug": "black-pearl",
+        "image": "/cases/a571f1a3e498eb0676940c1506d9b689-69f2333d21999.webp",
+        "label": null,
+        "section": {
+          "slug": "luxe",
+          "name": "Люкс",
+          "position": 40
+        },
+        "type": "paid",
+        "price": "159999.000",
+        "status": "active",
+        "total_opens": 8237,
+        "max_opens_at_once": 4,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "93",
+        "title": "Ультрафиолет",
+        "slug": "ultraviolet",
+        "image": "/cases/ef4ae1f9a13533b9e1233185e836b7d0-69f23b9e1936c.webp",
+        "label": null,
+        "section": {
+          "slug": "luxe",
+          "name": "Люкс",
+          "position": 40
+        },
+        "type": "paid",
+        "price": "28999.000",
+        "status": "active",
+        "total_opens": 8662,
+        "max_opens_at_once": 4,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "57",
+        "title": "Рубиновый",
+        "slug": "ruby",
+        "image": "/cases/1d2da436498122f6a532473ac63e994d-69f238f6df0c9.webp",
+        "label": null,
+        "section": {
+          "slug": "luxe",
+          "name": "Люкс",
+          "position": 40
+        },
+        "type": "paid",
+        "price": "139999.000",
+        "status": "active",
+        "total_opens": 5559,
+        "max_opens_at_once": 4,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "58",
+        "title": "Сапфировый",
+        "slug": "sapphire",
+        "image": "/cases/ab145ee7a19df13574844f5c07eeadd5-69f238fbe3f2c.webp",
+        "label": null,
+        "section": {
+          "slug": "luxe",
+          "name": "Люкс",
+          "position": 40
+        },
+        "type": "paid",
+        "price": "119999.000",
+        "status": "active",
+        "total_opens": 3921,
+        "max_opens_at_once": 4,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "92",
+        "title": "Зуб Тигра",
+        "slug": "tiger-tooth",
+        "image": "/cases/5ca1f400bb3ae35371cddc0ee5634301-69f23b974eab6.webp",
+        "label": null,
+        "section": {
+          "slug": "luxe",
+          "name": "Люкс",
+          "position": 40
+        },
+        "type": "paid",
+        "price": "39999.000",
+        "status": "active",
+        "total_opens": 5056,
+        "max_opens_at_once": 4,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "176",
+        "title": "Дамасская сталь",
+        "slug": "damascus-steel",
+        "image": "/cases/42743f583f7310a8ec3c48dc36659cb1-6ab66f8665f9a.webp",
+        "label": "NEW",
+        "section": {
+          "slug": "luxe",
+          "name": "Люкс",
+          "position": 40
+        },
+        "type": "paid",
+        "price": "24999.000",
+        "status": "active",
+        "total_opens": 3299,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "33",
+        "title": "Легенды",
+        "slug": "lore",
+        "image": "/cases/cacb6e2503de919d69ed1058eb97ea72-69f2362317f8d.webp",
+        "label": null,
+        "section": {
+          "slug": "luxe",
+          "name": "Люкс",
+          "position": 40
+        },
+        "type": "paid",
+        "price": "28999.000",
+        "status": "active",
+        "total_opens": 17199,
+        "max_opens_at_once": 4,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "177",
+        "title": "Оригинальные ножи",
+        "slug": "vanilla",
+        "image": "/cases/f110aadc541ae3c0016d2fbdf87c3e7c-6ab66f68e1b31.webp",
+        "label": "NEW",
+        "section": {
+          "slug": "luxe",
+          "name": "Люкс",
+          "position": 40
+        },
+        "type": "paid",
+        "price": "19999.000",
+        "status": "active",
+        "total_opens": 9235,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "175",
+        "title": "Люксовые перчатки",
+        "slug": "luxury-gloves",
+        "image": "/cases/17c8718f6706b4daea547cc304afa58d-6ab6704a32b34.webp",
+        "label": "NEW",
+        "section": {
+          "slug": "luxe",
+          "name": "Люкс",
+          "position": 40
+        },
+        "type": "paid",
+        "price": "64999.000",
+        "status": "active",
+        "total_opens": 5032,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "14",
+        "title": "Кровавая Паутина",
+        "slug": "crimson-web",
+        "image": "/cases/2d880dc48e62a97e088aac10b778c0ce-69f234377d247.webp",
+        "label": null,
+        "section": {
+          "slug": "luxe",
+          "name": "Люкс",
+          "position": 40
+        },
+        "type": "paid",
+        "price": "29999.000",
+        "status": "active",
+        "total_opens": 6344,
+        "max_opens_at_once": 4,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "22",
+        "title": "Градиент",
+        "slug": "fade",
+        "image": "/cases/90c32d03f730344fd157d310d5d38db3-69f2355ce903d.webp",
+        "label": null,
+        "section": {
+          "slug": "luxe",
+          "name": "Люкс",
+          "position": 40
+        },
+        "type": "paid",
+        "price": "49999.000",
+        "status": "active",
+        "total_opens": 26764,
+        "max_opens_at_once": 4,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "47",
+        "title": "Премиум 1",
+        "slug": "premium-1",
+        "image": "/cases/df4d5606781c7891d5f313ab6f3e4479-69f2334902591.webp",
+        "label": null,
+        "section": {
+          "slug": "premium",
+          "name": "Премиум",
+          "position": 50
+        },
+        "type": "paid",
+        "price": "4999.000",
+        "status": "active",
+        "total_opens": 534568,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "49",
+        "title": "Премиум 3",
+        "slug": "premium-3",
+        "image": "/cases/e6074a82ec28cc6bb7b93779b5d3b07b-69f23caea4ecb.webp",
+        "label": null,
+        "section": {
+          "slug": "premium",
+          "name": "Премиум",
+          "position": 50
+        },
+        "type": "paid",
+        "price": "13999.000",
+        "status": "active",
+        "total_opens": 57844,
+        "max_opens_at_once": 4,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "48",
+        "title": "Премиум 2",
+        "slug": "premium-2",
+        "image": "/cases/128b2e480e986fef650c9335c7642951-69f23350a6ec1.webp",
+        "label": null,
+        "section": {
+          "slug": "premium",
+          "name": "Премиум",
+          "position": 50
+        },
+        "type": "paid",
+        "price": "8999.000",
+        "status": "active",
+        "total_opens": 131713,
+        "max_opens_at_once": 5,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "50",
+        "title": "Премиум 4",
+        "slug": "premium-4",
+        "image": "/cases/0727b1d4b460b96ed996f4dde9c47433-69f2381fb2a31.webp",
+        "label": null,
+        "section": {
+          "slug": "premium",
+          "name": "Премиум",
+          "position": 50
+        },
+        "type": "paid",
+        "price": "19999.000",
+        "status": "active",
+        "total_opens": 31542,
+        "max_opens_at_once": 3,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "51",
+        "title": "Премиум 5",
+        "slug": "premium-5",
+        "image": "/cases/b82d55f13d56134fa784033bf044612a-69f23ba8d1ae6.webp",
+        "label": null,
+        "section": {
+          "slug": "premium",
+          "name": "Премиум",
+          "position": 50
+        },
+        "type": "paid",
+        "price": "29999.000",
+        "status": "active",
+        "total_opens": 32902,
+        "max_opens_at_once": 2,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "81",
+        "title": "Коллекция «Ascent»",
+        "slug": "the-ascent-collection",
+        "image": "/cases/693fab58189d4a26ed6a386109f41510-69f23a65ebef3.webp",
+        "label": null,
+        "section": {
+          "slug": "collections",
+          "name": "Коллекции",
+          "position": 90
+        },
+        "type": "paid",
+        "price": "25.000",
+        "status": "active",
+        "total_opens": 3099015,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "82",
+        "title": "Коллекция «Boreal»",
+        "slug": "the-boreal-collection",
+        "image": "/cases/567bc6838b234a522d2cc433ac98799d-69f23a6d76907.webp",
+        "label": null,
+        "section": {
+          "slug": "collections",
+          "name": "Коллекции",
+          "position": 90
+        },
+        "type": "paid",
+        "price": "39.000",
+        "status": "active",
+        "total_opens": 785470,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "88",
+        "title": "Коллекция «Radiant»",
+        "slug": "the-radiant-collection",
+        "image": "/cases/1cffd4efea7383c1647f16a04452dd5c-69f23b7a38e8a.webp",
+        "label": null,
+        "section": {
+          "slug": "collections",
+          "name": "Коллекции",
+          "position": 90
+        },
+        "type": "paid",
+        "price": "42.000",
+        "status": "active",
+        "total_opens": 1115082,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "91",
+        "title": "Коллекция «Train 2025»",
+        "slug": "the-train-2025-collection",
+        "image": "/cases/cb4db267a54af245dcf8c3cd2598899c-69f23b8992657.webp",
+        "label": null,
+        "section": {
+          "slug": "collections",
+          "name": "Коллекции",
+          "position": 90
+        },
+        "type": "paid",
+        "price": "490.000",
+        "status": "active",
+        "total_opens": 116778,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "73",
+        "title": "Коллекция «Inferno 2018»",
+        "slug": "the-2018-inferno-collection",
+        "image": "/cases/eb211ffb3a32cb6cf48041b3ddb3b48e-69f23a179f243.webp",
+        "label": null,
+        "section": {
+          "slug": "collections",
+          "name": "Коллекции",
+          "position": 90
+        },
+        "type": "paid",
+        "price": "60.000",
+        "status": "active",
+        "total_opens": 500996,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "108",
+        "title": "Коллекция «Achroma»",
+        "slug": "the-achroma-collection",
+        "image": "/cases/654a9abf71c82068ca75bae413866bae-69f23a2acedc7.webp",
+        "label": null,
+        "section": {
+          "slug": "collections",
+          "name": "Коллекции",
+          "position": 90
+        },
+        "type": "paid",
+        "price": "79.000",
+        "status": "active",
+        "total_opens": 2087266,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "107",
+        "title": "Коллекция «Harlequin»",
+        "slug": "the-harlequin-collection",
+        "image": "/cases/3b42dca2ab9ff58f6bf8f78f63802820-69f23b6927dfb.webp",
+        "label": null,
+        "section": {
+          "slug": "collections",
+          "name": "Коллекции",
+          "position": 90
+        },
+        "type": "paid",
+        "price": "60.000",
+        "status": "active",
+        "total_opens": 3282470,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "79",
+        "title": "Коллекция «Ancient»",
+        "slug": "the-ancient-collection",
+        "image": "/cases/1eb0aa8d2a017c06629ca4ba8a1ed118-69f23a5dde42e.webp",
+        "label": null,
+        "section": {
+          "slug": "collections",
+          "name": "Коллекции",
+          "position": 90
+        },
+        "type": "paid",
+        "price": "3270.000",
+        "status": "active",
+        "total_opens": 16757,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "83",
+        "title": "Коллекция «Canals»",
+        "slug": "the-canals-collection",
+        "image": "/cases/e1e7ecaf23e5d5c3b6073eb8820c7a00-69f23a74038ea.webp",
+        "label": null,
+        "section": {
+          "slug": "collections",
+          "name": "Коллекции",
+          "position": 90
+        },
+        "type": "paid",
+        "price": "9000.000",
+        "status": "active",
+        "total_opens": 16144,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "90",
+        "title": "Коллекция «St. Marc»",
+        "slug": "the-st-marc-collection",
+        "image": "/cases/d05ad00460569b5693e4229796d4aecf-69f23b8209e4c.webp",
+        "label": null,
+        "section": {
+          "slug": "collections",
+          "name": "Коллекции",
+          "position": 90
+        },
+        "type": "paid",
+        "price": "20000.000",
+        "status": "active",
+        "total_opens": 28329,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "182",
+        "title": "Коллекция «Рассвет»",
+        "slug": "the-rising-sun-collection",
+        "image": "/cases/d1f3da26d90b0ffbfbacf66c22271f9d-6ab67089d2ff3.webp",
+        "label": "NEW",
+        "section": {
+          "slug": "collections",
+          "name": "Коллекции",
+          "position": 90
+        },
+        "type": "paid",
+        "price": "7999.000",
+        "status": "active",
+        "total_opens": 6874,
+        "max_opens_at_once": 7,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "179",
+        "title": "Коллекция «Cobblestone»",
+        "slug": "the-cobblestone-collection",
+        "image": "/cases/0b54e8fbee32e1380e603c262aa8fcaf-6ab670fae7d2e.webp",
+        "label": "NEW",
+        "section": {
+          "slug": "collections",
+          "name": "Коллекции",
+          "position": 90
+        },
+        "type": "paid",
+        "price": "28999.000",
+        "status": "active",
+        "total_opens": 8815,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "78",
+        "title": "Коллекция Vertigo 2021",
+        "slug": "the-2021-vertigo-collection",
+        "image": "/cases/662c97f90ea79712d3367d33822848bc-69f23a24b9e8c.webp",
+        "label": null,
+        "section": {
+          "slug": "collections",
+          "name": "Коллекции",
+          "position": 90
+        },
+        "type": "paid",
+        "price": "3500.000",
+        "status": "active",
+        "total_opens": 18920,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "84",
+        "title": "Коллекция «Control»",
+        "slug": "the-control-collection",
+        "image": "/cases/bc16df3b17a7ed938b39fe079d718e1c-69f23a78db52d.webp",
+        "label": null,
+        "section": {
+          "slug": "collections",
+          "name": "Коллекции",
+          "position": 90
+        },
+        "type": "paid",
+        "price": "4900.000",
+        "status": "active",
+        "total_opens": 60372,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "183",
+        "title": "Коллекция «Чик-чик»",
+        "slug": "the-chop-shop-collection",
+        "image": "/cases/7d7be2241de391c1fce018b8b11165f0-6ab670ae24d6c.webp",
+        "label": "NEW",
+        "section": {
+          "slug": "collections",
+          "name": "Коллекции",
+          "position": 90
+        },
+        "type": "paid",
+        "price": "8999.000",
+        "status": "active",
+        "total_opens": 4089,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "181",
+        "title": "Коллекция «Север»",
+        "slug": "the-norse-collection",
+        "image": "/cases/8805a3626ca1f9766e655641438ec632-6ab671129f2a2.webp",
+        "label": "NEW",
+        "section": {
+          "slug": "collections",
+          "name": "Коллекции",
+          "position": 90
+        },
+        "type": "paid",
+        "price": "44999.000",
+        "status": "active",
+        "total_opens": 5084,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "89",
+        "title": "Коллекция «Спорт и досуг»",
+        "slug": "the-sport-field-collection",
+        "image": "/cases/9e01e3e445b5afd793bd7560f8839d33-6ab6706a9f838.webp",
+        "label": "NEW",
+        "section": {
+          "slug": "collections",
+          "name": "Коллекции",
+          "position": 90
+        },
+        "type": "paid",
+        "price": "1499.000",
+        "status": "active",
+        "total_opens": 58255,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "80",
+        "title": "Коллекция «Anubis»",
+        "slug": "the-anubis-collection",
+        "image": "/cases/7d0e9e15031f9436298e737a8ebe042e-69f23a6242b28.webp",
+        "label": null,
+        "section": {
+          "slug": "collections",
+          "name": "Коллекции",
+          "position": 90
+        },
+        "type": "paid",
+        "price": "2900.000",
+        "status": "active",
+        "total_opens": 74611,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "180",
+        "title": "Коллекция «Боги и чудовища»",
+        "slug": "the-gods-and-monsters-collection",
+        "image": "/cases/fe4d63c6ea48f3965ff5330b9aa30d08-6ab670cca64fd.webp",
+        "label": "NEW",
+        "section": {
+          "slug": "collections",
+          "name": "Коллекции",
+          "position": 90
+        },
+        "type": "paid",
+        "price": "19999.000",
+        "status": "active",
+        "total_opens": 3672,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "85",
+        "title": "Коллекция «Графический дизайн»",
+        "slug": "the-graphic-design-collection",
+        "image": "/cases/32cfea3fab722728fc3fe0da95fa83fa-69f23b628e7a8.webp",
+        "label": null,
+        "section": {
+          "slug": "collections",
+          "name": "Коллекции",
+          "position": 90
+        },
+        "type": "paid",
+        "price": "750.000",
+        "status": "active",
+        "total_opens": 166548,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "86",
+        "title": "Коллекция «Хаос»",
+        "slug": "the-havoc-collection",
+        "image": "/cases/cad8306c48c3cdf490051666f0665515-69f23b6ddf18e.webp",
+        "label": null,
+        "section": {
+          "slug": "collections",
+          "name": "Коллекции",
+          "position": 90
+        },
+        "type": "paid",
+        "price": "1900.000",
+        "status": "active",
+        "total_opens": 45657,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "75",
+        "title": "Коллекция «Dust 2 2021»",
+        "slug": "the-2021-dust-2-collection",
+        "image": "/cases/f7c13afc45ef63f7e89950b1acbe47dd-69f23a1c5e7b9.webp",
+        "label": null,
+        "section": {
+          "slug": "collections",
+          "name": "Коллекции",
+          "position": 90
+        },
+        "type": "paid",
+        "price": "6000.000",
+        "status": "inactive",
+        "total_opens": 15378,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "109",
+        "title": "Терминал «Мёртвая рука»",
+        "slug": "sealed-dead-hand",
+        "image": "/cases/d1b8cf50f45a1c127312be1df2f6bf0a-69f234eb6cb38.webp",
+        "label": null,
+        "section": {
+          "slug": "cs2-cases",
+          "name": "Из CS2",
+          "position": 80
+        },
+        "type": "paid",
+        "price": "119.000",
+        "status": "active",
+        "total_opens": 5004879,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "110",
+        "title": "Терминал «Генезис»",
+        "slug": "genesis",
+        "image": "/cases/29b57b4fa61dc1b5cb4b61d59bcf3324-69f235bf7866d.webp",
+        "label": null,
+        "section": {
+          "slug": "cs2-cases",
+          "name": "Из CS2",
+          "position": 80
+        },
+        "type": "paid",
+        "price": "89.000",
+        "status": "active",
+        "total_opens": 2835093,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "55",
+        "title": "Революция",
+        "slug": "revolution",
+        "image": "/cases/cfa1c3773ee0eaa79be92cbae2d10faf-69f238a37d899.webp",
+        "label": null,
+        "section": {
+          "slug": "cs2-cases",
+          "name": "Из CS2",
+          "position": 80
+        },
+        "type": "paid",
+        "price": "200.000",
+        "status": "active",
+        "total_opens": 105463,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "20",
+        "title": "Грёзы и кошмары",
+        "slug": "dreams-nightmares",
+        "image": "/cases/9f42fa79942e6e56d236610f6a8bbd21-69f234fbd8d17.webp",
+        "label": null,
+        "section": {
+          "slug": "cs2-cases",
+          "name": "Из CS2",
+          "position": 80
+        },
+        "type": "paid",
+        "price": "350.000",
+        "status": "active",
+        "total_opens": 83801,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "23",
+        "title": "Фальшион",
+        "slug": "falchion",
+        "image": "/cases/c99e710c9c0353d94ba345511a8468ea-69f235604a885.webp",
+        "label": null,
+        "section": {
+          "slug": "cs2-cases",
+          "name": "Из CS2",
+          "position": 80
+        },
+        "type": "paid",
+        "price": "240.000",
+        "status": "active",
+        "total_opens": 83568,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "43",
+        "title": "Операция «Феникс»",
+        "slug": "operation-phoenix-weapon",
+        "image": "/cases/64d01f3653f349636855fa95f92bb0f7-69f2378be4844.webp",
+        "label": null,
+        "section": {
+          "slug": "cs2-cases",
+          "name": "Из CS2",
+          "position": 80
+        },
+        "type": "paid",
+        "price": "550.000",
+        "status": "active",
+        "total_opens": 77350,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "13",
+        "title": "Решающий момент",
+        "slug": "clutch",
+        "image": "/cases/24a026395e3861506f5dbff40faf31cf-69f23433b03ef.webp",
+        "label": null,
+        "section": {
+          "slug": "cs2-cases",
+          "name": "Из CS2",
+          "position": 80
+        },
+        "type": "paid",
+        "price": "210.000",
+        "status": "active",
+        "total_opens": 60861,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "64",
+        "title": "Спектр 2",
+        "slug": "spectrum-2",
+        "image": "/cases/307be3339d7fd9e150099836df3370ae-69f239a1172ce.webp",
+        "label": null,
+        "section": {
+          "slug": "cs2-cases",
+          "name": "Из CS2",
+          "position": 80
+        },
+        "type": "paid",
+        "price": "690.000",
+        "status": "active",
+        "total_opens": 159473,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "30",
+        "title": "Киловатт",
+        "slug": "kilowatt",
+        "image": "/cases/840158fcaa2f8bdc85a97728032eb321-69f2361729a58.webp",
+        "label": null,
+        "section": {
+          "slug": "cs2-cases",
+          "name": "Из CS2",
+          "position": 80
+        },
+        "type": "paid",
+        "price": "350.000",
+        "status": "active",
+        "total_opens": 36840,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "59",
+        "title": "Тёмный",
+        "slug": "shadow",
+        "image": "/cases/c1324a3747c26e488a6de3248586b429-69f2390246400.webp",
+        "label": null,
+        "section": {
+          "slug": "cs2-cases",
+          "name": "Из CS2",
+          "position": 80
+        },
+        "type": "paid",
+        "price": "390.000",
+        "status": "active",
+        "total_opens": 53687,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "54",
+        "title": "Гремучий",
+        "slug": "recoil",
+        "image": "/cases/84b397dec78c08cf2fdae01ac70bac66-69f2389bbde94.webp",
+        "label": null,
+        "section": {
+          "slug": "cs2-cases",
+          "name": "Из CS2",
+          "position": 80
+        },
+        "type": "paid",
+        "price": "219.000",
+        "status": "active",
+        "total_opens": 66404,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "44",
+        "title": "Операция «Хищные воды»",
+        "slug": "operation-riptide",
+        "image": "/cases/80ade85e7bde8b501cc8289046c10817-69f237a5a29ae.webp",
+        "label": null,
+        "section": {
+          "slug": "cs2-cases",
+          "name": "Из CS2",
+          "position": 80
+        },
+        "type": "paid",
+        "price": "580.000",
+        "status": "active",
+        "total_opens": 50771,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "56",
+        "title": "Револьверный",
+        "slug": "revolver",
+        "image": "/cases/4368a2c33418f7d9804073bcec433a42-69f238edccb8c.webp",
+        "label": null,
+        "section": {
+          "slug": "cs2-cases",
+          "name": "Из CS2",
+          "position": 80
+        },
+        "type": "paid",
+        "price": "650.000",
+        "status": "active",
+        "total_opens": 35457,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "16",
+        "title": "Запретная зона",
+        "slug": "danger-zone",
+        "image": "/cases/4993abb6eacf04dbb2813ab42cd47320-69f234e5e6f24.webp",
+        "label": null,
+        "section": {
+          "slug": "cs2-cases",
+          "name": "Из CS2",
+          "position": 80
+        },
+        "type": "paid",
+        "price": "260.000",
+        "status": "active",
+        "total_opens": 84172,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "63",
+        "title": "Змеиный укус",
+        "slug": "snakebite",
+        "image": "/cases/e6dddea7868795d41800898c1c5c7b41-69f239983b6b5.webp",
+        "label": null,
+        "section": {
+          "slug": "cs2-cases",
+          "name": "Из CS2",
+          "position": 80
+        },
+        "type": "paid",
+        "price": "180.000",
+        "status": "active",
+        "total_opens": 162724,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "53",
+        "title": "Призма",
+        "slug": "prisma",
+        "image": "/cases/b5dc58d4183bdf383d983d33b2257a80-69f2387d44e51.webp",
+        "label": null,
+        "section": {
+          "slug": "cs2-cases",
+          "name": "Из CS2",
+          "position": 80
+        },
+        "type": "paid",
+        "price": "320.000",
+        "status": "active",
+        "total_opens": 43664,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "65",
+        "title": "Спектр",
+        "slug": "spectrum",
+        "image": "/cases/791df84beba637655cfd5c9248517855-69f239a4ae268.webp",
+        "label": null,
+        "section": {
+          "slug": "cs2-cases",
+          "name": "Из CS2",
+          "position": 80
+        },
+        "type": "paid",
+        "price": "800.000",
+        "status": "active",
+        "total_opens": 44793,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "45",
+        "title": "Операция «Дикое пламя»",
+        "slug": "operation-wildfire",
+        "image": "/cases/b38376d2bc7fe07f5ccd3db6b36a9db5-69f238171f12a.webp",
+        "label": null,
+        "section": {
+          "slug": "cs2-cases",
+          "name": "Из CS2",
+          "position": 80
+        },
+        "type": "paid",
+        "price": "690.000",
+        "status": "active",
+        "total_opens": 33643,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "42",
+        "title": "Операция «Гидра»",
+        "slug": "operation-hydra",
+        "image": "/cases/dfcf1c2e66db26305afa02b38f186016-69f237420bd01.webp",
+        "label": null,
+        "section": {
+          "slug": "cs2-cases",
+          "name": "Из CS2",
+          "position": 80
+        },
+        "type": "paid",
+        "price": "3000.000",
+        "status": "active",
+        "total_opens": 28887,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "28",
+        "title": "Горизонт",
+        "slug": "horizon",
+        "image": "/cases/f2d5773529f443ab84f59ad4dd72ad64-69f235ce263a3.webp",
+        "label": null,
+        "section": {
+          "slug": "cs2-cases",
+          "name": "Из CS2",
+          "position": 80
+        },
+        "type": "paid",
+        "price": "335.000",
+        "status": "active",
+        "total_opens": 55986,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "24",
+        "title": "Разлом",
+        "slug": "fracture",
+        "image": "/cases/18b58b8f911fc18f873cfd728ee08180-69f235b58e018.webp",
+        "label": null,
+        "section": {
+          "slug": "cs2-cases",
+          "name": "Из CS2",
+          "position": 80
+        },
+        "type": "paid",
+        "price": "235.000",
+        "status": "active",
+        "total_opens": 61511,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "52",
+        "title": "Призма 2",
+        "slug": "prisma-2",
+        "image": "/cases/1b1f69ce4a7097f99a91b17f592edd5e-69f23878f4143.webp",
+        "label": null,
+        "section": {
+          "slug": "cs2-cases",
+          "name": "Из CS2",
+          "position": 80
+        },
+        "type": "paid",
+        "price": "333.000",
+        "status": "active",
+        "total_opens": 75515,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "41",
+        "title": "Операция «Сломанный клык»",
+        "slug": "operation-broken-fang",
+        "image": "/cases/3863ff298dd90ec8cdf2dc42547ebf35-69f237380bdaf.webp",
+        "label": null,
+        "section": {
+          "slug": "cs2-cases",
+          "name": "Из CS2",
+          "position": 80
+        },
+        "type": "paid",
+        "price": "1050.000",
+        "status": "active",
+        "total_opens": 65863,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "25",
+        "title": "Галерейный",
+        "slug": "gallery",
+        "image": "/cases/8aebaacce73e66ae90ea293d1f063ae5-69f235b9dfb3b.webp",
+        "label": null,
+        "section": {
+          "slug": "cs2-cases",
+          "name": "Из CS2",
+          "position": 80
+        },
+        "type": "paid",
+        "price": "295.000",
+        "status": "active",
+        "total_opens": 62383,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "15",
+        "title": "CS20",
+        "slug": "cs20",
+        "image": "/cases/9037079a0e36afe5ee493ccfdd0b2206-69f234d695f6a.webp",
+        "label": null,
+        "section": {
+          "slug": "cs2-cases",
+          "name": "Из CS2",
+          "position": 80
+        },
+        "type": "paid",
+        "price": "380.000",
+        "status": "active",
+        "total_opens": 32160,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "60",
+        "title": "Расколотая сеть",
+        "slug": "shattered-web",
+        "image": "/cases/667612fabf613b9b790b819b279d4b55-69f2390d5381d.webp",
+        "label": null,
+        "section": {
+          "slug": "cs2-cases",
+          "name": "Из CS2",
+          "position": 80
+        },
+        "type": "paid",
+        "price": "450.000",
+        "status": "active",
+        "total_opens": 51358,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "31",
+        "title": "Ножевой",
+        "slug": "knife",
+        "image": "/cases/bc61edd4a117b3ea9de48b7090f06f3c-69f2361d0fd29.webp",
+        "label": null,
+        "section": {
+          "slug": "redkost",
+          "name": "Редкость",
+          "position": 30
+        },
+        "type": "paid",
+        "price": "12499.000",
+        "status": "active",
+        "total_opens": 128030,
+        "max_opens_at_once": 4,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "101",
+        "title": "Армейское",
+        "slug": "milspec",
+        "image": "/cases/ccf334afb6603b2b0b30f6a0d3683c1e-69f231f981a0f.webp",
+        "label": null,
+        "section": {
+          "slug": "redkost",
+          "name": "Редкость",
+          "position": 30
+        },
+        "type": "paid",
+        "price": "39.000",
+        "status": "active",
+        "total_opens": 1990607,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "100",
+        "title": "Запрещенное",
+        "slug": "restricted",
+        "image": "/cases/4928aeea8375fa94e65a5f0fd835fd83-69f2320c43d8b.webp",
+        "label": null,
+        "section": {
+          "slug": "redkost",
+          "name": "Редкость",
+          "position": 30
+        },
+        "type": "paid",
+        "price": "159.000",
+        "status": "active",
+        "total_opens": 1014765,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "99",
+        "title": "Засекреченное",
+        "slug": "classified",
+        "image": "/cases/d53eee91241e8cf6e9fef02295752d4a-69f23261a5212.webp",
+        "label": null,
+        "section": {
+          "slug": "redkost",
+          "name": "Редкость",
+          "position": 30
+        },
+        "type": "paid",
+        "price": "649.000",
+        "status": "active",
+        "total_opens": 496628,
+        "max_opens_at_once": 4,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "98",
+        "title": "Тайное",
+        "slug": "covert",
+        "image": "/cases/5d523f85bafce30f9c93bef22dc73a5d-69f231e228a6b.webp",
+        "label": null,
+        "section": {
+          "slug": "redkost",
+          "name": "Редкость",
+          "position": 30
+        },
+        "type": "paid",
+        "price": "5899.000",
+        "status": "active",
+        "total_opens": 92252,
+        "max_opens_at_once": 4,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "40",
+        "title": "Кристалл 2",
+        "slug": "crystal-2",
+        "image": "/cases/76139d635bc17e4cc53027771f157530-69f234402a313.webp",
+        "label": null,
+        "section": {
+          "slug": "limited",
+          "name": "Limited",
+          "position": 10
+        },
+        "type": "paid",
+        "price": "2599.000",
+        "status": "active",
+        "total_opens": 310401,
+        "max_opens_at_once": 4,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "103",
+        "title": "Операция «Альфа»",
+        "slug": "operation-alpha",
+        "image": "/cases/82e904141c3dc488637c9eaa46b8a86c-69f23732f20ca.webp",
+        "label": null,
+        "section": {
+          "slug": "limited",
+          "name": "Limited",
+          "position": 10
+        },
+        "type": "paid",
+        "price": "1599.000",
+        "status": "active",
+        "total_opens": 427680,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "104",
+        "title": "Аврора 2",
+        "slug": "aurora-2",
+        "image": "/cases/f7f0f9485526105572b8cda36fb0d82d-69f232c81fe80.webp",
+        "label": null,
+        "section": {
+          "slug": "limited",
+          "name": "Limited",
+          "position": 10
+        },
+        "type": "paid",
+        "price": "1899.000",
+        "status": "active",
+        "total_opens": 539404,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "102",
+        "title": "Зона боевых действий CS",
+        "slug": "cs-warzone",
+        "image": "/cases/9ff0366e512e73d4265a2a6e4704948c-69f2344c58ac9.webp",
+        "label": null,
+        "section": {
+          "slug": "limited",
+          "name": "Limited",
+          "position": 10
+        },
+        "type": "paid",
+        "price": "999.000",
+        "status": "active",
+        "total_opens": 551923,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "105",
+        "title": "Операция «Аврора»",
+        "slug": "operation-aurora",
+        "image": "/cases/f965c92d5573e3fd9fe77e3b6c28d626-69f232cb686f9.webp",
+        "label": null,
+        "section": {
+          "slug": "limited",
+          "name": "Limited",
+          "position": 10
+        },
+        "type": "paid",
+        "price": "2999.000",
+        "status": "active",
+        "total_opens": 927876,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "162",
+        "title": "Миньон",
+        "slug": "minion",
+        "image": "/cases/93f02e074af0972cd1e45a6e2cfd2e12-6a5e24ef3dd3f.webp",
+        "label": null,
+        "section": {
+          "slug": "new",
+          "name": "NEW",
+          "position": 2
+        },
+        "type": "paid",
+        "price": "99.000",
+        "status": "active",
+        "total_opens": 16418749,
+        "max_opens_at_once": 5,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "171",
+        "title": "Багровый лист",
+        "slug": "crimson-leaf",
+        "image": "/cases/add0e6679fb996876db75ffeb73527ed-6aa2e3a68ce7f.webp",
+        "label": null,
+        "section": {
+          "slug": "new",
+          "name": "NEW",
+          "position": 2
+        },
+        "type": "paid",
+        "price": "39.000",
+        "status": "active",
+        "total_opens": 21767261,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "168",
+        "title": "Бургунди",
+        "slug": "burgundy",
+        "image": "/cases/53266b78bea97bde2952188c1d4d8375-6aa2e3acaa96b.webp",
+        "label": null,
+        "section": {
+          "slug": "new",
+          "name": "NEW",
+          "position": 2
+        },
+        "type": "paid",
+        "price": "1199.000",
+        "status": "active",
+        "total_opens": 1960761,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "166",
+        "title": "Паучий",
+        "slug": "spider",
+        "image": "/cases/b01fa6f959e75fed289765a38132f0c3-6a86f9f0908de.webp",
+        "label": null,
+        "section": {
+          "slug": "new",
+          "name": "NEW",
+          "position": 2
+        },
+        "type": "paid",
+        "price": "679.000",
+        "status": "active",
+        "total_opens": 3195651,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "172",
+        "title": "Инпут лаг",
+        "slug": "input-lag",
+        "image": "/cases/fff94a4db8414400b3968a8c6b907f15-6aa2e3bfd99fd.webp",
+        "label": null,
+        "section": {
+          "slug": "new",
+          "name": "NEW",
+          "position": 2
+        },
+        "type": "paid",
+        "price": "167.000",
+        "status": "active",
+        "total_opens": 8241107,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": "2026-10-15T14:00:00+00:00"
+      },
+      {
+        "id": "170",
+        "title": "Дождливый вечер",
+        "slug": "rainy-evening",
+        "image": "/cases/2e6f10d20b920646e87eac7b06168360-6aa2e3b363ab5.webp",
+        "label": null,
+        "section": {
+          "slug": "new",
+          "name": "NEW",
+          "position": 2
+        },
+        "type": "paid",
+        "price": "349.000",
+        "status": "active",
+        "total_opens": 4686932,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "169",
+        "title": "Шепот осени",
+        "slug": "whisper-of-autumn",
+        "image": "/cases/da8b6dda4e8730e02a081d3e37cc5087-6aa2e3b9754e0.webp",
+        "label": null,
+        "section": {
+          "slug": "new",
+          "name": "NEW",
+          "position": 2
+        },
+        "type": "paid",
+        "price": "799.000",
+        "status": "active",
+        "total_opens": 1548758,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "149",
+        "title": "GTA VI",
+        "slug": "gta-vi",
+        "image": "/cases/cb99575c74e27e6e39a5b0bac0539c8c-6a3beee690af6.webp",
+        "label": null,
+        "section": {
+          "slug": "new",
+          "name": "NEW",
+          "position": 2
+        },
+        "type": "paid",
+        "price": "6500.000",
+        "status": "active",
+        "total_opens": 904722,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "174",
+        "title": "Морфей",
+        "slug": "morpheus",
+        "image": "/cases/fd818ec4faa4cc5a3c3f0e8b7bd5ae78-6ab66f1e2275c.webp",
+        "label": "NEW",
+        "section": {
+          "slug": "new",
+          "name": "NEW",
+          "position": 2
+        },
+        "type": "paid",
+        "price": "79.000",
+        "status": "active",
+        "total_opens": 10410083,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "189",
+        "title": "Оазис",
+        "slug": "oasis",
+        "image": "/cases/e1ab516fb8048d640b4822e17a8d054d-6ac7b9d36afff.webp",
+        "label": "NEW",
+        "section": {
+          "slug": "new",
+          "name": "NEW",
+          "position": 2
+        },
+        "type": "paid",
+        "price": "49900.000",
+        "status": "active",
+        "total_opens": 26743,
+        "max_opens_at_once": 4,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "167",
+        "title": "Сикс Севен",
+        "slug": "six-seven",
+        "image": "/cases/ec9b4ec7636158c1ea5955ca46552254-6aa2e39c5d7b1.webp",
+        "label": null,
+        "section": {
+          "slug": "new",
+          "name": "NEW",
+          "position": 2
+        },
+        "type": "paid",
+        "price": "6767.000",
+        "status": "inactive",
+        "total_opens": 67000,
+        "max_opens_at_once": 4,
+        "open_limit": 67000,
+        "opens_remaining": 0,
+        "time_limit": null
+      },
+      {
+        "id": "116",
+        "title": "Экспозиция",
+        "slug": "exhibition",
+        "image": "/cases/be9c7c74f5ef5405b967494fb5053701-6a01af6bcf130.webp",
+        "label": null,
+        "section": {
+          "slug": "nashi-sborki",
+          "name": "Наши сборки",
+          "position": 11
+        },
+        "type": "paid",
+        "price": "69.000",
+        "status": "active",
+        "total_opens": 18527819,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "117",
+        "title": "Змей",
+        "slug": "serpent",
+        "image": "/cases/4df3e66523449b4c7417a9dc1dcb6239-6a01b2a7c07df.webp",
+        "label": null,
+        "section": {
+          "slug": "nashi-sborki",
+          "name": "Наши сборки",
+          "position": 11
+        },
+        "type": "paid",
+        "price": "499.000",
+        "status": "active",
+        "total_opens": 4436340,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "111",
+        "title": "Магнум",
+        "slug": "magnum",
+        "image": "/cases/fcfab37f4b45e0e67ef2dd1315bff79d-69f23683ac862.webp",
+        "label": null,
+        "section": {
+          "slug": "nashi-sborki",
+          "name": "Наши сборки",
+          "position": 11
+        },
+        "type": "paid",
+        "price": "19.000",
+        "status": "active",
+        "total_opens": 118308463,
+        "max_opens_at_once": 9,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "122",
+        "title": "Тактический монолит",
+        "slug": "tactical-monolith",
+        "image": "/cases/928a2f0f5b15a355466f1a68fd8feab5-6a185940ed4d5.webp",
+        "label": null,
+        "section": {
+          "slug": "nashi-sborki",
+          "name": "Наши сборки",
+          "position": 11
+        },
+        "type": "paid",
+        "price": "999.000",
+        "status": "active",
+        "total_opens": 1529086,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "121",
+        "title": "Операция «Карантин»",
+        "slug": "operation-quarantine",
+        "image": "/cases/1540326ca76e8c7c1c3e897fb7d213dd-6a18593cc07b1.webp",
+        "label": null,
+        "section": {
+          "slug": "nashi-sborki",
+          "name": "Наши сборки",
+          "position": 11
+        },
+        "type": "paid",
+        "price": "1399.000",
+        "status": "active",
+        "total_opens": 2117745,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "123",
+        "title": "Лаборатория ZEISS",
+        "slug": "zeiss-laboratory",
+        "image": "/cases/2ce8f1c2dfab9491d909de50b35be476-6a185935d483c.webp",
+        "label": null,
+        "section": {
+          "slug": "nashi-sborki",
+          "name": "Наши сборки",
+          "position": 11
+        },
+        "type": "paid",
+        "price": "699.000",
+        "status": "active",
+        "total_opens": 1675555,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "165",
+        "title": "Летний Набор",
+        "slug": "summer-set",
+        "image": "/cases/90ce3bf08cab6207e9fc1f0f46a70997-6a6c8e41f2577.webp",
+        "label": null,
+        "section": {
+          "slug": "nashi-sborki",
+          "name": "Наши сборки",
+          "position": 11
+        },
+        "type": "paid",
+        "price": "199.000",
+        "status": "active",
+        "total_opens": 7747445,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "164",
+        "title": "Летний Клуб",
+        "slug": "sunset-club",
+        "image": "/cases/c36112d1672bf7128a6573dc2195c8c0-6a6c9ffcdf557.webp",
+        "label": null,
+        "section": {
+          "slug": "nashi-sborki",
+          "name": "Наши сборки",
+          "position": 11
+        },
+        "type": "paid",
+        "price": "13999.000",
+        "status": "active",
+        "total_opens": 113180,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "114",
+        "title": "Премиум Cache",
+        "slug": "premium-cache",
+        "image": "/cases/64e1398ebe1b76e13f9c6a5018ee426a-69f342b22a615.webp",
+        "label": null,
+        "section": {
+          "slug": "nashi-sborki",
+          "name": "Наши сборки",
+          "position": 11
+        },
+        "type": "paid",
+        "price": "17999.000",
+        "status": "active",
+        "total_opens": 125577,
+        "max_opens_at_once": 4,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "163",
+        "title": "Золотой час",
+        "slug": "golden-hour",
+        "image": "/cases/3b94c5a5d126b08302e71405bb474a40-6a6c8a91e37b0.webp",
+        "label": null,
+        "section": {
+          "slug": "nashi-sborki",
+          "name": "Наши сборки",
+          "position": 11
+        },
+        "type": "paid",
+        "price": "20999.000",
+        "status": "active",
+        "total_opens": 131579,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "106",
+        "title": "Новые Перчатки",
+        "slug": "new-gloves",
+        "image": "/cases/9a63241b35e3adf3be25d8d1906c6fd4-69f2372bac02f.webp",
+        "label": null,
+        "section": {
+          "slug": "nashi-sborki",
+          "name": "Наши сборки",
+          "position": 11
+        },
+        "type": "paid",
+        "price": "22999.000",
+        "status": "active",
+        "total_opens": 22294,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "156",
+        "title": "Коллекция «Арабеска»",
+        "slug": "arabesque-collection-skins",
+        "image": "/cases/44e955365ec8c4d9830a32633f75fefc-6a5a869af21fe.webp",
+        "label": null,
+        "section": {
+          "slug": "caser-armory-cases",
+          "name": "Caser Armory Cases",
+          "position": 3
+        },
+        "type": "paid",
+        "price": "800.000",
+        "status": "active",
+        "total_opens": 330462,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "151",
+        "title": "Коллекция брелков Dr. Boom",
+        "slug": "dr-boom-charm-collection",
+        "image": "/cases/6791956e7fa9ba7752547b5d46149d5f-6a5a872abc6f0.webp",
+        "label": null,
+        "section": {
+          "slug": "caser-armory-cases",
+          "name": "Caser Armory Cases",
+          "position": 3
+        },
+        "type": "paid",
+        "price": "100.000",
+        "status": "active",
+        "total_opens": 743822,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "152",
+        "title": "Коллекция брелоков от сообщества",
+        "slug": "missing-link-community-charm-collection",
+        "image": "/cases/b03140a16b92d2f08882c0eda62e7c53-6a5a8714b069b.webp",
+        "label": null,
+        "section": {
+          "slug": "caser-armory-cases",
+          "name": "Caser Armory Cases",
+          "position": 3
+        },
+        "type": "paid",
+        "price": "170.000",
+        "status": "active",
+        "total_opens": 461674,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "157",
+        "title": "Коллекция Overpass 2024",
+        "slug": "the-overpass-collection-2024",
+        "image": "/cases/a162d5f3b176370a0497a26a3324f267-6a5a868c4ac95.webp",
+        "label": null,
+        "section": {
+          "slug": "caser-armory-cases",
+          "name": "Caser Armory Cases",
+          "position": 3
+        },
+        "type": "paid",
+        "price": "399.000",
+        "status": "active",
+        "total_opens": 639692,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "155",
+        "title": "Коллекция «Шпионаж и технологии»",
+        "slug": "spy-tech-collection-skins",
+        "image": "/cases/efc1e70aa44e880adff70f02aac0280d-6a5a86a93ad25.webp",
+        "label": null,
+        "section": {
+          "slug": "caser-armory-cases",
+          "name": "Caser Armory Cases",
+          "position": 3
+        },
+        "type": "paid",
+        "price": "900.000",
+        "status": "active",
+        "total_opens": 471672,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "160",
+        "title": "Набор стикеров \"Фрукты и Овощи\"",
+        "slug": "fruits-and-veggies-stickers",
+        "image": "/cases/26087b065f9462af139eb75536963696-6a5a861a3c8e2.webp",
+        "label": null,
+        "section": {
+          "slug": "caser-armory-cases",
+          "name": "Caser Armory Cases",
+          "position": 3
+        },
+        "type": "paid",
+        "price": "65.000",
+        "status": "active",
+        "total_opens": 371621,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "154",
+        "title": "Коллекция брелков Малый калибр",
+        "slug": "small-arms-charm-collection",
+        "image": "/cases/2753cb8e7f8befd09a5c8d521a362889-6a5a86b7cd92e.webp",
+        "label": null,
+        "section": {
+          "slug": "caser-armory-cases",
+          "name": "Caser Armory Cases",
+          "position": 3
+        },
+        "type": "paid",
+        "price": "85.000",
+        "status": "active",
+        "total_opens": 512119,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "158",
+        "title": "Лихорадка",
+        "slug": "fever",
+        "image": "/cases/75fbce77d994ae3c94bcbdb5b3e3db0c-6a5a867ebc26f.webp",
+        "label": null,
+        "section": {
+          "slug": "caser-armory-cases",
+          "name": "Caser Armory Cases",
+          "position": 3
+        },
+        "type": "paid",
+        "price": "310.000",
+        "status": "active",
+        "total_opens": 846231,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "153",
+        "title": "Коллекция брелков Missing Link",
+        "slug": "missing-link-charm-collection",
+        "image": "/cases/758850db5daaed74be79f9727bed966a-6a5a8703c85cc.webp",
+        "label": null,
+        "section": {
+          "slug": "caser-armory-cases",
+          "name": "Caser Armory Cases",
+          "position": 3
+        },
+        "type": "paid",
+        "price": "120.000",
+        "status": "active",
+        "total_opens": 290755,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "161",
+        "title": "Коллекция наклеек от сообщества 2025",
+        "slug": "community-sticker-collection2025",
+        "image": "/cases/51612aead5c6759372b79b8d78fb884f-6a5a865de3c05.webp",
+        "label": null,
+        "section": {
+          "slug": "caser-armory-cases",
+          "name": "Caser Armory Cases",
+          "position": 3
+        },
+        "type": "paid",
+        "price": "65.000",
+        "status": "active",
+        "total_opens": 531357,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "159",
+        "title": "Автомобильные гоночные наклейки",
+        "slug": "auto-racing-stickers",
+        "image": "/cases/322784a095352d82b11305b5f76e67ac-6a5a8672254ad.webp",
+        "label": null,
+        "section": {
+          "slug": "caser-armory-cases",
+          "name": "Caser Armory Cases",
+          "position": 3
+        },
+        "type": "paid",
+        "price": "90.000",
+        "status": "active",
+        "total_opens": 391385,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": null
+      },
+      {
+        "id": "184",
+        "title": "Яичный",
+        "slug": "egg",
+        "image": "/cases/1611ed2e67dfcd18662d9d574b77a45e-6ab6460cd5709.webp",
+        "label": null,
+        "section": {
+          "slug": "operation-chicken-farm",
+          "name": "Операция \"Chicken Farm\"",
+          "position": 1
+        },
+        "type": "paid",
+        "price": "100.000",
+        "status": "active",
+        "total_opens": 9602693,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": "2026-10-24T20:00:00+00:00"
+      },
+      {
+        "id": "187",
+        "title": "Шелковый",
+        "slug": "silky",
+        "image": "/cases/4740f56eea0d2206dbf9217442cb080c-6ab64728105b0.webp",
+        "label": null,
+        "section": {
+          "slug": "operation-chicken-farm",
+          "name": "Операция \"Chicken Farm\"",
+          "position": 1
+        },
+        "type": "paid",
+        "price": "1000.000",
+        "status": "active",
+        "total_opens": 1521038,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": "2026-10-24T20:00:00+00:00"
+      },
+      {
+        "id": "188",
+        "title": "Золотое яйцо",
+        "slug": "golden-egg",
+        "image": "/cases/8534a82976f437bbdead2ddc61312cde-6ab6475cda0d8.webp",
+        "label": null,
+        "section": {
+          "slug": "operation-chicken-farm",
+          "name": "Операция \"Chicken Farm\"",
+          "position": 1
+        },
+        "type": "paid",
+        "price": "2500.000",
+        "status": "active",
+        "total_opens": 964248,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": "2026-10-24T20:00:00+00:00"
+      },
+      {
+        "id": "185",
+        "title": "Куриный",
+        "slug": "chicken",
+        "image": "/cases/60239f58548052e1b658cbd74d8fcdf3-6ab646582cbb7.webp",
+        "label": null,
+        "section": {
+          "slug": "operation-chicken-farm",
+          "name": "Операция \"Chicken Farm\"",
+          "position": 1
+        },
+        "type": "paid",
+        "price": "250.000",
+        "status": "active",
+        "total_opens": 3669476,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": "2026-10-24T20:00:00+00:00"
+      },
+      {
+        "id": "186",
+        "title": "Каталонский",
+        "slug": "catalan",
+        "image": "/cases/e00d90cb2886c1059abb4ce9771b5eb7-6ab646a6bc6ac.webp",
+        "label": null,
+        "section": {
+          "slug": "operation-chicken-farm",
+          "name": "Операция \"Chicken Farm\"",
+          "position": 1
+        },
+        "type": "paid",
+        "price": "500.000",
+        "status": "active",
+        "total_opens": 2629835,
+        "max_opens_at_once": 6,
+        "open_limit": null,
+        "opens_remaining": null,
+        "time_limit": "2026-10-24T20:00:00+00:00"
+      }
+    ]
+  }
+}
