@@ -7,7 +7,11 @@
     "node": ">=20"
   },
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node _test_withdrawal.js && node _test_rtp.js",
+    "test:store": "node _test_withdrawal.js",
+    "test:rtp": "node _test_rtp.js",
+    "test:api": "node _test_api.js"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",

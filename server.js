@@ -192,6 +192,17 @@ const SAMPLE_SKINS = [
 // Starting balance of a freshly provisioned player
 const START_BALANCE = 2043.31;
 
+/**
+ * Reads a query parameter as an integer inside [min, max].
+ * Garbage input ("?limit=abc", "?offset=-5") collapses to `fallback` instead of
+ * reaching SQL as NaN.
+ */
+function clampInt(raw, min, max, fallback) {
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
 // Builds the full catalogue of distinct skins from every cached case so that
 // ANY skin can be picked as an upgrade target / shop item.
 function buildShopCatalogue() {
@@ -570,8 +581,11 @@ const handleOpenCase = async (req, res) => {
     const dropPool = drawableItems.length ? drawableItems : SAMPLE_SKINS;
 
     for (let i = 0; i < count; i++) {
-      // Pick item from case pool
-      const won = dropPool[crypto.randomInt(0, dropPool.length)];
+      // Pick item from case pool using the RTP-weighted odds
+      const odds = getCaseOdds(caseData);
+      const won = odds
+        ? dropPool[pickByOdds(odds)]
+        : dropPool[crypto.randomInt(0, dropPool.length)];
       const marketName = won.marketName || won.name || 'AK-47 | Redline';
       const price = String(won.price ?? 1500);
 
@@ -785,6 +799,23 @@ function pushNewItems(items) {
   wsBroadcast('inventory.new_items', { items: items.map((i) => ({ id: String(i.id) })) });
 }
 
+/**
+ * Sends an event to every socket belonging to one user.
+ *
+ * Withdrawal events carry item names and trade-offer links, so they must never
+ * go out on the global broadcast - that would leak one player's trades to every
+ * connected browser. Sockets are tagged with their user id at handshake time.
+ */
+function wsSendToUser(userId, event, data) {
+  if (!userId) return;
+  const payload = JSON.stringify({ event, data });
+  for (const client of wss.clients) {
+    if (client.readyState !== WebSocket.OPEN) continue;
+    if (client.userId !== String(userId)) continue;
+    try { client.send(payload); } catch (e) { /* ignore */ }
+  }
+}
+
 const inventoryBalancePayload = (user) => {
   const amount = parseFloat((user && user.balance) || START_BALANCE) || 0;
   const payload = { amount: amount.toFixed(2), balance: amount.toFixed(2), defuses: amount };
@@ -921,6 +952,68 @@ function randomUnit() {
   return crypto.randomInt(0, 1e9) / 1e9;
 }
 
+// ---------------------------------------------------------------------------
+// House edge (RTP)
+// ---------------------------------------------------------------------------
+// Return to player = share of wagered money that comes back as winnings.
+// RTP 0.80 -> the house keeps 20%. Override with the RTP env var.
+const RTP = Math.min(0.99, Math.max(0.01, parseFloat(process.env.RTP) || 0.8));
+
+/**
+ * Builds cumulative drop odds for a case so the expected payout equals
+ * RTP * casePrice. Items are weighted with w_i = price_i^(-beta); beta = 0 is
+ * uniform, larger beta pushes probability towards cheaper items (lower RTP).
+ * Returns null when even uniform odds are already below the target.
+ */
+function buildDropOdds(items, casePrice, rtp = RTP) {
+  const target = Math.max(0, casePrice * rtp);
+  const prices = items.map((i) => Math.max(parseFloat(i.price) || 0, 0.01));
+  const expected = (beta) => {
+    const w = prices.map((p) => Math.pow(p, -beta));
+    const Z = w.reduce((a, b) => a + b, 0) || 1;
+    return w.reduce((acc, wi, i) => acc + (wi / Z) * prices[i], 0);
+  };
+  if (target <= 0 || expected(0) <= target) {
+    const n = items.length;
+    return items.map((_, i) => (i + 1) / n);
+  }
+  let lo = 0;
+  let hi = 60;
+  for (let k = 0; k < 60; k++) {
+    const mid = (lo + hi) / 2;
+    if (expected(mid) > target) lo = mid;
+    else hi = mid;
+  }
+  const w = prices.map((p) => Math.pow(p, -(lo + hi) / 2));
+  const Z = w.reduce((a, b) => a + b, 0) || 1;
+  const cum = [];
+  let acc = 0;
+  for (const wi of w) {
+    acc += wi / Z;
+    cum.push(acc);
+  }
+  cum[cum.length - 1] = 1;
+  return cum;
+}
+
+function pickByOdds(cum) {
+  const r = randomUnit();
+  for (let i = 0; i < cum.length; i++) if (r < cum[i]) return i;
+  return cum.length - 1;
+}
+
+// Per-case cumulative odds, built lazily and cached for the process lifetime.
+const dropOddsCache = new Map();
+function getCaseOdds(caseData) {
+  const slug = caseData?.case?.slug;
+  if (slug && dropOddsCache.has(slug)) return dropOddsCache.get(slug);
+  const items = Array.isArray(caseData?.items) ? caseData.items : [];
+  const price = parseFloat(caseData?.case?.price) || 0;
+  const odds = items.length ? buildDropOdds(items, price) : null;
+  if (slug) dropOddsCache.set(slug, odds);
+  return odds;
+}
+
 // Shape expected by the client (useUpgradeBet in 2mwsxxmwyqhg9.js):
 //   { bet: { id, status: 'won'|'lost', wonItem/targetItem, betItems, isMystery, superDrop }, balance }
 const toBetItemPayload = (entry) => ({
@@ -979,8 +1072,10 @@ const handleUpgradeBet = async (req, res) => {
   await store.removeInventoryItems(user.id, betEntries.map((e) => e.id));
 
   const targetVal = target ? parseFloat(target.price) || 0 : 0;
-  // Chance = stake / targetPrice, matching the 1%..80% band the wheel UI accepts
-  const winChance = targetVal > 0 ? Math.min(0.8, Math.max(0.01, stake / targetVal)) : 0.5;
+  // Chance = stake / targetPrice, scaled by the house edge (RTP) so the wheel
+  // is no longer a zero-expectation game. Capped to the 1%..80% band the UI
+  // accepts.
+  const winChance = targetVal > 0 ? Math.min(0.8, Math.max(0.01, (stake / targetVal) * RTP)) : 0.5;
   const roll = randomUnit();
   const isWin = roll < winChance;
 
@@ -1041,7 +1136,250 @@ const handleUpgradeBet = async (req, res) => {
 app.post('/api/game/upgrade/bet', handleUpgradeBet);
 app.post('/game/upgrade/bet', handleUpgradeBet);
 
-app.get('/api/users/notifications/unread/count', (req, res) => res.json({ count: 0 }));
+// ----------------------------------------------------
+// WITHDRAWALS & NOTIFICATIONS
+// ----------------------------------------------------
+
+/**
+ * Records a notification and pushes it live to the owner's open tabs.
+ * Awaited on purpose: a floating promise here would surface as an unhandled
+ * rejection, which kills the whole server process.
+ */
+async function notify(userId, type, content) {
+  await store.createNotification(userId, type, content);
+  wsSendToUser(userId, 'notifications.new', { type, content, createdAt: new Date().toISOString() });
+}
+
+app.post('/api/items/withdraw', async (req, res) => {
+  const user = await resolveUser(req);
+  const { inventoryItemId } = req.body || {};
+  if (!inventoryItemId) return res.status(400).json({ success: false, message: 'Item id required' });
+
+  const result = await store.createWithdrawal(user.id, inventoryItemId);
+  if (result.error) return res.status(400).json({ success: false, message: result.error });
+
+  await notify(user.id, 'withdrawal_created', {
+    withdrawalId: result.withdrawal.id,
+    itemName: result.withdrawal.marketName
+  });
+  // The item just became unsellable, so the client must re-render the row.
+  wsSendToUser(user.id, 'inventory.item_status_changed', {
+    id: result.withdrawal.inventoryItemId,
+    status: 'locked_for_withdrawal'
+  });
+
+  res.json({ success: true, data: result.withdrawal });
+});
+
+app.get('/api/withdrawals', async (req, res) => {
+  const user = await resolveUser(req);
+  const limit = clampInt(req.query.limit, 1, 100, 50);
+  const offset = clampInt(req.query.offset, 0, 1e6, 0);
+  const items = await store.listWithdrawals({
+    userId: user.id,
+    status: req.query.status || undefined,
+    limit,
+    offset
+  });
+  res.json({ success: true, items, total: items.length });
+});
+
+app.get('/api/withdrawals/:id', async (req, res) => {
+  const user = await resolveUser(req);
+  const withdrawal = await store.getWithdrawal(req.params.id);
+  // Someone else's request is reported as missing rather than forbidden so the
+  // endpoint cannot be used to probe which ids exist.
+  if (!withdrawal || (withdrawal.userId !== user.id && !isAdminId(user.id))) {
+    return res.status(404).json({ success: false, message: 'Not found' });
+  }
+  res.json({ success: true, data: withdrawal });
+});
+
+// ----------------------------------------------------
+// ADMIN: WITHDRAWAL MANAGEMENT
+// ----------------------------------------------------
+
+/**
+ * Two ways to prove you are the operator:
+ *   1. the shared ADMIN_TOKEN (used by the standalone /admin page), or
+ *   2. logging in as an account listed in ADMIN_IDS.
+ * ADMIN_IDS keeps the in-game admin working; the token is what the panel uses.
+ *
+ * When ADMIN_TOKEN is not configured we mint a random one instead of falling
+ * back to an empty string: an empty token would match a missing header and
+ * leave the panel permanently unreachable.
+ */
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || require('crypto').randomBytes(24).toString('hex');
+const ADMIN_TOKEN_IS_EPHEMERAL = !process.env.ADMIN_TOKEN;
+const ADMIN_IDS = new Set(
+  (process.env.ADMIN_IDS || 'player_10001').split(',').map((s) => s.trim()).filter(Boolean)
+);
+
+if (ADMIN_TOKEN_IS_EPHEMERAL) {
+  console.log('[admin] ADMIN_TOKEN is not set - generated a temporary one:');
+  console.log(`[admin]   ${ADMIN_TOKEN}`);
+  console.log('[admin]   Set ADMIN_TOKEN in the environment to keep it stable across restarts.');
+}
+
+function tokenFromRequest(req) {
+  return (
+    req.get('x-admin-token') ||
+    (req.body && req.body.adminToken) ||
+    req.query.admin_token ||
+    null
+  );
+}
+
+/** Safe to call on routes that already resolved the user. */
+function isAdminId(userId) {
+  return !!userId && ADMIN_IDS.has(String(userId));
+}
+
+async function requireAdmin(req, res, next) {
+  // A matching token wins - the admin page has no session cookie.
+  const token = tokenFromRequest(req);
+  if (token && token === ADMIN_TOKEN) return next();
+
+  // Otherwise fall back to the session account. NOTE: resolveUser is async, so
+  // this must be awaited - comparing a Promise against the admin id would
+  // always fail and lock the operator out of their own panel.
+  const user = await resolveUser(req);
+  if (!isAdminId(user.id)) {
+    return res.status(403).json({ success: false, message: 'Admin only' });
+  }
+  req.adminUser = user;
+  next();
+}
+
+app.get('/api/admin/withdrawals', requireAdmin, async (req, res) => {
+  const limit = clampInt(req.query.limit, 1, 200, 50);
+  const offset = clampInt(req.query.offset, 0, 1e6, 0);
+  const items = await store.listWithdrawals({
+    status: req.query.status || undefined,
+    limit,
+    offset
+  });
+  // The operator needs to see what is being traded, so decorate each row with
+  // its thumbnail. Resolved from the static catalogue by name rather than
+  // stored on the withdrawal row - it keeps working after the inventory entry
+  // is deleted on completion.
+  const decorated = items.map((w) => {
+    const match = SHOP_ITEMS.find((s) => s.marketName === w.marketName);
+    return { ...w, image: match ? match.image : null };
+  });
+  res.json({ success: true, items: decorated, total: decorated.length });
+});
+
+/**
+ * Shared tail for the three admin transitions: apply the status, notify the
+ * owner, tell their open tabs. Keeps the three routes from drifting apart.
+ */
+async function runWithdrawalTransition(req, res, status, extra) {
+  const result = await store.setWithdrawalStatus(req.params.id, status, extra);
+  if (result.error) return res.status(400).json({ success: false, message: result.error });
+
+  const w = result.withdrawal;
+  await notify(w.userId, `withdrawal_${status === 'completed' ? 'completed' : status}`, {
+    withdrawalId: w.id,
+    itemName: w.marketName,
+    ...(w.tradeOfferUrl ? { tradeOfferUrl: w.tradeOfferUrl } : {}),
+    ...(extra && extra.reason ? { reason: extra.reason } : {})
+  });
+
+  // Completed removes the item from the inventory; failed puts it back on sale.
+  wsSendToUser(w.userId, 'inventory.item_status_changed', {
+    id: w.inventoryItemId,
+    status: status === 'completed' ? 'removed' : (status === 'failed' ? 'available' : 'trade_ready')
+  });
+
+  res.json({ success: true, data: w });
+}
+
+app.post('/api/admin/withdrawals/:id/ready', requireAdmin, async (req, res) => {
+  const { tradeOfferUrl } = req.body || {};
+  await runWithdrawalTransition(req, res, 'ready', { tradeOfferUrl });
+});
+
+app.post('/api/admin/withdrawals/:id/complete', requireAdmin, async (req, res) => {
+  await runWithdrawalTransition(req, res, 'completed');
+});
+
+app.post('/api/admin/withdrawals/:id/fail', requireAdmin, async (req, res) => {
+  await runWithdrawalTransition(req, res, 'failed', { reason: (req.body || {}).reason });
+});
+
+// House numbers: money in vs money out, so the operator can see the edge.
+app.get('/api/admin/stats', requireAdmin, async (req, res) => {
+  const store_ = await store.stats();
+  const withdrawals = await store.listWithdrawals({ limit: 200, offset: 0 });
+
+  const byStatus = { pending: 0, ready: 0, completed: 0, failed: 0 };
+  let paidOut = 0;
+  for (const w of withdrawals) {
+    byStatus[w.status] = (byStatus[w.status] || 0) + 1;
+    if (w.status === 'completed') paidOut += w.price;
+  }
+
+  res.json({
+    success: true,
+    data: {
+      storage: { mode: store_.mode, error: store_.error },
+      users: store_.users,
+      inventoryItems: store_.inventory,
+      transactions: store_.transactions,
+      caseOpens: store_.opens,
+      online: wss.clients.size,
+      withdrawals: { ...byStatus, paidOutValue: Number(paidOut.toFixed(2)), sampled: withdrawals.length },
+      rtp: RTP
+    }
+  });
+});
+
+// The operator panel. Served raw - it has its own token login, so it does not
+// need the in-game session injection the public pages get.
+app.get(['/admin', '/admin/'], (req, res) => {
+  res.sendFile(path.join(SITE_DIR, 'admin.html'));
+});
+
+// ----------------------------------------------------
+// NOTIFICATIONS
+// ----------------------------------------------------
+app.get('/api/notifications', async (req, res) => {
+  const user = await resolveUser(req);
+  const limit = clampInt(req.query.limit, 1, 100, 20);
+  const offset = clampInt(req.query.offset, 0, 1e6, 0);
+  // Scoped to the resolved user only - a ?userId= parameter would let anyone
+  // read anyone else's notifications.
+  const items = await store.listNotifications(user.id, limit, offset);
+  res.json({ success: true, items, total: items.length });
+});
+
+app.post('/api/notifications/read', async (req, res) => {
+  const user = await resolveUser(req);
+  const ids = (req.body && req.body.ids) || [];
+  const owned = await store.listNotifications(user.id, 100, 0);
+  const ownedIds = new Set(owned.map((n) => n.id));
+  for (const id of ids) {
+    if (ownedIds.has(String(id))) await store.markNotificationRead(id);
+  }
+  res.json({ success: true });
+});
+
+app.post('/api/notifications/:id/read', async (req, res) => {
+  const user = await resolveUser(req);
+  const owned = await store.listNotifications(user.id, 100, 0);
+  if (!owned.some((n) => n.id === String(req.params.id))) {
+    return res.status(404).json({ success: false, message: 'Not found' });
+  }
+  await store.markNotificationRead(req.params.id);
+  res.json({ success: true });
+});
+
+app.get('/api/users/notifications/unread/count', async (req, res) => {
+  const user = await resolveUser(req);
+  res.json({ count: await store.countUnreadNotifications(user.id) });
+});
+
 app.post('/api/handshake', (req, res) => res.json({ status: 'ok' }));
 
 app.get('/api/game/giveaways', (req, res) => {
@@ -1204,7 +1542,16 @@ app.use((req, res) => {
 });
 
 // WebSocket Server for live drops & online counters
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, wsReq) => {
+  // Tag the socket with its owner so per-user events (withdrawals, trade
+  // offers) can be routed without leaking to other browsers.
+  try {
+    const cookies = parseCookies({ headers: wsReq.headers || {} });
+    ws.userId = cookies['caser_user_id'] || null;
+  } catch (e) {
+    ws.userId = null;
+  }
+
   // Send initial counters
   ws.send(JSON.stringify({
     event: 'statistics.counters',

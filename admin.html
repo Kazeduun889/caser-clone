@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Caser — панель администратора</title>
+<style>
+  :root {
+    --bg: #0e1116;
+    --panel: #161b22;
+    --panel-2: #1c232c;
+    --line: #2a323d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #4c9aff;
+    --green: #3fb950;
+    --red: #f85149;
+    --yellow: #d29922;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.5 -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  }
+  header {
+    padding: 18px 24px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 18px; margin: 0; font-weight: 600; }
+  header .spacer { flex: 1; }
+  main { padding: 24px; max-width: 1400px; margin: 0 auto; }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 18px; margin-bottom: 20px;
+  }
+  .card h2 { margin: 0 0 14px; font-size: 14px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+
+  /* --- login --- */
+  #login { max-width: 420px; margin: 80px auto; }
+  input[type=text], input[type=password], textarea {
+    width: 100%; padding: 10px 12px; background: var(--bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 6px; font: inherit;
+  }
+  input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+  label { display: block; margin: 12px 0 6px; color: var(--muted); font-size: 12px; }
+
+  button {
+    padding: 9px 16px; border-radius: 6px; border: 1px solid var(--line);
+    background: var(--panel-2); color: var(--text); font: inherit; cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #04101f; font-weight: 600; }
+  button.go { border-color: var(--green); color: var(--green); }
+  button.no { border-color: var(--red); color: var(--red); }
+
+  /* --- stats --- */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+  .stat { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
+  .stat .k { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+  .stat .v { font-size: 22px; font-weight: 600; margin-top: 4px; }
+  .stat.warn .v { color: var(--yellow); }
+  .stat.ok .v { color: var(--green); }
+
+  /* --- filters --- */
+  .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .filters button.active { background: var(--accent); border-color: var(--accent); color: #04101f; font-weight: 600; }
+
+  /* --- table --- */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+  td.item { min-width: 260px; }
+  td.item .name { display: flex; align-items: center; gap: 10px; }
+  td.item img { width: 40px; height: 40px; border-radius: 5px; background: #0b0e12; flex: none; object-fit: contain; }
+  td.item .meta { color: var(--muted); font-size: 11px; }
+  td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  td.actions { white-space: nowrap; }
+  td.actions button { padding: 5px 10px; font-size: 12px; margin-right: 4px; }
+
+  .pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+  .pill.pending { background: rgba(210,153,34,.15); color: var(--yellow); }
+  .pill.ready { background: rgba(76,154,255,.15); color: var(--accent); }
+  .pill.completed { background: rgba(63,185,80,.15); color: var(--green); }
+  .pill.failed { background: rgba(248,81,73,.15); color: var(--red); }
+
+  .offer { display: flex; gap: 6px; align-items: center; }
+  .offer input { min-width: 230px; }
+  .empty { text-align: center; color: var(--muted); padding: 40px 0; }
+  .hint { color: var(--muted); font-size: 12px; }
+  .err { color: var(--red); font-size: 13px; min-height: 18px; }
+  code { background: var(--panel-2); padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div id="login">
+  <div class="card">
+    <h2>Вход</h2>
+    <p class="hint">Введите <code>ADMIN_TOKEN</code> из переменных окружения Render.</p>
+    <label for="token">Токен</label>
+    <input type="password" id="token" placeholder="ADMIN_TOKEN" autocomplete="current-password">
+    <p class="err" id="loginErr"></p>
+    <button class="primary" id="loginBtn" style="width:100%">Войти</button>
+    <p class="hint" style="margin-top:14px">
+      Токен принимается через заголовок <code>X-Admin-Token</code> и хранится в localStorage этого браузера.
+    </p>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+  <header>
+    <h1>Caser — админ</h1>
+    <span class="spacer"></span>
+    <button id="refresh">Обновить</button>
+    <button id="logout">Выйти</button>
+  </header>
+
+  <main>
+    <div class="card">
+      <h2>Показатели</h2>
+      <div class="stats" id="stats"></div>
+    </div>
+
+    <div class="card">
+      <h2>Заявки на вывод</h2>
+      <div class="filters" id="filters">
+        <button data-status="" class="active">Все</button>
+        <button data-status="pending">Ожидают</button>
+        <button data-status="ready">Trade offer</button>
+        <button data-status="completed">Выполнены</button>
+        <button data-status="failed">Отклонены</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Предмет</th>
+              <th>Игрок</th>
+              <th class="num">Цена</th>
+              <th>Trade offer</th>
+              <th>Статус</th>
+              <th>Создан</th>
+              <th>Действия</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="empty" style="display:none">Заявок нет</div>
+    </div>
+  </main>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var TOKEN_KEY = 'caser_admin_token';
+  var $ = function (id) { return document.getElementById(id); };
+
+  function token() { return localStorage.getItem(TOKEN_KEY) || ''; }
+  function setToken(v) {
+    if (v) localStorage.setItem(TOKEN_KEY, v);
+    else localStorage.removeItem(TOKEN_KEY);
+  }
+
+  function api(method, path, body) {
+    var opts = { method: method, headers: { 'X-Admin-Token': token() } };
+    if (body !== undefined) {
+      opts.headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(body);
+    }
+    return fetch(path, opts).then(function (r) {
+      return r.json().catch(function () { return {}; })
+        .then(function (data) {
+          if (!r.ok) throw new Error(data.message || ('HTTP ' + r.status));
+          return data;
+        });
+    });
+  }
+
+  function money(n) {
+    return '$' + (Number(n) || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function when(iso) {
+    if (!iso) return '—';
+    var d = new Date(iso);
+    return isNaN(d.getTime()) ? iso : d.toLocaleString('ru-RU');
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  // ---------- stats ----------
+  function renderStats(d) {
+    var w = d.withdrawals || {};
+    var cards = [
+      ['Ожидают', w.pending || 0, 'warn'],
+      ['Trade offer', w.ready || 0, ''],
+      ['Выполнено', w.completed || 0, 'ok'],
+      ['Отклонено', w.failed || 0, ''],
+      ['Выплачено', money(w.paidOutValue), 'ok'],
+      ['RTP', Math.round((d.rtp || 0) * 100) + '%', 'warn'],
+      ['Игроков', d.users || 0, ''],
+      ['Открытий кейсов', d.caseOpens || 0, ''],
+      ['Онлайн', d.online || 0, ''],
+      ['Хранилище', d.storage && d.storage.mode === 'memory' ? 'память' : (d.storage && d.storage.mode) || '—',
+        d.storage && d.storage.mode === 'memory' ? 'warn' : '']
+    ];
+    $('stats').innerHTML = cards.map(function (c) {
+      return '<div class="stat ' + c[2] + '"><div class="k">' + esc(c[0]) +
+        '</div><div class="v">' + esc(c[1]) + '</div></div>';
+    }).join('');
+  }
+
+  // ---------- withdrawals ----------
+  var current = '';
+
+  function actionsFor(w) {
+    if (w.status === 'pending') {
+      return '<div class="offer"><input type="text" data-offer="' + esc(w.id) +
+        '" placeholder="https://steamcommunity.com/tradeoffer/...">' +
+        '<button class="go" data-act="ready" data-id="' + esc(w.id) + '">Готов</button>' +
+        '<button class="no" data-act="fail" data-id="' + esc(w.id) + '">Отклонить</button></div>';
+    }
+    if (w.status === 'ready') {
+      return '<button class="go" data-act="complete" data-id="' + esc(w.id) + '">Выполнено</button>' +
+        '<button class="no" data-act="fail" data-id="' + esc(w.id) + '">Отклонить</button>';
+    }
+    return '<span class="hint">—</span>';
+  }
+
+  function renderRows(items) {
+    var tb = $('rows');
+    $('empty').style.display = items.length ? 'none' : 'block';
+    tb.innerHTML = items.map(function (w) {
+      var img = w.image || '';
+      return '<tr>' +
+        '<td class="item"><div class="name">' +
+        (img ? '<img src="' + esc(img) + '" alt="">' : '') +
+        '<div><div>' + esc(w.marketName || '—') + '</div>' +
+        '<div class="meta">' + esc(w.id) + '</div></div></div></td>' +
+        '<td>' + esc(w.userId) + '</td>' +
+        '<td class="num">' + money(w.price) + '</td>' +
+        '<td>' + (w.tradeOfferUrl
+          ? '<a href="' + esc(w.tradeOfferUrl) + '" target="_blank" rel="noopener">открыть</a>'
+          : '<span class="hint">—</span>') + '</td>' +
+        '<td><span class="pill ' + esc(w.status) + '">' + esc(w.status) + '</span></td>' +
+        '<td class="hint">' + esc(when(w.createdAt)) + '</td>' +
+        '<td class="actions">' + actionsFor(w) + '</td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  function loadWithdrawals() {
+    var q = '/api/admin/withdrawals?limit=200' + (current ? '&status=' + current : '');
+    return api('GET', q).then(function (d) { renderRows(d.items || []); });
+  }
+
+  function loadStats() {
+    return api('GET', '/api/admin/stats').then(function (d) { renderStats(d.data || {}); });
+  }
+
+  function refreshAll() {
+    return Promise.all([loadStats(), loadWithdrawals()]).catch(function (e) {
+      // A rejected token should drop us back to the login screen.
+      if (/admin|unauthor|forbidden|http 40/i.test(e.message)) {
+        setToken('');
+        showLogin('Сессия недействительна, войдите снова');
+      } else {
+        alert(e.message);
+      }
+    });
+  }
+
+  // ---------- screens ----------
+  function showLogin(err) {
+    $('login').style.display = 'block';
+    $('app').style.display = 'none';
+    $('loginErr').textContent = err || '';
+  }
+  function showApp() {
+    $('login').style.display = 'none';
+    $('app').style.display = 'block';
+    refreshAll();
+  }
+
+  // ---------- events ----------
+  $('loginBtn').onclick = function () {
+    var v = $('token').value.trim();
+    if (!v) { $('loginErr').textContent = 'Введите токен'; return; }
+    setToken(v);
+    api('GET', '/api/admin/stats')
+      .then(function () { $('loginErr').textContent = ''; showApp(); })
+      .catch(function (e) { setToken(''); $('loginErr').textContent = e.message; });
+  };
+
+  $('token').onkeydown = function (e) { if (e.key === 'Enter') $('loginBtn').click(); };
+  $('logout').onclick = function () { setToken(''); showLogin(''); };
+  $('refresh').onclick = refreshAll;
+
+  $('filters').onclick = function (e) {
+    var btn = e.target.closest('button[data-status]');
+    if (!btn) return;
+    current = btn.getAttribute('data-status');
+    Array.prototype.forEach.call(this.querySelectorAll('button'), function (b) {
+      b.classList.toggle('active', b === btn);
+    });
+    loadWithdrawals().catch(function (err) { alert(err.message); });
+  };
+
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    var id = btn.getAttribute('data-id');
+    var act = btn.getAttribute('data-act');
+    var body = {};
+    if (act === 'ready') {
+      var input = document.querySelector('input[data-offer="' + id + '"]');
+      body.tradeOfferUrl = input ? input.value.trim() : '';
+      if (!body.tradeOfferUrl) { alert('Вставьте ссылку на trade offer'); return; }
+    }
+    if (act === 'fail') {
+      var reason = prompt('Причина отклонения (необязательно):');
+      if (reason === null) return;
+      body.reason = reason;
+    }
+    if (act === 'complete' && !confirm('Предмет будет удалён из инвентаря игрока. Продолжить?')) return;
+
+    btn.disabled = true;
+    api('POST', '/api/admin/withdrawals/' + encodeURIComponent(id) + '/' + act, body)
+      .then(refreshAll)
+      .catch(function (err) { alert(err.message); })
+      .finally(function () { btn.disabled = false; });
+  });
+
+  // ---------- boot ----------
+  if (token()) showApp(); else showLogin('');
+})();
+</script>
+</body>
+</html>

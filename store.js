@@ -33,7 +33,9 @@ const mem = {
   users: new Map(),
   inventory: new Map(), // userId -> [entry]
   transactions: [],
-  opens: []
+  opens: [],
+  withdrawals: [],
+  notifications: []
 };
 
 // ---------------------------------------------------------------------------
@@ -55,6 +57,11 @@ async function init() {
       client = createClient({ url: `file:${path.join(DATA_DIR, 'caser.db')}` });
       mode = 'local';
     }
+
+    // Concurrent readers should not block the single writer, and a blocked
+    // writer should wait instead of throwing SQLITE_BUSY straight away.
+    await client.execute('PRAGMA busy_timeout = 10000');
+    await client.execute('PRAGMA journal_mode = WAL');
 
     await migrate();
     // Fail fast on a bad connection instead of erroring on the first request
@@ -94,6 +101,43 @@ const val = (v) => {
   if (typeof v === 'string') return v;
   return String(v);
 };
+
+/**
+ * Serialises write transactions inside this process.
+ *
+ * libSQL/SQLite allows exactly one writer. Two overlapping write transactions
+ * from the same Node process do not wait for each other politely - the second
+ * one dies with SQLITE_BUSY. Chaining them on a single promise makes the
+ * database effectively single-writer while leaving reads fully concurrent.
+ */
+let writeChain = Promise.resolve();
+
+/**
+ * Runs fn inside a database transaction. The callback receives the transaction
+ * handle - every statement MUST go through it (`tx.execute`), never through the
+ * client directly: touching the client while a write transaction is open asks
+ * the pool for a second connection and fails with TRANSACTION_ACTIVE/SQLITE_BUSY.
+ * Commits on success, rolls back on any thrown error.
+ */
+async function dbTransaction(fn) {
+  if (mode === 'memory') return fn({ execute: async () => ({ rowsAffected: 1 }), batch: async () => [] });
+
+  const run = writeChain.then(async () => {
+    const tx = await client.transaction('write');
+    try {
+      const out = await fn(tx);
+      await tx.commit();
+      return out;
+    } catch (err) {
+      try { await tx.rollback(); } catch (e) { /* ignore */ }
+      throw err;
+    }
+  });
+
+  // Keep the chain alive even if this transaction rejects.
+  writeChain = run.then(() => undefined, () => undefined);
+  return run;
+}
 
 // ---------------------------------------------------------------------------
 // Schema
@@ -141,7 +185,29 @@ async function migrate() {
       items_json  TEXT NOT NULL,
       created_at  TEXT NOT NULL
     )`,
-    'CREATE INDEX IF NOT EXISTS idx_open_user ON case_opens(user_id, id DESC)'
+    'CREATE INDEX IF NOT EXISTS idx_open_user ON case_opens(user_id, id DESC)',
+    `CREATE TABLE IF NOT EXISTS withdrawals (
+      id                TEXT PRIMARY KEY,
+      user_id           TEXT NOT NULL,
+      inventory_item_id TEXT NOT NULL,
+      market_name       TEXT,
+      price             REAL NOT NULL DEFAULT 0,
+      status            TEXT NOT NULL DEFAULT 'pending',
+      trade_offer_url   TEXT,
+      created_at        TEXT NOT NULL,
+      updated_at        TEXT NOT NULL
+    )`,
+    'CREATE INDEX IF NOT EXISTS idx_wd_status ON withdrawals(status, created_at DESC)',
+    'CREATE INDEX IF NOT EXISTS idx_wd_user ON withdrawals(user_id, created_at DESC)',
+    `CREATE TABLE IF NOT EXISTS notifications (
+      id         TEXT PRIMARY KEY,
+      user_id    TEXT NOT NULL,
+      type       TEXT NOT NULL,
+      content    TEXT NOT NULL,
+      is_read    INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    )`,
+    'CREATE INDEX IF NOT EXISTS idx_ntf_user ON notifications(user_id, id DESC)'
   ];
   await client.batch(statements.map((sql) => ({ sql })), 'write');
 }
@@ -445,6 +511,260 @@ async function countCaseOpens(userId) {
 }
 
 // ---------------------------------------------------------------------------
+// Withdrawals
+// ---------------------------------------------------------------------------
+const WITHDRAWAL_STATUS = {
+  pending: 'pending',
+  ready: 'ready',
+  completed: 'completed',
+  failed: 'failed'
+};
+
+/**
+ * Legal status transitions.
+ *
+ * The important one is that `pending` cannot jump straight to `completed`:
+ * completing removes the item from the player's inventory, so doing it without
+ * a trade offer in between would destroy a skin that was never handed over.
+ */
+const WITHDRAWAL_TRANSITIONS = {
+  pending: ['ready', 'failed'],
+  ready: ['completed', 'failed'],
+  completed: [],
+  failed: []
+};
+
+function canTransition(from, to) {
+  const allowed = WITHDRAWAL_TRANSITIONS[from];
+  return Array.isArray(allowed) && allowed.includes(to);
+}
+
+/** Maps a `withdrawals` row (snake_case, from either backend) to the API shape. */
+function rowToWithdrawal(r) {
+  if (!r) return null;
+  return {
+    id: r.id,
+    userId: r.user_id !== undefined ? r.user_id : r.userId,
+    inventoryItemId: r.inventory_item_id !== undefined ? r.inventory_item_id : r.inventoryItemId,
+    marketName: r.market_name !== undefined ? r.market_name : r.marketName,
+    price: Number(r.price) || 0,
+    status: r.status,
+    tradeOfferUrl: r.trade_offer_url !== undefined ? r.trade_offer_url : r.tradeOfferUrl,
+    createdAt: r.created_at !== undefined ? r.created_at : r.createdAt,
+    updatedAt: r.updated_at !== undefined ? r.updated_at : r.updatedAt
+  };
+}
+
+/**
+ * Locks the item and opens a withdrawal request.
+ * Returns { withdrawal } or { error } when the item is not sellable.
+ */
+async function createWithdrawal(userId, inventoryItemId) {
+  const uid = String(userId);
+  const entry = await getInventoryEntry(uid, inventoryItemId);
+  if (!entry) return { error: 'Item not found' };
+  if (entry.status !== 'available') return { error: 'Item is not available' };
+
+  const id = newId('wd');
+  const ts = now();
+
+  if (mode === 'memory') {
+    entry.status = 'locked_for_withdrawal';
+    const record = {
+      id, user_id: uid, inventory_item_id: entry.id, market_name: entry.item.marketName,
+      price: entry.price, status: 'pending', trade_offer_url: null, created_at: ts, updated_at: ts
+    };
+    mem.withdrawals.push(record);
+    return { withdrawal: rowToWithdrawal(record) };
+  }
+
+  const ok = await dbTransaction(async (tx) => {
+    // The `status = 'available'` guard is what makes double submits impossible:
+    // the second attempt updates 0 rows and never reaches the INSERT.
+    const locked = await tx.execute({
+      sql: "UPDATE inventory_items SET status = 'locked_for_withdrawal' WHERE user_id = ? AND id = ? AND status = 'available'",
+      args: [uid, String(inventoryItemId)]
+    });
+    if (!locked.rowsAffected) return false;
+
+    await tx.execute({
+      sql: `INSERT INTO withdrawals (id, user_id, inventory_item_id, market_name, price, status, trade_offer_url, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, 'pending', NULL, ?, ?)`,
+      args: [id, uid, String(inventoryItemId), val(entry.item.marketName), Number(entry.price) || 0, ts, ts]
+    });
+    return true;
+  });
+
+  if (!ok) return { error: 'Item is not available' };
+
+  return { withdrawal: await getWithdrawal(id) };
+}
+
+async function getWithdrawal(id) {
+  if (mode === 'memory') return rowToWithdrawal(mem.withdrawals.find((w) => w.id === String(id)));
+  const res = await client.execute({ sql: 'SELECT * FROM withdrawals WHERE id = ?', args: [String(id)] });
+  return res.rows.length ? rowToWithdrawal(res.rows[0]) : null;
+}
+
+async function listWithdrawals({ userId, status, limit = 50, offset = 0 } = {}) {
+  if (mode === 'memory') {
+    let list = mem.withdrawals.slice().sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    if (userId) list = list.filter((w) => w.user_id === String(userId));
+    if (status) list = list.filter((w) => w.status === status);
+    return list.slice(offset, offset + limit).map(rowToWithdrawal);
+  }
+
+  const where = [];
+  const args = [];
+  if (userId) { where.push('user_id = ?'); args.push(String(userId)); }
+  if (status) { where.push('status = ?'); args.push(status); }
+  const sql = `SELECT * FROM withdrawals ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?`;
+  const res = await client.execute({ sql, args: [...args, Number(limit), Number(offset)] });
+  return res.rows.map(rowToWithdrawal);
+}
+
+/**
+ * Moves a withdrawal forward and keeps the inventory item in sync.
+ *   ready     -> item becomes 'trade_ready', stores the trade offer URL
+ *   completed -> item leaves the inventory (handed over to the player)
+ *   failed    -> item is unlocked back to 'available'
+ */
+async function setWithdrawalStatus(id, status, extra = {}) {
+  const key = String(id);
+  if (!Object.prototype.hasOwnProperty.call(WITHDRAWAL_STATUS, status)) return { error: 'Unknown status' };
+
+  const w = await getWithdrawal(key);
+  if (!w) return { error: 'Withdrawal not found' };
+  if (!canTransition(w.status, status)) {
+    return { error: `Cannot go from ${w.status} to ${status}` };
+  }
+
+  if (mode === 'memory') {
+    const record = mem.withdrawals.find((r) => r.id === key);
+    record.status = status;
+    record.updated_at = now();
+    if (status === 'ready') {
+      record.trade_offer_url = extra.tradeOfferUrl || null;
+      const list = mem.inventory.get(w.userId) || [];
+      const entry = list.find((e) => String(e.id) === String(w.inventoryItemId));
+      if (entry) { entry.status = 'trade_ready'; entry.tradeOfferUrl = record.trade_offer_url; }
+    } else if (status === 'completed') {
+      const list = mem.inventory.get(w.userId) || [];
+      mem.inventory.set(w.userId, list.filter((e) => String(e.id) !== String(w.inventoryItemId)));
+    } else if (status === 'failed') {
+      const list = mem.inventory.get(w.userId) || [];
+      const entry = list.find((e) => String(e.id) === String(w.inventoryItemId));
+      if (entry) { entry.status = 'available'; entry.tradeOfferUrl = null; }
+    }
+    return { withdrawal: rowToWithdrawal(record) };
+  }
+
+  const ts = now();
+  // NOTE: every statement goes through `tx`. Calling client.execute() from in
+  // here would need a second connection while the write transaction holds the
+  // only one, which fails with SQLITE_BUSY / TRANSACTION_ACTIVE.
+  await dbTransaction(async (tx) => {
+    if (status === 'ready') {
+      await tx.execute({
+        sql: "UPDATE inventory_items SET status = 'trade_ready' WHERE user_id = ? AND id = ?",
+        args: [w.userId, w.inventoryItemId]
+      });
+      await tx.execute({
+        sql: 'UPDATE withdrawals SET status = ?, trade_offer_url = ?, updated_at = ? WHERE id = ?',
+        args: ['ready', val(extra.tradeOfferUrl), ts, key]
+      });
+    } else if (status === 'completed') {
+      // The item leaves the inventory for good: it now belongs to the player.
+      await tx.execute({
+        sql: 'DELETE FROM inventory_items WHERE user_id = ? AND id = ?',
+        args: [w.userId, w.inventoryItemId]
+      });
+      await tx.execute({
+        sql: 'UPDATE withdrawals SET status = ?, updated_at = ? WHERE id = ?',
+        args: ['completed', ts, key]
+      });
+    } else if (status === 'failed') {
+      // Unlock it so the player can retry or sell it.
+      await tx.execute({
+        sql: "UPDATE inventory_items SET status = 'available' WHERE user_id = ? AND id = ?",
+        args: [w.userId, w.inventoryItemId]
+      });
+      await tx.execute({
+        sql: 'UPDATE withdrawals SET status = ?, updated_at = ? WHERE id = ?',
+        args: ['failed', ts, key]
+      });
+    }
+  });
+
+  return { withdrawal: await getWithdrawal(key) };
+}
+
+// ---------------------------------------------------------------------------
+// Notifications (the header bell + withdrawal lifecycle)
+// ---------------------------------------------------------------------------
+async function createNotification(userId, type, content) {
+  const id = newId('ntf');
+  const ts = now();
+  if (mode === 'memory') {
+    mem.notifications.push({ id, user_id: String(userId), type, content: JSON.stringify(content), is_read: 0, created_at: ts });
+    return id;
+  }
+  await client.execute({
+    sql: 'INSERT INTO notifications (id, user_id, type, content, is_read, created_at) VALUES (?, ?, ?, ?, 0, ?)',
+    args: [id, String(userId), String(type), JSON.stringify(content), ts]
+  });
+  return id;
+}
+
+async function listNotifications(userId, limit = 20, offset = 0) {
+  const shape = (r) => ({
+    id: r.id,
+    userId: r.user_id,
+    type: r.type,
+    content: typeof r.content === 'string' ? safeJson(r.content) : (r.content || {}),
+    isRead: !!r.is_read,
+    createdAt: r.created_at
+  });
+
+  if (mode === 'memory') {
+    return mem.notifications
+      .filter((n) => n.user_id === String(userId))
+      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+      .slice(offset, offset + limit)
+      .map(shape);
+  }
+  const res = await client.execute({
+    sql: 'SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?',
+    args: [String(userId), Number(limit), Number(offset)]
+  });
+  return res.rows.map(shape);
+}
+
+async function countUnreadNotifications(userId) {
+  if (mode === 'memory') {
+    return mem.notifications.filter((n) => n.user_id === String(userId) && !n.is_read).length;
+  }
+  const res = await client.execute({
+    sql: 'SELECT COUNT(*) AS c FROM notifications WHERE user_id = ? AND is_read = 0',
+    args: [String(userId)]
+  });
+  return Number(res.rows[0].c) || 0;
+}
+
+async function markNotificationRead(id) {
+  if (mode === 'memory') {
+    const n = mem.notifications.find((n) => n.id === String(id));
+    if (n) n.is_read = 1;
+    return;
+  }
+  await client.execute({ sql: 'UPDATE notifications SET is_read = 1 WHERE id = ?', args: [String(id)] });
+}
+
+const safeJson = (raw) => {
+  try { return JSON.parse(raw); } catch (e) { return {}; }
+};
+
+// ---------------------------------------------------------------------------
 // Housekeeping
 // ---------------------------------------------------------------------------
 async function stats() {
@@ -499,5 +819,17 @@ module.exports = {
   totalInventoryValue,
   recordCaseOpen,
   countCaseOpens,
+  // Withdrawals
+  createWithdrawal,
+  getWithdrawal,
+  listWithdrawals,
+  setWithdrawalStatus,
+  WITHDRAWAL_STATUS,
+  WITHDRAWAL_TRANSITIONS,
+  // Notifications
+  createNotification,
+  listNotifications,
+  countUnreadNotifications,
+  markNotificationRead,
   stats
 };
