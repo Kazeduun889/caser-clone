@@ -14,6 +14,22 @@ try {
 } catch (e) {
   // Compression optional
 }
+
+// ---------------------------------------------------------------------------
+// Crash resilience.
+//
+// Node's default is to exit on an unhandled rejection or an uncaught
+// exception. On Render that means the instance dies, the health check starts
+// failing, and the site stops answering entirely - which is exactly the
+// "opens and never loads" failure. Log loudly and keep serving instead; a
+// single bad request must not take the whole site down.
+// ---------------------------------------------------------------------------
+process.on('unhandledRejection', (reason) => {
+  console.error('[fatal:unhandledRejection]', reason && reason.stack ? reason.stack : reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[fatal:uncaughtException]', err && err.stack ? err.stack : err);
+});
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/api/ws' });
 
@@ -63,6 +79,20 @@ function parseCookies(req) {
   return list;
 }
 
+// Malformed JSON bodies raise here. Answer 400 instead of letting the default
+// handler dump a stack trace into the deploy log on every bad request.
+app.use((err, req, res, next) => {
+  if (err && (err.type === 'entity.parse.failed' || err instanceof SyntaxError)) {
+    return res.status(400).json({ success: false, message: 'Malformed JSON body' });
+  }
+  if (err && err.type === 'entity.too.large') {
+    return res.status(413).json({ success: false, message: 'Body too large' });
+  }
+  console.error('[http:error]', err && err.stack ? err.stack : err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ success: false, message: 'Internal error' });
+});
+
 // CORS & Headers
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -75,10 +105,16 @@ app.use((req, res, next) => {
   next();
 });
 
-// Health check (used by Render and by uptime monitors)
+// Health check (used by Render and by uptime monitors).
+// Reports the boot stage too: if the process is stuck or crash-looping, the
+// stage tells you where without needing shell access to the box.
+const BOOT = { startedAt: Date.now(), stage: 'booting', errors: 0 };
+
 app.get('/healthz', async (req, res) => {
   res.json({
     ok: true,
+    stage: BOOT.stage,
+    bootedInMs: Date.now() - BOOT.startedAt,
     uptime: Math.round(process.uptime()),
     cases: casesData.length,
     shopItems: SHOP_ITEMS.length,
@@ -93,8 +129,9 @@ let casesData = [];
 try {
   const rawCases = fs.readFileSync(path.join(SITE_DIR, 'cases.json'), 'utf8');
   casesData = JSON.parse(rawCases).data.cases;
+  console.log(`[boot] cases.json loaded: ${casesData.length} cases`);
 } catch (e) {
-  console.warn('Could not read cases.json:', e.message);
+  console.warn('[boot] Could not read cases.json:', e.message);
 }
 
 // Sample skin pool with Steam CDN images
@@ -689,7 +726,10 @@ app.get('/api/game/giveaways/winners', (req, res) => res.json({ winners: [] }));
 app.get('/game/giveaways/winners', (req, res) => res.json({ winners: [] }));
 
 // Shop catalogue = every distinct skin known to the server (all cached cases + samples)
+BOOT.stage = 'building-catalogue';
+console.log('[boot] building shop catalogue...');
 const SHOP_ITEMS = buildShopCatalogue();
+console.log(`[boot] catalogue ready: ${SHOP_ITEMS.length} distinct skins`);
 
 const toShopPayload = (s) => {
   const rarity = Number(s.rarity);
@@ -1463,27 +1503,100 @@ app.get('/api/game/weekly-drops/top-feed', (req, res) => res.json({ feed: [] }))
 app.get('/api/payments/categories', (req, res) => res.json([]));
 app.get('/api/fingerprint-pro/required', (req, res) => res.json({ required: false }));
 
-// Proxy helper for missing remote assets
-function proxyFromOrigin(reqPath, res) {
+// Serves a static asset straight off disk. This is the hot path: a single page
+// pulls ~100 chunks, images and stylesheets.
+const STATIC_TYPES = {
+  '.js': 'application/javascript; charset=utf-8',
+  '.mjs': 'application/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.html': 'text/html; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.avif': 'image/avif',
+  '.gif': 'image/gif',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.webmanifest': 'application/manifest+json'
+};
+
+// Chunks are content-addressed by Next.js, so they can be cached hard.
+const IMMUTABLE_CACHE = 'public, max-age=31536000, immutable';
+const REVALIDATE_CACHE = 'public, max-age=300';
+
+function staticFilePath(reqPath) {
+  const rel = decodeURIComponent(reqPath.replace(/^\//, '').split('?')[0]);
+  // Never let a crafted path escape the site directory.
+  const resolved = path.resolve(SITE_DIR, rel);
+  if (resolved !== SITE_DIR && !resolved.startsWith(SITE_DIR + path.sep)) return null;
+  return resolved;
+}
+
+/**
+ * Serves an asset from disk, or fetches it from the origin once and caches it.
+ *
+ * The check-then-proxy order matters: always hitting the network first made
+ * every page load ~100 sequential round trips to the CDN, which is what made
+ * the site feel like it hung. Render's filesystem is ephemeral, so the cache
+ * is cold after each deploy, but a warm instance serves entirely from disk.
+ */
+function serveStatic(reqPath, res) {
+  const file = staticFilePath(reqPath);
+  if (!file) return res.status(400).send('Bad path');
+
+  const ext = path.extname(file).toLowerCase();
+  const type = STATIC_TYPES[ext] || 'application/octet-stream';
+  const isHashedChunk = /^\/_next\/static\//.test(reqPath);
+
+  // 1) Disk hit - no network at all.
+  if (fs.existsSync(file) && fs.statSync(file).isFile()) {
+    res.setHeader('Content-Type', type);
+    res.setHeader('Cache-Control', isHashedChunk ? IMMUTABLE_CACHE : REVALIDATE_CACHE);
+    return fs.createReadStream(file).pipe(res);
+  }
+
+  // 2) Miss - pull it once from the origin, store it, then pass it through.
   const remoteUrl = REMOTE_CDN + reqPath;
-  https.get(remoteUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (proxyRes) => {
-    if (proxyRes.statusCode === 200) {
-      res.writeHead(200, {
-        'Content-Type': proxyRes.headers['content-type'] || 'application/octet-stream',
-        'Cache-Control': 'public, max-age=86400'
-      });
-      const localFile = path.join(SITE_DIR, reqPath.replace(/^\//, '').split('?')[0]);
-      try {
-        fs.mkdirSync(path.dirname(localFile), { recursive: true });
-        const fileStream = fs.createWriteStream(localFile);
-        proxyRes.pipe(fileStream);
-      } catch (err) {}
-      proxyRes.pipe(res);
-    } else {
-      res.status(proxyRes.statusCode || 404).send('Not found');
+  const upstream = https.get(remoteUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (proxyRes) => {
+    if (proxyRes.statusCode !== 200) {
+      proxyRes.resume(); // drain so the socket can be reused
+      return res.status(proxyRes.statusCode || 404).send('Not found');
     }
-  }).on('error', () => {
-    res.status(404).send('Asset not found');
+
+    const contentType = proxyRes.headers['content-type'] || type;
+    res.writeHead(200, {
+      'Content-Type': contentType,
+      'Cache-Control': isHashedChunk ? IMMUTABLE_CACHE : REVALIDATE_CACHE
+    });
+
+    // Persist a copy for the next request. On Render the file system is
+    // ephemeral, so this only speeds up the life of one instance - which is
+    // exactly what we need, since every visitor hits the same instance.
+    let sink = null;
+    try {
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      sink = fs.createWriteStream(file);
+      sink.on('error', () => { /* cache write failure must not break the response */ });
+    } catch (err) { /* read-only fs - just stream through */ }
+
+    if (sink) proxyRes.pipe(sink);
+    proxyRes.pipe(res);
+  });
+
+  // Without a timeout a slow upstream holds the socket open indefinitely and
+  // the page never finishes loading.
+  upstream.setTimeout(15000, () => {
+    upstream.destroy();
+    if (!res.headersSent) res.status(504).send('Upstream timeout');
+  });
+
+  upstream.on('error', () => {
+    if (!res.headersSent) res.status(404).send('Asset not found');
   });
 }
 
@@ -1596,9 +1709,9 @@ app.use((req, res, next) => {
     return sendInjectedHtml(pageCandidate, res);
   }
 
-  // If path looks like an asset and not on disk, proxy and cache
+  // If path looks like an asset and not on disk, serve from cache or fetch it
   if (cleanPath.startsWith('/_next/') || cleanPath.startsWith('/cdn/') || cleanPath.startsWith('/icons/') || cleanPath.startsWith('/images/') || cleanPath.startsWith('/cases/')) {
-    return proxyFromOrigin(cleanPath, res);
+    return serveStatic(cleanPath, res);
   }
 
   next();
@@ -1673,9 +1786,21 @@ wss.on('connection', (ws, wsReq) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
+  BOOT.stage = 'listening';
   console.log(`\n====================================================`);
   console.log(`  Сайт успешно запущен и работает!`);
+  console.log(`  Порт:                ${PORT}`);
   console.log(`  Откройте в браузере: http://localhost:${PORT}`);
   console.log(`  Каталог кейсов:      http://localhost:${PORT}/ru/cases`);
+  console.log(`  Админ-панель:        http://localhost:${PORT}/admin`);
   console.log(`====================================================\n`);
 });
+
+// Keep the process out of the event loop for a clean deploy shutdown.
+for (const sig of ['SIGTERM', 'SIGINT']) {
+  process.on(sig, () => {
+    console.log(`[shutdown] ${sig} received, closing`);
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 5000).unref();
+  });
+}

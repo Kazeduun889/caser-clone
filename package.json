@@ -13,7 +13,10 @@
     "test:rtp": "node _test_rtp.js",
     "test:odds": "node _test_odds.js",
     "test:api": "node _test_api.js",
-    "test:upgrade": "node _test_upgrade_live.js"
+    "test:upgrade": "node _test_upgrade_live.js",
+    "test:resilience": "node _test_resilience.js",
+    "probe:render": "node _probe_render.js",
+    "probe:assets": "node _probe_assets.js"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",
