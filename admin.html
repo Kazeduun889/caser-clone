@@ -125,6 +125,30 @@
     </div>
 
     <div class="card">
+      <h2>Игроки</h2>
+      <div class="filters" id="playerTools">
+        <input type="text" id="playerSearch" placeholder="Поиск по id или нику..." style="max-width:280px">
+        <button id="playerReload">Обновить</button>
+        <button id="creditLast" class="primary">Начисли 6 999 999 последнему</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Игрок</th>
+              <th class="num">Баланс</th>
+              <th>Роль</th>
+              <th>Регистрация</th>
+              <th>Действия</th>
+            </tr>
+          </thead>
+          <tbody id="playerRows"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="playerEmpty" style="display:none">Игроки не найдены</div>
+    </div>
+
+    <div class="card">
       <h2>Заявки на вывод</h2>
       <div class="filters" id="filters">
         <button data-status="" class="active">Все</button>
@@ -220,6 +244,35 @@
     }).join('');
   }
 
+  // ---------- players ----------
+  function renderPlayers(items) {
+    var tb = $('playerRows');
+    $('playerEmpty').style.display = items.length ? 'none' : 'block';
+    tb.innerHTML = items.map(function (u) {
+      return '<tr>' +
+        '<td><div>' + esc(u.nickname || '—') + '</div>' +
+        '<div class="meta">' + esc(u.id) + '</div></td>' +
+        '<td class="num" data-bal="' + esc(u.id) + '">' + money(u.balance) + '</td>' +
+        '<td>' + esc(u.role || 'user') + '</td>' +
+        '<td class="hint">' + esc(when(u.createdAt)) + '</td>' +
+        '<td class="actions">' +
+        '<button data-setbal="' + esc(u.id) + '">Задать баланс</button>' +
+        '</td></tr>';
+    }).join('');
+  }
+
+  function loadPlayers() {
+    var q = $('playerSearch').value.trim();
+    var url = '/api/admin/users?limit=50' + (q ? '&search=' + encodeURIComponent(q) : '');
+    return api('GET', url).then(function (d) { renderPlayers(d.items || []); });
+  }
+
+  /** Sets an absolute balance (not a top-up). */
+  function setBalance(userId, value) {
+    return api('POST', '/api/admin/users/' + encodeURIComponent(userId) + '/balance', { balance: value })
+      .then(function () { return Promise.all([loadPlayers(), loadStats()]); });
+  }
+
   // ---------- withdrawals ----------
   var current = '';
 
@@ -269,7 +322,7 @@
   }
 
   function refreshAll() {
-    return Promise.all([loadStats(), loadWithdrawals()]).catch(function (e) {
+    return Promise.all([loadStats(), loadWithdrawals(), loadPlayers()]).catch(function (e) {
       // A rejected token should drop us back to the login screen.
       if (/admin|unauthor|forbidden|http 40/i.test(e.message)) {
         setToken('');
@@ -306,6 +359,32 @@
   $('logout').onclick = function () { setToken(''); showLogin(''); };
   $('refresh').onclick = refreshAll;
 
+  $('playerReload').onclick = function () {
+    loadPlayers().catch(function (err) { alert(err.message); });
+  };
+  $('playerSearch').onkeydown = function (e) {
+    if (e.key === 'Enter') $('playerReload').click();
+  };
+
+  // One-click top-up for whoever registered most recently.
+  $('creditLast').onclick = function () {
+    var amount = prompt('Сколько начислить новейшему игроку?', '6999999');
+    if (amount === null) return;
+    var value = parseFloat(String(amount).replace(/\s/g, '').replace(',', '.'));
+    if (!isFinite(value) || value < 0) { alert('Введите число'); return; }
+
+    api('GET', '/api/admin/users?limit=1')
+      .then(function (d) {
+        var newest = (d.items || [])[0];
+        if (!newest) throw new Error('Игроки не найдены');
+        if (!confirm('Начисли ' + money(value) + ' игроку ' + newest.id + '?')) return null;
+        return setBalance(newest.id, value).then(function () {
+          alert('Готово. Баланс ' + newest.id + ' = ' + money(value));
+        });
+      })
+      .catch(function (err) { alert(err.message); });
+  };
+
   $('filters').onclick = function (e) {
     var btn = e.target.closest('button[data-status]');
     if (!btn) return;
@@ -317,6 +396,24 @@
   };
 
   document.addEventListener('click', function (e) {
+    // "Set exact balance" on a player row.
+    var balBtn = e.target.closest('button[data-setbal]');
+    if (balBtn) {
+      var uid = balBtn.getAttribute('data-setbal');
+      var cur = (balBtn.closest('tr').querySelector('[data-bal]') || {}).textContent || '';
+      var input = prompt('Новый баланс для ' + uid + '\n(сейчас ' + cur.trim() + ')', '');
+      if (input === null) return;
+      var val = parseFloat(String(input).replace(/\s/g, '').replace(',', '.'));
+      if (!isFinite(val) || val < 0) { alert('Введите число'); return; }
+      if (!confirm('Поставить баланс ' + uid + ' = ' + money(val) + '?')) return;
+      balBtn.disabled = true;
+      setBalance(uid, val)
+        .then(function () { alert('Баланс обновлён'); })
+        .catch(function (err) { alert(err.message); })
+        .finally(function () { balBtn.disabled = false; });
+      return;
+    }
+
     var btn = e.target.closest('button[data-act]');
     if (!btn) return;
     var id = btn.getAttribute('data-id');

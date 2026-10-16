@@ -510,6 +510,77 @@ async function countCaseOpens(userId) {
   return Number(res.rows[0].c);
 }
 
+/**
+ * Writes a ledger row WITHOUT touching the balance.
+ *
+ * Needed when the balance was already changed elsewhere (setBalance, a
+ * correction) and you only want the history to explain it. Calling addBalance
+ * for this would apply the delta a second time and double the balance.
+ */
+async function recordTransaction(userId, type, delta, meta, balanceAfter) {
+  const uid = String(userId);
+  const amount = Number(delta) || 0;
+
+  if (mode === 'memory') {
+    const u = mem.users.get(uid);
+    const after = balanceAfter != null ? Number(balanceAfter) : (u ? u.balance : 0);
+    mem.transactions.push({ user_id: uid, type, delta: amount, balance_after: after, meta, created_at: now() });
+    return after;
+  }
+
+  let after = balanceAfter;
+  if (after == null) {
+    const row = await client.execute({ sql: 'SELECT balance FROM users WHERE id = ?', args: [uid] });
+    if (!row.rows.length) return null;
+    after = Number(row.rows[0].balance);
+  }
+  await client.execute({
+    sql: `INSERT INTO transactions (user_id, type, delta, balance_after, meta, created_at)
+          VALUES (?, ?, ?, ?, ?, ?)`,
+    args: [uid, String(type), amount, after, meta ? JSON.stringify(meta) : null, now()]
+  });
+  return after;
+}
+
+/**
+ * Accounts for the admin panel, newest first. Lets the operator find the
+ * player who just registered and check what their balance is.
+ */
+async function listUsers({ limit = 25, offset = 0, search = '' } = {}) {
+  const n = Number(limit) || 25;
+  const o = Number(offset) || 0;
+
+  if (mode === 'memory') {
+    let list = [...mem.users.values()];
+    if (search) {
+      const q = String(search).toLowerCase();
+      list = list.filter((u) =>
+        String(u.id).toLowerCase().includes(q) || String(u.nickname || '').toLowerCase().includes(q));
+    }
+    list.sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+    return list.slice(o, o + n).map((u) => ({ ...u, balance: Number(u.balance) || 0 }));
+  }
+
+  const where = [];
+  const args = [];
+  if (search) {
+    where.push('(id LIKE ? OR nickname LIKE ?)');
+    const like = `%${search}%`;
+    args.push(like, like);
+  }
+  const sql = `SELECT * FROM users ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+               ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?`;
+  const res = await client.execute({ sql, args: [...args, n, o] });
+  return res.rows.map((r) => ({
+    id: r.id,
+    nickname: r.nickname,
+    image: r.image,
+    balance: Number(r.balance) || 0,
+    role: r.role,
+    createdAt: r.created_at
+  }));
+}
+
 // ---------------------------------------------------------------------------
 // Withdrawals
 // ---------------------------------------------------------------------------
@@ -809,6 +880,8 @@ module.exports = {
   ensureUser,
   setBalance,
   addBalance,
+  recordTransaction,
+  listUsers,
   listTransactions,
   listInventory,
   countInventory,

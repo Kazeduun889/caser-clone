@@ -230,6 +230,19 @@ const SAMPLE_SKINS = [
 const START_BALANCE = 2043.31;
 
 /**
+ * Money is rounded to 2 decimals on every read.
+ *
+ * Repeated float arithmetic (stake sums, percentage payouts) otherwise leaves
+ * values like 2043.3099999999998, which render differently depending on the
+ * endpoint the client happened to read last.
+ */
+function round2(n) {
+  const v = typeof n === 'number' ? n : parseFloat(n);
+  if (!Number.isFinite(v)) return 0;
+  return Math.round((v + Number.EPSILON) * 100) / 100;
+}
+
+/**
  * Reads a query parameter as an integer inside [min, max].
  * Garbage input ("?limit=abc", "?offset=-5") collapses to `fallback` instead of
  * reaching SQL as NaN.
@@ -434,10 +447,17 @@ app.post('/api/auth/register', async (req, res) => {
 
 app.post('/api/users/balance/topup', async (req, res) => {
   const user = await resolveUser(req);
-  const amount = parseFloat(req.body && req.body.amount) || 5000;
+  // Strict parsing. This used to fall back to a 5000 default, so a request
+  // with a missing or malformed amount silently credited 5000 - including
+  // `amount: 0`, which is falsy and therefore also got the default.
+  const raw = req.body && req.body.amount;
+  const amount = typeof raw === 'number' ? raw : parseFloat(raw);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return res.status(400).json({ success: false, message: 'Invalid amount' });
+  }
   const balance = (await store.addBalance(user.id, amount, 'topup', { amount })) ?? user.balance;
   pushBalance({ ...user, balance });
-  res.json({ success: true, balance });
+  res.json({ success: true, balance: round2(balance) });
 });
 
 const handleLogout = (req, res) => {
@@ -486,7 +506,10 @@ const handleUsersMe = async (req, res) => {
     id: user.id,
     nickname: user.nickname,
     image: user.image || DEFAULT_AVATARS[0],
-    balance: String(user.balance ?? START_BALANCE),
+    // Number, not a string: this endpoint and the topup/case-open endpoints
+    // must agree on the type. A string here made the client treat the balance
+    // differently depending on which request landed last.
+    balance: round2(user.balance ?? START_BALANCE),
     tradeUrl: user.tradeUrl || 'https://steamcommunity.com/tradeoffer/new/?partner=12345678',
     role: user.role || 'user'
   });
@@ -669,7 +692,7 @@ const handleOpenCase = async (req, res) => {
 
     // Tell the client about the new drops so the sell buttons light up and
     // the header balance refreshes without a reload
-    pushNewItems(createdEntries);
+    pushNewItems(user.id, createdEntries);
     pushBalance({ ...user, balance });
 
     res.json({
@@ -827,16 +850,29 @@ function wsBroadcast(event, data) {
   }
 }
 
+/**
+ * Pushes a balance update to the owner only.
+ *
+ * This used to be a global broadcast, which made every player's balance pill
+ * jump to whoever spent money last - with two tabs open, or two players, the
+ * number appeared to flicker between completely different values. Balance is
+ * per-account, so the event has to be routed per-account.
+ */
 function pushBalance(user) {
-  if (!user) return;
+  if (!user || !user.id) return;
   const amount = parseFloat(user.balance) || 0;
-  wsBroadcast('users.update_balance', amount);
-  wsBroadcast('users.update_inventory_balance', { amount: amount.toFixed(2) });
+  if (!Number.isFinite(amount)) return;
+  wsSendToUser(user.id, 'users.update_balance', amount);
+  wsSendToUser(user.id, 'users.update_inventory_balance', { amount: amount.toFixed(2) });
 }
 
-function pushNewItems(items) {
-  if (!Array.isArray(items) || !items.length) return;
-  wsBroadcast('inventory.new_items', { items: items.map((i) => ({ id: String(i.id) })) });
+/**
+ * Announces freshly won items to their owner only. Broadcasting this made
+ * every connected client try to render (and sell) items it does not own.
+ */
+function pushNewItems(userId, items) {
+  if (!userId || !Array.isArray(items) || !items.length) return;
+  wsSendToUser(userId, 'inventory.new_items', { items: items.map((i) => ({ id: String(i.id) })) });
 }
 
 /**
@@ -857,8 +893,11 @@ function wsSendToUser(userId, event, data) {
 }
 
 const inventoryBalancePayload = (user) => {
-  const amount = parseFloat((user && user.balance) || START_BALANCE) || 0;
-  const payload = { amount: amount.toFixed(2), balance: amount.toFixed(2), defuses: amount };
+  const amount = round2((user && user.balance) ?? START_BALANCE);
+  // Numbers everywhere, matching /api/users/me and the topup response. Sending
+  // `amount` as a pre-formatted string here while other endpoints sent a
+  // number is what let the displayed balance flip between renderings.
+  const payload = { amount, balance: amount, defuses: amount };
   // The api client exposes the raw body as `res.data`, and the client reads
   // `res.data.amount` -> the value must sit at the TOP level of the response.
   return { ...payload, success: true, data: payload };
@@ -1209,7 +1248,7 @@ const handleUpgradeBet = async (req, res) => {
 
   // Live UI updates: balance + the freshly won item
   pushBalance({ ...user, balance });
-  if (wonEntry) pushNewItems([wonEntry]);
+  if (wonEntry) pushNewItems(user.id, [wonEntry]);
 
   const stakeFromItems = Number(
     betEntries.reduce((sum, i) => sum + (parseFloat(i.price) || 0), 0).toFixed(2)
@@ -1441,6 +1480,45 @@ app.get('/api/admin/stats', requireAdmin, async (req, res) => {
       upgradeDisplayRange: [UPGRADE_DISPLAY_MIN, UPGRADE_DISPLAY_MAX]
     }
   });
+});
+
+// --- Admin: player balances ------------------------------------------------
+
+/** Newest accounts first - "who just joined" is the usual question. */
+app.get('/api/admin/users', requireAdmin, async (req, res) => {
+  const limit = clampInt(req.query.limit, 1, 200, 25);
+  const offset = clampInt(req.query.offset, 0, 1e6, 0);
+  const items = await store.listUsers({ limit, offset, search: req.query.search || '' });
+  res.json({ success: true, items, total: items.length });
+});
+
+/**
+ * Sets an exact balance. Credit/debit goes through topup; this is for
+ * corrections and for setting a starting figure.
+ */
+app.post('/api/admin/users/:id/balance', requireAdmin, async (req, res) => {
+  const id = String(req.params.id || '');
+  if (!id) return res.status(400).json({ success: false, message: 'User id required' });
+
+  const raw = req.body && req.body.balance;
+  const value = typeof raw === 'number' ? raw : parseFloat(raw);
+  if (!Number.isFinite(value) || value < 0) {
+    return res.status(400).json({ success: false, message: 'Invalid balance' });
+  }
+
+  const before = await store.getUser(id);
+  if (!before) return res.status(404).json({ success: false, message: 'User not found' });
+
+  const balance = await store.setBalance(id, value);
+  // Log the correction WITHOUT applying it again. setBalance already moved the
+  // money; calling addBalance with the delta would double it.
+  await store.recordTransaction(id, 'admin_set_balance', round2(balance) - round2(before.balance), {
+    from: round2(before.balance),
+    to: round2(balance)
+  }, balance);
+  pushBalance({ ...before, id, balance });
+
+  res.json({ success: true, data: { id, balance: round2(balance), previous: round2(before.balance) } });
 });
 
 // The operator panel. Served raw - it has its own token login, so it does not
