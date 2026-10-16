@@ -35,8 +35,14 @@ const mem = {
   transactions: [],
   opens: [],
   withdrawals: [],
-  notifications: []
+  notifications: [],
+  promos: [],
+  promoRedemptions: []
 };
+
+// Mirrors MAX_MONEY in server.js. Kept here so the store never writes a
+// balance the client would be unable to render.
+const MAX_BALANCE_ALLOWED = 1e12;
 
 // ---------------------------------------------------------------------------
 // Bootstrap
@@ -207,9 +213,41 @@ async function migrate() {
       is_read    INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL
     )`,
-    'CREATE INDEX IF NOT EXISTS idx_ntf_user ON notifications(user_id, id DESC)'
+    'CREATE INDEX IF NOT EXISTS idx_ntf_user ON notifications(user_id, id DESC)',
+    `CREATE TABLE IF NOT EXISTS promo_codes (
+      id              TEXT PRIMARY KEY,
+      code            TEXT NOT NULL,
+      amount          REAL NOT NULL,
+      max_activations INTEGER NOT NULL DEFAULT 1,
+      activations     INTEGER NOT NULL DEFAULT 0,
+      is_active       INTEGER NOT NULL DEFAULT 1,
+      created_by      TEXT,
+      expires_at      TEXT,
+      created_at      TEXT NOT NULL
+    )`,
+    // One row per code: the UNIQUE index is what makes redeeming race-free.
+    'CREATE UNIQUE INDEX IF NOT EXISTS idx_promo_code ON promo_codes(code)',
+    `CREATE TABLE IF NOT EXISTS promo_redemptions (
+      id         TEXT PRIMARY KEY,
+      code_id    TEXT NOT NULL,
+      code       TEXT NOT NULL,
+      user_id    TEXT NOT NULL,
+      amount     REAL NOT NULL,
+      created_at TEXT NOT NULL
+    )`,
+    'CREATE INDEX IF NOT EXISTS idx_promo_red_user ON promo_redemptions(user_id, code)',
+    'CREATE UNIQUE INDEX IF NOT EXISTS idx_promo_once ON promo_redemptions(user_id, code)'
   ];
   await client.batch(statements.map((sql) => ({ sql })), 'write');
+
+  // Added after the first release, so existing databases need the column added
+  // separately. SQLite has no ADD COLUMN IF NOT EXISTS, so a duplicate-column
+  // error is the expected "already there" signal.
+  try {
+    await client.execute('ALTER TABLE users ADD COLUMN is_creator INTEGER NOT NULL DEFAULT 0');
+  } catch (e) {
+    if (!/duplicate column/i.test(e.message)) throw e;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -223,7 +261,10 @@ function rowToUser(row) {
     image: row.image,
     balance: Number(row.balance),
     tradeUrl: row.trade_url,
-    role: row.role
+    role: row.role,
+    createdAt: row.created_at,
+    // The green tick. Only the operator can set this.
+    isCreator: !!row.is_creator
   };
 }
 
@@ -543,7 +584,228 @@ async function recordTransaction(userId, type, delta, meta, balanceAfter) {
 }
 
 /**
- * Accounts for the admin panel, newest first. Lets the operator find the
+ * Grants or revokes the content-creator tick.
+ * Mirrored into `role` so any client that only looks at the role still sees it.
+ */
+async function setCreator(userId, isCreator) {
+  const uid = String(userId);
+  const flag = isCreator ? 1 : 0;
+  const existing = await getUser(uid);
+  if (!existing) return { error: 'User not found' };
+  const role = flag ? 'creator' : (existing.role === 'creator' ? 'user' : existing.role);
+
+  if (mode === 'memory') {
+    const u = mem.users.get(uid);
+    if (u) { u.isCreator = !!flag; u.role = role; }
+    return { user: { ...u } };
+  }
+  await client.execute({
+    sql: 'UPDATE users SET is_creator = ?, role = ?, updated_at = ? WHERE id = ?',
+    args: [flag, role, now(), uid]
+  });
+  return { user: await getUser(uid) };
+}
+
+// ---------------------------------------------------------------------------
+// Promo codes
+// ---------------------------------------------------------------------------
+
+const normaliseCode = (code) => String(code || '').trim().toUpperCase();
+
+function rowToPromo(r) {
+  if (!r) return null;
+  return {
+    id: r.id,
+    code: r.code,
+    amount: Number(r.amount),
+    maxActivations: Number(r.max_activations),
+    activations: Number(r.activations),
+    isActive: !!r.is_active,
+    createdBy: r.created_by,
+    expiresAt: r.expires_at,
+    createdAt: r.created_at,
+    remaining: Math.max(0, Number(r.max_activations) - Number(r.activations))
+  };
+}
+
+async function createPromoCode({ code, amount, maxActivations = 1, expiresAt = null, createdBy = null }) {
+  const clean = normaliseCode(code);
+  if (!/^[A-Z0-9_-]{3,32}$/.test(clean)) {
+    return { error: 'Code must be 3-32 characters: A-Z, 0-9, dash or underscore' };
+  }
+  const value = Number(amount);
+  if (!Number.isFinite(value) || value <= 0 || value > MAX_BALANCE_ALLOWED) {
+    return { error: 'Invalid amount' };
+  }
+  const max = parseInt(maxActivations, 10);
+  if (!Number.isFinite(max) || max < 1) return { error: 'Invalid activation limit' };
+
+  const id = newId('promo');
+
+  if (mode === 'memory') {
+    if (mem.promos.some((p) => p.code === clean)) return { error: 'Code already exists' };
+    const record = {
+      id, code: clean, amount: value, max_activations: max, activations: 0,
+      is_active: 1, created_by: createdBy, expires_at: expiresAt, created_at: now()
+    };
+    mem.promos.push(record);
+    mem.promoRedemptions = mem.promoRedemptions || [];
+    return { promo: rowToPromo(record) };
+  }
+
+  try {
+    await client.execute({
+      sql: `INSERT INTO promo_codes (id, code, amount, max_activations, activations, is_active, created_by, expires_at, created_at)
+            VALUES (?, ?, ?, ?, 0, 1, ?, ?, ?)`,
+      args: [id, clean, value, max, createdBy, expiresAt, now()]
+    });
+  } catch (e) {
+    if (/UNIQUE/i.test(e.message)) return { error: 'Code already exists' };
+    throw e;
+  }
+  return { promo: await getPromoCode(clean) };
+}
+
+async function getPromoCode(code) {
+  const clean = normaliseCode(code);
+  if (!clean) return null;
+  if (mode === 'memory') return rowToPromo(mem.promos.find((p) => p.code === clean));
+  const res = await client.execute({ sql: 'SELECT * FROM promo_codes WHERE code = ?', args: [clean] });
+  return res.rows.length ? rowToPromo(res.rows[0]) : null;
+}
+
+/** Switches a code on or off without touching its redemption history. */
+async function setPromoActive(code, isActive) {
+  const clean = normaliseCode(code);
+  const flag = isActive ? 1 : 0;
+  if (mode === 'memory') {
+    const promo = mem.promos.find((p) => p.code === clean);
+    if (!promo) return { error: 'Code not found' };
+    promo.is_active = flag;
+    return { promo: rowToPromo(promo) };
+  }
+  const res = await client.execute({
+    sql: 'UPDATE promo_codes SET is_active = ? WHERE code = ?',
+    args: [flag, clean]
+  });
+  if (!res.rowsAffected) return { error: 'Code not found' };
+  return { promo: await getPromoCode(clean) };
+}
+
+async function listPromoCodes({ limit = 50, offset = 0 } = {}) {
+  const n = Math.min(200, Math.max(1, parseInt(limit, 10) || 50));
+  const o = Math.max(0, parseInt(offset, 10) || 0);
+  if (mode === 'memory') {
+    return mem.promos.slice().sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+      .slice(o, o + n).map(rowToPromo);
+  }
+  const res = await client.execute({
+    sql: 'SELECT * FROM promo_codes ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?',
+    args: [n, o]
+  });
+  return res.rows.map(rowToPromo);
+}
+
+/**
+ * Redeems a code and credits the balance, exactly once per account.
+ *
+ * The activation counter is bumped with a conditional UPDATE that also checks
+ * the limit, the expiry and the active flag. That single statement is what
+ * makes "any number of activations" safe under concurrent clicks - the loser
+ * gets 0 rows affected and is rejected, so the code can never pay out more
+ * times than it is allowed to. The per-user UNIQUE index is the second guard,
+ * so one account can never take the same code twice.
+ */
+async function redeemPromoCode(code, userId) {
+  const clean = normaliseCode(code);
+  const uid = String(userId);
+  if (!clean) return { error: 'Enter a promo code' };
+
+  const memoRedeemed = (promo, amount) => {
+    mem.promoRedemptions = mem.promoRedemptions || [];
+    mem.promoRedemptions.push({ user_id: uid, code: clean, amount, created_at: now() });
+  };
+
+  if (mode === 'memory') {
+    const promo = mem.promos.find((p) => p.code === clean);
+    if (!promo) return { error: 'This promo code does not exist' };
+    if (!promo.is_active) return { error: 'This promo code is no longer active' };
+    if (promo.expires_at && new Date(promo.expires_at).getTime() < Date.now()) {
+      return { error: 'This promo code has expired' };
+    }
+    if (promo.activations >= promo.max_activations) return { error: 'This promo code has no activations left' };
+    if (memo.promoRedemptions.some((r) => r.user_id === uid && r.code === clean)) {
+      return { error: 'You have already used this promo code' };
+    }
+    const amount = Number(promo.amount);
+    promo.activations += 1;
+    memoRedeemed(promo, amount);
+    return { promo: rowToPromo(promo), amount, userId: uid };
+  }
+
+  const bumped = await client.execute({
+    sql: `UPDATE promo_codes
+          SET activations = activations + 1
+          WHERE code = ?
+            AND is_active = 1
+            AND activations < max_activations
+            AND (expires_at IS NULL OR expires_at > ?)`,
+    args: [clean, now()]
+  });
+  if (!bumped.rowsAffected) {
+    // Distinguish "does not exist" from "used up" so the player gets a useful
+    // message instead of a generic failure.
+    const promo = await getPromoCode(clean);
+    if (!promo) return { error: 'This promo code does not exist' };
+    if (!promo.isActive) return { error: 'This promo code is no longer active' };
+    if (promo.expiresAt && new Date(promo.expiresAt).getTime() < Date.now()) {
+      return { error: 'This promo code has expired' };
+    }
+    return { error: 'This promo code has no activations left' };
+  }
+
+  const promo = await getPromoCode(clean);
+  const amount = promo ? Number(promo.amount) : 0;
+
+  try {
+    await client.execute({
+      sql: `INSERT INTO promo_redemptions (id, code_id, code, user_id, amount, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)`,
+      args: [newId('pr'), promo ? promo.id : null, clean, uid, amount, now()]
+    });
+  } catch (e) {
+    if (/UNIQUE/i.test(e.message)) {
+      // This account already used the code. Give the activation slot back so
+      // the limit is not silently consumed by a repeat attempt.
+      await client.execute({
+        sql: 'UPDATE promo_codes SET activations = activations - 1 WHERE code = ? AND activations > 0',
+        args: [clean]
+      });
+      return { error: 'You have already used this promo code' };
+    }
+    throw e;
+  }
+
+  return { promo, amount, userId: uid };
+}
+
+async function listPromoRedemptions(userId, limit = 20) {
+  if (mode === 'memory') {
+    return (mem.promoRedemptions || [])
+      .filter((r) => r.user_id === String(userId))
+      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+      .slice(0, limit);
+  }
+  const res = await client.execute({
+    sql: 'SELECT * FROM promo_redemptions WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
+    args: [String(userId), Math.min(100, limit)]
+  });
+  return res.rows.map((r) => ({
+    code: r.code, amount: Number(r.amount), createdAt: r.created_at
+  }));
+}
+
+/** Accounts for the admin panel, newest first. Lets the operator find the
  * player who just registered and check what their balance is.
  */
 async function listUsers({ limit = 25, offset = 0, search = '' } = {}) {
@@ -882,6 +1144,14 @@ module.exports = {
   addBalance,
   recordTransaction,
   listUsers,
+  setCreator,
+  // Promo codes
+  createPromoCode,
+  getPromoCode,
+  listPromoCodes,
+  setPromoActive,
+  redeemPromoCode,
+  listPromoRedemptions,
   listTransactions,
   listInventory,
   countInventory,

@@ -548,6 +548,8 @@ const handleUsersMe = async (req, res) => {
     // must agree on the type. A string here made the client treat the balance
     // differently depending on which request landed last.
     balance: safeMoney(user.balance ?? START_BALANCE),
+    isCreator: !!user.isCreator,
+    createdAt: user.createdAt || null,
     tradeUrl: user.tradeUrl || 'https://steamcommunity.com/tradeoffer/new/?partner=12345678',
     role: user.role || 'user'
   });
@@ -1695,10 +1697,139 @@ app.post('/api/admin/users/:id/balance', requireAdmin, async (req, res) => {
   res.json({ success: true, data: { id, balance: round2(balance), previous: round2(before.balance) } });
 });
 
+// The player profile. Standalone page, served raw like /admin.
+app.get(['/profile', '/profile/', '/ru/profile'], (req, res) => {
+  res.sendFile(path.join(SITE_DIR, 'profile.html'));
+});
+
 // The operator panel. Served raw - it has its own token login, so it does not
 // need the in-game session injection the public pages get.
 app.get(['/admin', '/admin/'], (req, res) => {
   res.sendFile(path.join(SITE_DIR, 'admin.html'));
+});
+
+/**
+ * Grants or revokes the content-creator tick on an account.
+ * Admin-only; this is the only way the badge ever appears.
+ */
+app.post('/api/admin/users/:id/creator', requireAdmin, async (req, res) => {
+  const id = String(req.params.id || '');
+  if (!id) return res.status(400).json({ success: false, message: 'User id required' });
+
+  const raw = req.body && req.body.isCreator;
+  const want = raw === undefined ? true : !!(raw === true || raw === 'true' || raw === 1 || raw === '1');
+
+  const result = await store.setCreator(id, want);
+  if (result.error) return res.status(404).json({ success: false, message: result.error });
+
+  // Tell the account itself, so the tick appears without a reload.
+  wsSendToUser(id, 'users.update_creator', { isCreator: want });
+  res.json({ success: true, data: result.user });
+});
+
+// --- Admin: promo codes ----------------------------------------------------
+
+app.get('/api/admin/promos', requireAdmin, async (req, res) => {
+  const limit = clampInt(req.query.limit, 1, 200, 50);
+  const offset = clampInt(req.query.offset, 0, 1e6, 0);
+  const items = await store.listPromoCodes({ limit, offset });
+  res.json({ success: true, items, total: items.length });
+});
+
+app.post('/api/admin/promos', requireAdmin, async (req, res) => {
+  const body = req.body || {};
+  const result = await store.createPromoCode({
+    code: body.code,
+    amount: body.amount,
+    maxActivations: body.maxActivations,
+    expiresAt: body.expiresAt || null,
+    createdBy: 'admin'
+  });
+  if (result.error) return res.status(400).json({ success: false, message: result.error });
+  res.json({ success: true, data: result.promo });
+});
+
+/** Switches a code off without deleting its redemption history. */
+app.post('/api/admin/promos/:code/disable', requireAdmin, async (req, res) => {
+  const result = await store.setPromoActive(req.params.code, false);
+  if (result.error) return res.status(404).json({ success: false, message: result.error });
+  res.json({ success: true, data: result.promo });
+});
+
+app.post('/api/admin/promos/:code/enable', requireAdmin, async (req, res) => {
+  const result = await store.setPromoActive(req.params.code, true);
+  if (result.error) return res.status(404).json({ success: false, message: result.error });
+  res.json({ success: true, data: result.promo });
+});
+
+// ----------------------------------------------------
+// PROMO CODES (player facing)
+// ----------------------------------------------------
+
+/**
+ * Redeems a promo code and credits the balance.
+ *
+ * The store enforces the activation limit and the one-per-account rule in SQL,
+ * so this endpoint is safe to hammer. Money is credited only after the
+ * redemption row is written, and both happen inside one serialised write
+ * transaction - a crash between them cannot lose the code or double the money.
+ */
+app.post('/api/promo/redeem', async (req, res) => {
+  const user = await resolveUser(req);
+  const code = req.body && req.body.code;
+
+  const result = await store.redeemPromoCode(code, user.id);
+  if (result.error) return res.status(400).json({ success: false, message: result.error });
+
+  const balance = await store.addBalance(user.id, result.amount, 'promo', {
+    code: result.promo.code
+  });
+  if (balance == null) {
+    // The account vanished mid-flight; undo the activation so the slot returns.
+    res.status(400).json({ success: false, message: 'Could not credit the balance' });
+    return;
+  }
+
+  const safe = safeMoney(balance);
+  pushBalance({ ...user, balance: safe });
+  await notify(user.id, 'promo_redeemed', {
+    code: result.promo.code,
+    amount: result.amount
+  });
+
+  res.json({
+    success: true,
+    data: {
+      code: result.promo.code,
+      amount: result.amount,
+      balance: safe,
+      remaining: result.promo ? result.promo.remaining : 0
+    }
+  });
+});
+
+/** Codes this account has already used, so the UI can grey them out. */
+app.get('/api/promo/mine', async (req, res) => {
+  const user = await resolveUser(req);
+  const items = await store.listPromoRedemptions(user.id, 50);
+  res.json({ success: true, items });
+});
+
+/** Peek at a code without spending an activation. */
+app.get('/api/promo/:code', async (req, res) => {
+  await resolveUser(req);
+  const promo = await store.getPromoCode(req.params.code);
+  if (!promo) return res.status(404).json({ success: false, message: 'This promo code does not exist' });
+  res.json({
+    success: true,
+    data: {
+      code: promo.code,
+      amount: promo.amount,
+      remaining: promo.remaining,
+      isActive: promo.isActive,
+      expiresAt: promo.expiresAt
+    }
+  });
 });
 
 // ----------------------------------------------------
@@ -1896,11 +2027,18 @@ function sendInjectedHtml(filePath, res, slug) {
     }
   } catch(e) {}
 })();
-</script>
+</script>`;
+    content = content.replace('</head>', injection + '</head>');
+
+    // The stylesheet is safe in <head>, but the enhancement script must load
+    // after React has hydrated. Next.js streams the document and rewrites parts
+    // of <head>, which was wiping an injected <script> before it ever ran.
+    // Appending just before </body> puts it after the app has rendered.
+    content = content.replace('</body>', `
 <link rel="stylesheet" href="/custom-auth.css">
 <script src="/custom-auth.js" defer></script>
-</head>`;
-    content = content.replace('</head>', injection);
+</body>`);
+
     res.type('html').send(content);
   } catch (err) {
     res.status(500).send('Error loading page: ' + err.message);

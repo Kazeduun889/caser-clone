@@ -92,6 +92,10 @@
   .hint { color: var(--muted); font-size: 12px; }
   .err { color: var(--red); font-size: 13px; min-height: 18px; }
   code { background: var(--panel-2); padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+  label.lbl { display: block; font-size: 11px; color: var(--muted); margin: 0 0 6px; text-transform: uppercase; letter-spacing: .04em; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; }
+  @media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } }
+  .pill.off { background: rgba(139,148,158,.15); color: var(--muted); }
 </style>
 </head>
 <body>
@@ -122,6 +126,42 @@
     <div class="card">
       <h2>Показатели</h2>
       <div class="stats" id="stats"></div>
+    </div>
+
+    <div class="card">
+      <h2>Промокоды</h2>
+      <div class="grid2">
+        <div>
+          <label class="lbl" for="promoCode">Код</label>
+          <input type="text" id="promoCode" placeholder="BONUS2026" autocomplete="off" spellcheck="false">
+        </div>
+        <div>
+          <label class="lbl" for="promoAmount">Сумма зачисления</label>
+          <input type="number" id="promoAmount" value="1000" min="1" step="0.01">
+        </div>
+        <div>
+          <label class="lbl" for="promoUses">Сколько активаций</label>
+          <input type="number" id="promoUses" value="100" min="1" step="1">
+        </div>
+        <div>
+          <label class="lbl" for="promoExpiry">Действует до (необязательно)</label>
+          <input type="datetime-local" id="promoExpiry">
+        </div>
+      </div>
+      <button class="primary" id="promoCreate" style="margin-top:14px">Создать промокод</button>
+      <p class="hint" style="margin-top:10px">
+        Итоговая сумма к выдаче: <strong id="promoTotal">$100 000.00</strong>
+      </p>
+      <p class="err" id="promoErr"></p>
+      <div class="table-wrap" style="margin-top:16px">
+        <table>
+          <thead>
+            <tr><th>Код</th><th class="num">Сумма</th><th class="num">Активаций</th><th>Статус</th><th>Создан</th><th></th></tr>
+          </thead>
+          <tbody id="promoRows"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="promoEmpty" style="display:none">Промокодов пока нет</div>
     </div>
 
     <div class="card">
@@ -256,8 +296,12 @@
         '<td>' + esc(u.role || 'user') + '</td>' +
         '<td class="hint">' + esc(when(u.createdAt)) + '</td>' +
         '<td class="actions">' +
-        '<button data-setbal="' + esc(u.id) + '">Задать баланс</button>' +
-        '</td></tr>';
+        '<button data-setbal="' + esc(u.id) + '">Баланс</button> ' +
+        '<button data-creator="' + esc(u.id) + '" data-on="' + (u.isCreator ? '1' : '0') +
+        '" style="border-color:' + (u.isCreator ? '#3fb950' : 'var(--line)') + ';' +
+        (u.isCreator ? 'color:#3fb950' : '') + '">' +
+        (u.isCreator ? '✓ Автор' : 'Сделать автором') +
+        '</button></td></tr>';
     }).join('');
   }
 
@@ -271,6 +315,39 @@
   function setBalance(userId, value) {
     return api('POST', '/api/admin/users/' + encodeURIComponent(userId) + '/balance', { balance: value })
       .then(function () { return Promise.all([loadPlayers(), loadStats()]); });
+  }
+
+  // ---------- promo codes ----------
+  function promoTotal() {
+    var amount = parseFloat($('promoAmount').value) || 0;
+    var uses = parseInt($('promoUses').value, 10) || 0;
+    return amount * uses;
+  }
+  function refreshPromoTotal() { $('promoTotal').textContent = money(promoTotal()); }
+
+  function renderPromos(items) {
+    var tb = $('promoRows');
+    $('promoEmpty').style.display = items.length ? 'none' : 'block';
+    tb.innerHTML = items.map(function (p) {
+      var left = Math.max(0, (p.maxActivations || 0) - (p.activations || 0));
+      var state = !p.isActive ? ['off', 'выключен']
+        : left === 0 ? ['completed', 'исчерпан']
+        : ['pending', 'активен'];
+      return '<tr>' +
+        '<td><code>' + esc(p.code) + '</code></td>' +
+        '<td class="num">' + money(p.amount) + '</td>' +
+        '<td class="num">' + (p.activations || 0) + ' / ' + (p.maxActivations || 0) + '</td>' +
+        '<td><span class="pill ' + state[0] + '">' + state[1] + '</span></td>' +
+        '<td class="hint">' + esc(when(p.createdAt)) + '</td>' +
+        '<td class="actions"><button data-promo="' + esc(p.code) + '" data-enable="' +
+        (p.isActive ? '0' : '1') + '">' + (p.isActive ? 'Выключить' : 'Включить') +
+        '</button></td></tr>';
+    }).join('');
+  }
+
+  function loadPromos() {
+    return api('GET', '/api/admin/promos?limit=100')
+      .then(function (d) { renderPromos(d.items || []); });
   }
 
   // ---------- withdrawals ----------
@@ -322,7 +399,7 @@
   }
 
   function refreshAll() {
-    return Promise.all([loadStats(), loadWithdrawals(), loadPlayers()]).catch(function (e) {
+    return Promise.all([loadStats(), loadWithdrawals(), loadPlayers(), loadPromos()]).catch(function (e) {
       // A rejected token should drop us back to the login screen.
       if (/admin|unauthor|forbidden|http 40/i.test(e.message)) {
         setToken('');
@@ -358,6 +435,35 @@
   $('token').onkeydown = function (e) { if (e.key === 'Enter') $('loginBtn').click(); };
   $('logout').onclick = function () { setToken(''); showLogin(''); };
   $('refresh').onclick = refreshAll;
+
+  // ---------- promo code form ----------
+  $('promoAmount').oninput = refreshPromoTotal;
+  $('promoUses').oninput = refreshPromoTotal;
+  refreshPromoTotal();
+
+  $('promoCreate').onclick = function () {
+    $('promoErr').textContent = '';
+    var code = $('promoCode').value.trim();
+    var amount = parseFloat($('promoAmount').value);
+    var uses = parseInt($('promoUses').value, 10);
+    if (!code) { $('promoErr').textContent = 'Введите код'; return; }
+    if (!isFinite(amount) || amount <= 0) { $('promoErr').textContent = 'Сумма неверна'; return; }
+    if (!isFinite(uses) || uses < 1) { $('promoErr').textContent = 'Число активаций неверно'; return; }
+
+    var expiryRaw = $('promoExpiry').value;
+    var expiresAt = expiryRaw ? new Date(expiryRaw).toISOString() : null;
+
+    $('promoCreate').disabled = true;
+    api('POST', '/api/admin/promos', { code: code, amount: amount, maxActivations: uses, expiresAt: expiresAt })
+      .then(function (d) {
+        $('promoCode').value = '';
+        alert('Промокод ' + d.data.code + ' создан.\nВыдаст ' + money(d.data.amount) +
+          ' на ' + d.data.maxActivations + ' активаций.');
+        return loadPromos();
+      })
+      .catch(function (err) { $('promoErr').textContent = err.message; })
+      .finally(function () { $('promoCreate').disabled = false; });
+  };
 
   $('playerReload').onclick = function () {
     loadPlayers().catch(function (err) { alert(err.message); });
@@ -411,6 +517,36 @@
         .then(function () { alert('Баланс обновлён'); })
         .catch(function (err) { alert(err.message); })
         .finally(function () { balBtn.disabled = false; });
+      return;
+    }
+
+    // Enable / disable a promo code.
+    var promoBtn = e.target.closest('button[data-promo]');
+    if (promoBtn) {
+      var pcode = promoBtn.getAttribute('data-promo');
+      var enable = promoBtn.getAttribute('data-enable') === '1';
+      promoBtn.disabled = true;
+      api('POST', '/api/admin/promos/' + encodeURIComponent(pcode) + (enable ? '/enable' : '/disable'))
+        .then(loadPromos)
+        .catch(function (err) { alert(err.message); })
+        .finally(function () { promoBtn.disabled = false; });
+      return;
+    }
+
+    // Grant or revoke the content-creator tick.
+    var creatorBtn = e.target.closest('button[data-creator]');
+    if (creatorBtn) {
+      var cid = creatorBtn.getAttribute('data-creator');
+      var currently = creatorBtn.getAttribute('data-on') === '1';
+      var next = !currently;
+      if (!confirm((next ? 'Выдать' : 'Снять') + ' галочку Автора у ' + cid + '?')) return;
+      creatorBtn.disabled = true;
+      api('POST', '/api/admin/users/' + encodeURIComponent(cid) + '/creator', { isCreator: next })
+        .then(function (d) {
+          return loadPlayers().then(function () { return d; });
+        })
+        .catch(function (err) { alert(err.message); })
+        .finally(function () { creatorBtn.disabled = false; });
       return;
     }
 

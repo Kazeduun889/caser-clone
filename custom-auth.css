@@ -426,3 +426,46 @@
   background: rgba(255, 82, 82, 0.1);
   color: #ff7676;
 }
+
+/* ---------------------------------------------------------------------------
+   Content-creator tick
+   The green check only ever appears because the server said so - the client
+   cannot grant it to itself.
+   --------------------------------------------------------------------------- */
+.caser-creator-tick {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #44C987;
+  border: 2px solid #151515;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.caser-creator-tick svg {
+  width: 10px;
+  height: 10px;
+}
+
+.caser-user-avatar-btn {
+  position: relative;
+}
+
+.caser-creator-tag {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(68, 201, 135, 0.15);
+  color: #44C987;
+  border: 1px solid rgba(68, 201, 135, 0.4);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: middle;
+  margin-left: 6px;
+}

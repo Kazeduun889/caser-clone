@@ -379,12 +379,14 @@
           <button type="button" class="caser-user-topup-btn" title="Пополнить баланс">+</button>
           <button type="button" class="caser-user-avatar-btn" title="${user.nickname}">
             <img src="${user.image || DEFAULT_AVATARS[0]}" alt="${user.nickname}" />
+            ${user.isCreator ? '<span class="caser-creator-tick" title="Автор"><svg viewBox="0 0 24 24" fill="none" stroke="#0a1a12" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>' : ''}
           </button>
           <div class="caser-user-dropdown">
             <div class="caser-dropdown-header">
-              <div class="caser-dropdown-name">${user.nickname}</div>
+              <div class="caser-dropdown-name">${user.nickname}${user.isCreator ? ' <span class="caser-creator-tag">✓ Автор</span>' : ''}</div>
               <div class="caser-dropdown-sub">ID: ${user.id}</div>
             </div>
+            <a href="/profile" class="caser-dropdown-item">👤 Профиль и промокод</a>
             <a href="/ru/inventory" class="caser-dropdown-item">🎒 Мой инвентарь</a>
             <button type="button" class="caser-dropdown-item caser-topup-menu-btn">💳 Пополнить (+5 000 ₽)</button>
             <button type="button" class="caser-dropdown-item caser-bonus-menu-btn">🎁 Ежедневный бонус (+1 000 ₽)</button>
@@ -491,6 +493,63 @@
       });
     };
 
+    /**
+     * Applies a creator-tick change live. When the operator grants or revokes
+     * the badge the header updates in place, so the page never needs a reload.
+     */
+    const applyCreator = (data) => {
+      const on = !!(data && data.isCreator);
+      const user = getStoredUser();
+      if (user) {
+        user.isCreator = on;
+        localStorage.setItem('caser_user', JSON.stringify(user));
+      }
+
+      document.querySelectorAll('.caser-user-avatar-btn').forEach((btn) => {
+        let tick = btn.querySelector('.caser-creator-tick');
+        if (on && !tick) {
+          tick = document.createElement('span');
+          tick.className = 'caser-creator-tick';
+          tick.title = 'Автор';
+          tick.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#0a1a12" ' +
+            'stroke-width="4" stroke-linecap="round" stroke-linejoin="round">' +
+            '<polyline points="20 6 9 17 4 12"></polyline></svg>';
+          btn.appendChild(tick);
+        } else if (!on && tick) {
+          tick.remove();
+        }
+      });
+
+      document.querySelectorAll('.caser-dropdown-name').forEach((el) => {
+        const tag = el.querySelector('.caser-creator-tag');
+        if (on && !tag) {
+          const span = document.createElement('span');
+          span.className = 'caser-creator-tag';
+          span.textContent = '✓ Автор';
+          el.appendChild(span);
+        } else if (!on && tag) {
+          tag.remove();
+        }
+      });
+    };
+
+    // Pick up a tick that was granted in another tab or before this page load.
+    (function refreshCreatorFlag() {
+      fetch('/api/users/me', { headers: { 'X-Requested-With': 'fetch' } })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((me) => {
+          if (me && me.id) {
+            const user = getStoredUser();
+            if (user) {
+              user.isCreator = !!me.isCreator;
+              localStorage.setItem('caser_user', JSON.stringify(user));
+            }
+            applyCreator({ isCreator: !!me.isCreator });
+          }
+        })
+        .catch(() => { /* offline - keep whatever is cached */ });
+    })();
+
     const connect = () => {
       try {
         const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -501,6 +560,7 @@
             const msg = JSON.parse(event.data);
             if (!msg || !msg.event) return;
             if (msg.event === 'users.update_balance') apply(msg.data);
+            if (msg.event === 'users.update_creator') applyCreator(msg.data);
           } catch (e) { /* ignore malformed frames */ }
         };
         socket.onclose = () => {

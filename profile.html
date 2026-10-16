@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Caser — профиль</title>
+<link rel="stylesheet" href="/custom-auth.css">
+<style>
+  :root {
+    --bg: #151515;
+    --panel: #1e1e1e;
+    --line: #2f2f2f;
+    --text: #f2f2f2;
+    --muted: #9a9a9a;
+    --accent: #44C987;
+    --red: #ff5c5c;
+    --yellow: #d29922;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text); min-height: 100vh;
+    font: 14px/1.5 -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 32px 20px 80px; }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 22px; margin-bottom: 18px;
+  }
+  .card h2 {
+    margin: 0 0 16px; font-size: 13px; color: var(--muted);
+    font-weight: 600; text-transform: uppercase; letter-spacing: .05em;
+  }
+
+  /* --- profile header --- */
+  .head { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+  .avatar {
+    position: relative; width: 88px; height: 88px; border-radius: 8px; overflow: hidden;
+    border: 3px solid var(--accent); background: #0c0c0c; flex: none;
+  }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  /* the creator tick, overlaid on the avatar corner */
+  .tick {
+    position: absolute; right: -6px; bottom: -6px;
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--accent); border: 3px solid var(--panel);
+    display: none; align-items: center; justify-content: center;
+  }
+  .tick.on { display: flex; }
+  .tick svg { width: 15px; height: 15px; display: block; }
+
+  .who { min-width: 220px; flex: 1; }
+  .nick { display: flex; align-items: center; gap: 8px; font-size: 22px; font-weight: 700; }
+  .nick .tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: rgba(68, 201, 135, .15); color: var(--accent);
+    border: 1px solid rgba(68, 201, 135, .4); border-radius: 999px;
+    padding: 2px 10px; font-size: 12px; font-weight: 600;
+  }
+  .nick .tag svg { width: 12px; height: 12px; }
+  .uid { color: var(--muted); font-size: 12px; margin-top: 4px; word-break: break-all; }
+
+  .stats { display: flex; gap: 28px; flex-wrap: wrap; }
+  .stat .k { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+  .stat .v { font-size: 20px; font-weight: 700; margin-top: 2px; }
+
+  /* --- promo --- */
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  input[type=text], input[type=number], input[type=datetime-local] {
+    padding: 11px 13px; background: #141414; color: var(--text);
+    border: 1px solid var(--line); border-radius: 6px; font: inherit; min-width: 0;
+  }
+  input:focus { outline: none; border-color: var(--accent); }
+  input.code { flex: 1; min-width: 200px; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+
+  button {
+    padding: 11px 20px; border-radius: 6px; border: 1px solid var(--line);
+    background: #262626; color: var(--text); font: inherit; cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #0a1a12; font-weight: 700; }
+
+  .msg { margin-top: 12px; font-size: 13px; min-height: 20px; }
+  .msg.ok { color: var(--accent); }
+  .msg.err { color: var(--red); }
+  .msg.info { color: var(--muted); }
+
+  label { display: block; font-size: 12px; color: var(--muted); margin: 14px 0 6px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+  @media (max-width: 620px) { .grid2 { grid-template-columns: 1fr; } }
+
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  code { background: #141414; padding: 2px 7px; border-radius: 4px; }
+  .empty { text-align: center; color: var(--muted); padding: 26px 0; }
+  .hint { color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="card">
+    <h2>Профиль</h2>
+    <div class="head">
+      <div class="avatar">
+        <img id="avatar" alt="">
+        <div class="tick" id="tick" title="Верифицированный автор">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#0a1a12" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </div>
+      </div>
+      <div class="who">
+        <div class="nick">
+          <span id="nick">—</span>
+          <span class="tag" id="creatorTag" style="display:none">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Автор
+          </span>
+        </div>
+        <div class="uid" id="uid">—</div>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="k">Баланс</div><div class="v" id="balance">—</div></div>
+        <div class="stat"><div class="k">Предметов</div><div class="v" id="items">—</div></div>
+        <div class="stat"><div class="k">Регистрация</div><div class="v" id="since" style="font-size:14px">—</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Промокод</h2>
+    <p class="hint">Введите код, который вам выдали. Код начисляет сумму на баланс и действует один раз на аккаунт.</p>
+    <div class="row" style="margin-top:12px">
+      <input class="code" type="text" id="code" placeholder="ВВЕДИТЕ КОД" autocomplete="off" spellcheck="false">
+      <button class="primary" id="redeemBtn">Активировать</button>
+    </div>
+    <div class="msg" id="promoMsg"></div>
+  </div>
+
+  <div class="card">
+    <h2>Активированные промокоды</h2>
+    <div id="history"></div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+
+  function readCookie(name) {
+    var m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+
+  function money(n) {
+    return '$' + (Number(n) || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function when(iso) {
+    if (!iso) return '—';
+    var d = new Date(iso);
+    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('ru-RU');
+  }
+
+  function say(el, text, kind) {
+    el.textContent = text || '';
+    el.className = 'msg' + (kind ? ' ' + kind : '');
+  }
+
+  function render(user, invTotal) {
+    $('nick').textContent = user.nickname || 'Игрок';
+    $('uid').textContent = user.id;
+    $('avatar').src = user.image || '';
+    $('balance').textContent = money(user.balance);
+    $('items').textContent = invTotal != null ? invTotal : '—';
+
+    // The creator tick. The server is the only source of truth for this.
+    var creator = !!user.isCreator;
+    $('tick').classList.toggle('on', creator);
+    $('creatorTag').style.display = creator ? 'inline-flex' : 'none';
+  }
+
+  function loadProfile() {
+    return fetch('/api/users/me', { headers: { 'X-Requested-With': 'fetch' } })
+      .then(function (r) { return r.json(); })
+      .then(function (me) {
+        if (!me || me.status === 401) throw new Error('Нужно войти в аккаунт');
+        return Promise.all([
+          me,
+          fetch('/api/items/inventory?limit=1').then(function (r) { return r.json(); }).catch(function () { return null; })
+        ]);
+      })
+      .then(function (pair) {
+        var me = pair[0];
+        var inv = pair[1];
+        var created = me.id && null;
+        render(me, inv && typeof inv.total === 'number' ? inv.total : null);
+        return me;
+      });
+  }
+
+  function loadHistory() {
+    return fetch('/api/promo/mine').then(function (r) { return r.json(); })
+      .then(function (d) {
+        var items = (d && d.items) || [];
+        if (!items.length) {
+          $('history').innerHTML = '<div class="empty">Пока ни одного промокода</div>';
+          return;
+        }
+        $('history').innerHTML =
+          '<table><thead><tr><th>Код</th><th class="num">Сумма</th><th>Когда</th></tr></thead><tbody>' +
+          items.map(function (i) {
+            return '<tr><td><code>' + String(i.code).replace(/[&<>]/g, '') + '</code></td>' +
+              '<td class="num">' + money(i.amount) + '</td>' +
+              '<td class="hint">' + when(i.createdAt) + '</td></tr>';
+          }).join('') + '</tbody></table>';
+      })
+      .catch(function () {
+        $('history').innerHTML = '<div class="empty">Пока ни одного промокода</div>';
+      });
+  }
+
+  var redeemBtn = $('redeemBtn');
+  redeemBtn.onclick = function () {
+    var code = $('code').value.trim();
+    if (!code) { say($('promoMsg'), 'Введите код', 'err'); return; }
+
+    redeemBtn.disabled = true;
+    say($('promoMsg'), 'Проверяем код...', 'info');
+
+    fetch('/api/promo/redeem', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: code })
+    })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+      .then(function (res) {
+        if (!res.ok || !res.body.success) {
+          throw new Error((res.body && res.body.message) || 'Не удалось активировать код');
+        }
+        var d = res.body.data;
+        say($('promoMsg'), 'Код активирован: +' + money(d.amount) +
+          (d.remaining > 0 ? ' (осталось активаций: ' + d.remaining + ')' : ''), 'ok');
+        $('code').value = '';
+        $('balance').textContent = money(d.balance);
+        loadHistory();
+      })
+      .catch(function (e) {
+        say($('promoMsg'), e.message || 'Не удалось активировать код', 'err');
+      })
+      .finally(function () { redeemBtn.disabled = false; });
+  };
+
+  $('code').onkeydown = function (e) { if (e.key === 'Enter') redeemBtn.click(); };
+
+  // Live updates: the balance and the creator tick both push over WebSocket.
+  (function connect() {
+    try {
+      var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      var ws = new WebSocket(proto + '//' + location.host + '/api/ws');
+      ws.onmessage = function (ev) {
+        try {
+          var msg = JSON.parse(ev.data);
+          if (!msg || !msg.event) return;
+          if (msg.event === 'users.update_balance') {
+            var v = typeof msg.data === 'number' ? msg.data : parseFloat(msg.data);
+            if (isFinite(v)) $('balance').textContent = money(v);
+          }
+          if (msg.event === 'users.update_creator') {
+            var on = !!msg.data.isCreator;
+            $('tick').classList.toggle('on', on);
+            $('creatorTag').style.display = on ? 'inline-flex' : 'none';
+          }
+        } catch (e) { /* ignore */ }
+      };
+      ws.onclose = function () { setTimeout(connect, 3000); };
+    } catch (e) { /* no websocket */ }
+  })();
+
+  // ?promo=CODE prefills and auto-submits, like the original's promo links.
+  var fromLink = new URLSearchParams(location.search).get('promo');
+  if (fromLink) {
+    $('code').value = fromLink;
+    redeemBtn.click();
+  }
+
+  loadProfile()
+    .then(function (me) {
+      if (me && me.createdAt) $('since').textContent = when(me.createdAt);
+    })
+    .catch(function (e) { say($('promoMsg'), e.message, 'err'); });
+  loadHistory();
+})();
+</script>
+</body>
+</html>
