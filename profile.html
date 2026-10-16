@@ -4,120 +4,298 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Caser — профиль</title>
+<!-- The real stylesheets: this is where --font-oswald, --font-sofia-sans,
+     --brand-accent and every surface shade come from. Keeping a private copy of
+     those values here is what made the page drift from the rest of the site. -->
+<link rel="stylesheet" href="/_next/static/chunks/03rygwhrpje4o.css">
+<link rel="stylesheet" href="/_next/static/chunks/2h7znwflj3yb4.css">
+<link rel="stylesheet" href="/_next/static/chunks/17tdfa7y23qrt.css">
 <link rel="stylesheet" href="/custom-auth.css">
 <style>
+/* ---------------------------------------------------------------------------
+   Every visual value comes from the site's own stylesheets, loaded above.
+   Only the layout rules live here - the profile screen is one the original
+   renders behind a login, so there is no upstream markup to inherit from.
+   --------------------------------------------------------------------------- */
   :root {
-    --bg: #151515;
-    --panel: #1e1e1e;
-    --line: #2f2f2f;
-    --text: #f2f2f2;
-    --muted: #9a9a9a;
-    --accent: #44C987;
-    --red: #ff5c5c;
-    --yellow: #d29922;
+    /* Fallbacks for a failed stylesheet. The real values are --brand-accent
+       #44C987, --brand-nav-active #83D8FF, --brand-header-bg #2D3540,
+       surfaces black-250 #00000040 and black-450 #00000073. */
+    --brand-accent: #44C987;
+    --brand-nav-active: #83D8FF;
+    --brand-header-bg: #2D3540;
+    --brand-balance-text: #83D8FF;
+    --brand-btn-text: #44C987;
+    --brand-btn-border: #44C987;
+    --brand-btn-bg: linear-gradient(180deg, #13432C 0%, #0F2E20 100%);
+    --surface-250: #00000040;
+    --surface-450: #00000073;
+    --line-150: #ffffff26;
+    --text-450: #ffffff73;
+    --text-550: #ffffff8c;
+    --text-650: #ffffffa6;
+    --radius: 0.2rem;
   }
+
   * { box-sizing: border-box; }
+
+  html, body {
+    background: #000;
+    color: #fff;
+    min-height: 100%;
+  }
+
   body {
-    margin: 0; background: var(--bg); color: var(--text); min-height: 100vh;
-    font: 14px/1.5 -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-  }
-  .wrap { max-width: 900px; margin: 0 auto; padding: 32px 20px 80px; }
-
-  .card {
-    background: var(--panel); border: 1px solid var(--line);
-    border-radius: 10px; padding: 22px; margin-bottom: 18px;
-  }
-  .card h2 {
-    margin: 0 0 16px; font-size: 13px; color: var(--muted);
-    font-weight: 600; text-transform: uppercase; letter-spacing: .05em;
+    font-family: var(--font-sofia-sans), "Sofia Sans", "Segoe UI", Roboto, Arial, sans-serif;
+    font-size: 1.4rem;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
   }
 
-  /* --- profile header --- */
-  .head { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+  /* --- top bar, same surface as the site header --- */
+  .topbar {
+    background: var(--brand-header-bg);
+    border-bottom: 0.1rem solid #00000040;
+  }
+  .topbar-inner {
+    max-width: 80rem;
+    margin: 0 auto;
+    padding: 1.2rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1.6rem;
+  }
+  .brand {
+    font-family: var(--font-oswald), Oswald, sans-serif;
+    font-size: 1.8rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #fff;
+    text-decoration: none;
+  }
+  .topbar-nav { display: flex; gap: 2rem; margin-left: auto; }
+  .topbar-nav a {
+    color: var(--text-550);
+    text-decoration: none;
+    font-size: 1.3rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    transition: color .15s;
+  }
+  .topbar-nav a:hover { color: var(--brand-nav-active); }
+
+  .page {
+    max-width: 80rem;
+    margin: 0 auto;
+    padding: 2.4rem 2rem 6rem;
+    display: grid;
+    gap: 1.6rem;
+  }
+
+  /* --- panels --- */
+  .panel {
+    background: var(--surface-250);
+    border: 0.1rem solid var(--line-150);
+    border-radius: var(--radius);
+    padding: 2rem;
+  }
+  .panel-title {
+    font-family: var(--font-oswald), Oswald, sans-serif;
+    font-size: 1.3rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-550);
+    margin: 0 0 1.6rem;
+  }
+
+  /* --- identity --- */
+  .identity { display: flex; gap: 2rem; align-items: center; flex-wrap: wrap; }
+
   .avatar {
-    position: relative; width: 88px; height: 88px; border-radius: 8px; overflow: hidden;
-    border: 3px solid var(--accent); background: #0c0c0c; flex: none;
+    position: relative;
+    width: 8.8rem; height: 8.8rem;
+    flex: none;
+    border-radius: var(--radius);
+    overflow: visible;
+    border: 0.2rem solid var(--brand-accent);
+    background: #00000073;
   }
-  .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  /* the creator tick, overlaid on the avatar corner */
+  .avatar > img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    border-radius: var(--radius);
+    display: block;
+  }
+  /* the creator tick - only ever rendered because the server said so */
   .tick {
-    position: absolute; right: -6px; bottom: -6px;
-    width: 28px; height: 28px; border-radius: 50%;
-    background: var(--accent); border: 3px solid var(--panel);
-    display: none; align-items: center; justify-content: center;
+    position: absolute;
+    right: -0.8rem; bottom: -0.8rem;
+    width: 2.6rem; height: 2.6rem;
+    border-radius: 50%;
+    background: var(--brand-accent);
+    border: 0.2rem solid #000;
+    display: none;
+    align-items: center;
+    justify-content: center;
   }
   .tick.on { display: flex; }
-  .tick svg { width: 15px; height: 15px; display: block; }
+  .tick svg { width: 1.4rem; height: 1.4rem; display: block; }
 
-  .who { min-width: 220px; flex: 1; }
-  .nick { display: flex; align-items: center; gap: 8px; font-size: 22px; font-weight: 700; }
-  .nick .tag {
-    display: inline-flex; align-items: center; gap: 4px;
-    background: rgba(68, 201, 135, .15); color: var(--accent);
-    border: 1px solid rgba(68, 201, 135, .4); border-radius: 999px;
-    padding: 2px 10px; font-size: 12px; font-weight: 600;
+  .id-block { min-width: 20rem; flex: 1; }
+
+  .nick-row { display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; }
+  .nick {
+    font-family: var(--font-oswald), Oswald, sans-serif;
+    font-size: 2.4rem;
+    font-weight: 600;
+    line-height: 1.2;
+    text-transform: uppercase;
   }
-  .nick .tag svg { width: 12px; height: 12px; }
-  .uid { color: var(--muted); font-size: 12px; margin-top: 4px; word-break: break-all; }
-
-  .stats { display: flex; gap: 28px; flex-wrap: wrap; }
-  .stat .k { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
-  .stat .v { font-size: 20px; font-weight: 700; margin-top: 2px; }
-
-  /* --- promo --- */
-  .row { display: flex; gap: 10px; flex-wrap: wrap; }
-  input[type=text], input[type=number], input[type=datetime-local] {
-    padding: 11px 13px; background: #141414; color: var(--text);
-    border: 1px solid var(--line); border-radius: 6px; font: inherit; min-width: 0;
+  .creator-tag {
+    display: none;
+    align-items: center;
+    gap: 0.4rem;
+    background: rgba(68, 201, 135, 0.12);
+    border: 0.1rem solid var(--brand-accent);
+    color: var(--brand-accent);
+    border-radius: 999px;
+    padding: 0.2rem 0.9rem;
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
   }
-  input:focus { outline: none; border-color: var(--accent); }
-  input.code { flex: 1; min-width: 200px; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+  .creator-tag.on { display: inline-flex; }
+  .creator-tag svg { width: 1.1rem; height: 1.1rem; }
 
-  button {
-    padding: 11px 20px; border-radius: 6px; border: 1px solid var(--line);
-    background: #262626; color: var(--text); font: inherit; cursor: pointer;
+  .uid { color: var(--text-450); font-size: 1.2rem; margin-top: 0.4rem; word-break: break-all; }
+
+  /* --- numeric tiles, same family as the balance widget --- */
+  .tiles { display: flex; gap: 3.2rem; flex-wrap: wrap; margin-left: auto; }
+  .tile .k {
+    font-size: 1.05rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-450);
   }
-  button:hover:not(:disabled) { border-color: var(--accent); }
-  button:disabled { opacity: .5; cursor: not-allowed; }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #0a1a12; font-weight: 700; }
+  .tile .v {
+    font-family: var(--font-oswald), Oswald, sans-serif;
+    font-size: 2rem;
+    font-weight: 600;
+    line-height: 1.2;
+    color: #fff;
+  }
+  .tile.balance .v { color: var(--brand-balance-text); }
 
-  .msg { margin-top: 12px; font-size: 13px; min-height: 20px; }
-  .msg.ok { color: var(--accent); }
-  .msg.err { color: var(--red); }
-  .msg.info { color: var(--muted); }
+  /* --- form --- */
+  label { display: block; font-size: 1.1rem; letter-spacing: .06em; text-transform: uppercase; color: var(--text-450); margin-bottom: 0.6rem; }
+  input {
+    width: 100%;
+    padding: 1.1rem 1.3rem;
+    background: var(--surface-450);
+    border: 0.1rem solid var(--line-150);
+    border-radius: var(--radius);
+    color: #fff;
+    font: inherit;
+    font-family: inherit;
+  }
+  input::placeholder { color: var(--text-450); }
+  input:focus { outline: none; border-color: var(--brand-accent); }
+  input.code {
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 600;
+  }
 
-  label { display: block; font-size: 12px; color: var(--muted); margin: 14px 0 6px; }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
-  @media (max-width: 620px) { .grid2 { grid-template-columns: 1fr; } }
+  /* The primary button uses the site's own gradient + glow. */
+  .btn {
+    padding: 1.1rem 2.4rem;
+    border-radius: var(--radius);
+    border: 0.1rem solid var(--brand-btn-border);
+    background: var(--brand-btn-bg);
+    color: var(--brand-btn-text);
+    font: inherit;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    box-shadow: inset 0 0 1.66rem rgba(68, 201, 135, 0.4);
+    transition: background .15s, box-shadow .15s;
+  }
+  .btn:hover:not(:disabled) {
+    background: linear-gradient(180deg, #1D5A3A 0%, #13432C 100%);
+    box-shadow: inset 0 0 1.66rem rgba(68, 201, 135, 0.6);
+  }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
 
+  .promo-row { display: flex; gap: 1rem; flex-wrap: wrap; }
+  .promo-row input { flex: 1; min-width: 22rem; }
+  .promo-row .btn { flex: none; }
+
+  .msg { margin-top: 1.2rem; font-size: 1.3rem; min-height: 2rem; }
+  .msg.ok { color: var(--brand-accent); }
+  .msg.err { color: #ff5252; }
+  .msg.info { color: var(--text-550); }
+
+  .hint { color: var(--text-450); font-size: 1.2rem; margin: 0.6rem 0 0; }
+
+  /* --- table --- */
   table { width: 100%; border-collapse: collapse; }
-  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); }
-  th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
-  td.num { text-align: right; font-variant-numeric: tabular-nums; }
-  code { background: #141414; padding: 2px 7px; border-radius: 4px; }
-  .empty { text-align: center; color: var(--muted); padding: 26px 0; }
-  .hint { color: var(--muted); font-size: 12px; }
+  th, td { text-align: left; padding: 1rem 1.2rem; border-bottom: 0.1rem solid var(--line-150); }
+  th { font-size: 1.05rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-450); font-weight: 500; }
+  td.num, th.num { text-align: right; }
+  td.amount { font-family: var(--font-oswald), Oswald, sans-serif; font-size: 1.5rem; }
+  td.code-cell code {
+    background: var(--surface-450);
+    border: 0.1rem solid var(--line-150);
+    border-radius: var(--radius);
+    padding: 0.2rem 0.7rem;
+    letter-spacing: 0.1em;
+    font-weight: 600;
+  }
+  td.when { color: var(--text-450); }
+  .empty { text-align: center; color: var(--text-450); padding: 3rem 0; }
+
+  @media (max-width: 700px) {
+    .tiles { margin-left: 0; gap: 2rem; }
+    .topbar-nav a { display: none; }
+    .promo-row input { min-width: 0; }
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
 
-  <div class="card">
-    <h2>Профиль</h2>
-    <div class="head">
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="/ru">Кейсер</a>
+    <nav class="topbar-nav">
+      <a href="/ru/cases">Кейсы</a>
+      <a href="/ru/inventory">Инвентарь</a>
+      <a href="/ru/rewards">Награды</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+
+  <div class="panel">
+    <h1 class="panel-title">Профиль</h1>
+    <div class="identity">
       <div class="avatar">
         <img id="avatar" alt="">
-        <div class="tick" id="tick" title="Верифицированный автор">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#0a1a12" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+        <div class="tick" id="tick" title="Автор">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#0a1a12" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="20 6 9 17 4 12"></polyline>
           </svg>
         </div>
       </div>
-      <div class="who">
-        <div class="nick">
-          <span id="nick">—</span>
-          <span class="tag" id="creatorTag" style="display:none">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+      <div class="id-block">
+        <div class="nick-row">
+          <span class="nick" id="nick">—</span>
+          <span class="creator-tag" id="creatorTag">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
             Автор
@@ -125,26 +303,26 @@
         </div>
         <div class="uid" id="uid">—</div>
       </div>
-      <div class="stats">
-        <div class="stat"><div class="k">Баланс</div><div class="v" id="balance">—</div></div>
-        <div class="stat"><div class="k">Предметов</div><div class="v" id="items">—</div></div>
-        <div class="stat"><div class="k">Регистрация</div><div class="v" id="since" style="font-size:14px">—</div></div>
+      <div class="tiles">
+        <div class="tile balance"><div class="k">Баланс</div><div class="v" id="balance">—</div></div>
+        <div class="tile"><div class="k">Предметов</div><div class="v" id="items">—</div></div>
+        <div class="tile"><div class="k">Регистрация</div><div class="v" id="since" style="font-size:1.4rem">—</div></div>
       </div>
     </div>
   </div>
 
-  <div class="card">
-    <h2>Промокод</h2>
-    <p class="hint">Введите код, который вам выдали. Код начисляет сумму на баланс и действует один раз на аккаунт.</p>
-    <div class="row" style="margin-top:12px">
+  <div class="panel">
+    <h2 class="panel-title">Промокод</h2>
+    <p class="hint">Введите код, который вам выдали. Сумма зачисляется на баланс, код действует один раз на аккаунт.</p>
+    <div class="promo-row" style="margin-top:1.4rem">
       <input class="code" type="text" id="code" placeholder="ВВЕДИТЕ КОД" autocomplete="off" spellcheck="false">
-      <button class="primary" id="redeemBtn">Активировать</button>
+      <button class="btn" id="redeemBtn">Активировать</button>
     </div>
     <div class="msg" id="promoMsg"></div>
   </div>
 
-  <div class="card">
-    <h2>Активированные промокоды</h2>
+  <div class="panel">
+    <h2 class="panel-title">Активированные промокоды</h2>
     <div id="history"></div>
   </div>
 
@@ -155,37 +333,36 @@
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
 
-  function readCookie(name) {
-    var m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
-    return m ? decodeURIComponent(m[1]) : null;
-  }
-
   function money(n) {
     return '$' + (Number(n) || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
-
   function when(iso) {
     if (!iso) return '—';
     var d = new Date(iso);
     return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('ru-RU');
   }
-
   function say(el, text, kind) {
     el.textContent = text || '';
     el.className = 'msg' + (kind ? ' ' + kind : '');
   }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
 
-  function render(user, invTotal) {
+  function render(user, itemCount) {
     $('nick').textContent = user.nickname || 'Игрок';
     $('uid').textContent = user.id;
     $('avatar').src = user.image || '';
     $('balance').textContent = money(user.balance);
-    $('items').textContent = invTotal != null ? invTotal : '—';
+    if (itemCount != null) $('items').textContent = itemCount;
+    if (user.createdAt) $('since').textContent = when(user.createdAt);
 
-    // The creator tick. The server is the only source of truth for this.
+    // The tick mirrors the server flag; the page cannot grant it to itself.
     var creator = !!user.isCreator;
     $('tick').classList.toggle('on', creator);
-    $('creatorTag').style.display = creator ? 'inline-flex' : 'none';
+    $('creatorTag').classList.toggle('on', creator);
   }
 
   function loadProfile() {
@@ -193,17 +370,10 @@
       .then(function (r) { return r.json(); })
       .then(function (me) {
         if (!me || me.status === 401) throw new Error('Нужно войти в аккаунт');
-        return Promise.all([
-          me,
-          fetch('/api/items/inventory?limit=1').then(function (r) { return r.json(); }).catch(function () { return null; })
-        ]);
-      })
-      .then(function (pair) {
-        var me = pair[0];
-        var inv = pair[1];
-        var created = me.id && null;
-        render(me, inv && typeof inv.total === 'number' ? inv.total : null);
-        return me;
+        return fetch('/api/items/inventory?limit=1').then(function (r) { return r.json(); }).catch(function () { return null; })
+          .then(function (inv) {
+            render(me, inv && typeof inv.total === 'number' ? inv.total : null);
+          });
       });
   }
 
@@ -212,19 +382,19 @@
       .then(function (d) {
         var items = (d && d.items) || [];
         if (!items.length) {
-          $('history').innerHTML = '<div class="empty">Пока ни одного промокода</div>';
+          $('history').innerHTML = '<div class="empty">Активированных промокодов пока нет</div>';
           return;
         }
         $('history').innerHTML =
-          '<table><thead><tr><th>Код</th><th class="num">Сумма</th><th>Когда</th></tr></thead><tbody>' +
+          '<table><thead><tr><th>Код</th><th class="num">Сумма</th><th class="num">Дата</th></tr></thead><tbody>' +
           items.map(function (i) {
-            return '<tr><td><code>' + String(i.code).replace(/[&<>]/g, '') + '</code></td>' +
-              '<td class="num">' + money(i.amount) + '</td>' +
-              '<td class="hint">' + when(i.createdAt) + '</td></tr>';
+            return '<tr><td class="code-cell"><code>' + esc(i.code) + '</code></td>' +
+              '<td class="num amount">' + money(i.amount) + '</td>' +
+              '<td class="num when">' + esc(when(i.createdAt)) + '</td></tr>';
           }).join('') + '</tbody></table>';
       })
       .catch(function () {
-        $('history').innerHTML = '<div class="empty">Пока ни одного промокода</div>';
+        $('history').innerHTML = '<div class="empty">Активированных промокодов пока нет</div>';
       });
   }
 
@@ -247,8 +417,8 @@
           throw new Error((res.body && res.body.message) || 'Не удалось активировать код');
         }
         var d = res.body.data;
-        say($('promoMsg'), 'Код активирован: +' + money(d.amount) +
-          (d.remaining > 0 ? ' (осталось активаций: ' + d.remaining + ')' : ''), 'ok');
+        say($('promoMsg'), 'Код активирован: ' + money(d.amount) +
+          (d.remaining > 0 ? ' — осталось активаций: ' + d.remaining : ''), 'ok');
         $('code').value = '';
         $('balance').textContent = money(d.balance);
         loadHistory();
@@ -261,7 +431,7 @@
 
   $('code').onkeydown = function (e) { if (e.key === 'Enter') redeemBtn.click(); };
 
-  // Live updates: the balance and the creator tick both push over WebSocket.
+  // Live balance and creator tick over the existing WebSocket.
   (function connect() {
     try {
       var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -277,7 +447,7 @@
           if (msg.event === 'users.update_creator') {
             var on = !!msg.data.isCreator;
             $('tick').classList.toggle('on', on);
-            $('creatorTag').style.display = on ? 'inline-flex' : 'none';
+            $('creatorTag').classList.toggle('on', on);
           }
         } catch (e) { /* ignore */ }
       };
@@ -285,18 +455,14 @@
     } catch (e) { /* no websocket */ }
   })();
 
-  // ?promo=CODE prefills and auto-submits, like the original's promo links.
+  // ?promo=CODE, like the original's promo links.
   var fromLink = new URLSearchParams(location.search).get('promo');
   if (fromLink) {
     $('code').value = fromLink;
     redeemBtn.click();
   }
 
-  loadProfile()
-    .then(function (me) {
-      if (me && me.createdAt) $('since').textContent = when(me.createdAt);
-    })
-    .catch(function (e) { say($('promoMsg'), e.message, 'err'); });
+  loadProfile().catch(function (e) { say($('promoMsg'), e.message, 'err'); });
   loadHistory();
 })();
 </script>
