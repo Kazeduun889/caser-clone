@@ -243,6 +243,40 @@ function round2(n) {
 }
 
 /**
+ * The site's own formatAmount() (chunks/3afhs_vz7l64i.js) does:
+ *
+ *   let s = typeof e === 'number' ? e.toString() : e;
+ *   let [int, frac] = s.split('.');
+ *   if (!/^\d*$/.test(int) || !/^\d*$/.test(frac)) return '0.00';
+ *
+ * Anything that is not plain decimal digits - thousand separators, exponential
+ * notation, an empty string - silently renders as 0.00. toFixed itself starts
+ * producing "1e+21" at 1e21, so a very large balance would display as zero
+ * while the server held the real number.
+ *
+ * Money therefore never leaves the server in a shape the client cannot parse:
+ * plain decimal, no separators, no exponent, and capped well below the
+ * exponential threshold.
+ */
+const MAX_MONEY = 1e12; // a trillion - far past any plausible balance
+
+/** Clamps to the range the client can render. */
+function safeMoney(n) {
+  const v = round2(n);
+  if (!Number.isFinite(v)) return 0;
+  if (v > MAX_MONEY) return MAX_MONEY;
+  if (v < -MAX_MONEY) return -MAX_MONEY;
+  return v;
+}
+
+/** A plain-decimal string with exactly two decimals, e.g. "7000000.00". */
+function moneyString(n) {
+  const v = safeMoney(n);
+  // toFixed is safe below 1e21; MAX_MONEY is 1e12.
+  return v.toFixed(2);
+}
+
+/**
  * Reads a query parameter as an integer inside [min, max].
  * Garbage input ("?limit=abc", "?offset=-5") collapses to `fallback` instead of
  * reaching SQL as NaN.
@@ -455,9 +489,13 @@ app.post('/api/users/balance/topup', async (req, res) => {
   if (!Number.isFinite(amount) || amount <= 0) {
     return res.status(400).json({ success: false, message: 'Invalid amount' });
   }
+  if (amount > MAX_MONEY) {
+    return res.status(400).json({ success: false, message: 'Amount exceeds the maximum balance' });
+  }
   const balance = (await store.addBalance(user.id, amount, 'topup', { amount })) ?? user.balance;
-  pushBalance({ ...user, balance });
-  res.json({ success: true, balance: round2(balance) });
+  const safe = safeMoney(balance);
+  pushBalance({ ...user, balance: safe });
+  res.json({ success: true, balance: safe });
 });
 
 const handleLogout = (req, res) => {
@@ -509,7 +547,7 @@ const handleUsersMe = async (req, res) => {
     // Number, not a string: this endpoint and the topup/case-open endpoints
     // must agree on the type. A string here made the client treat the balance
     // differently depending on which request landed last.
-    balance: round2(user.balance ?? START_BALANCE),
+    balance: safeMoney(user.balance ?? START_BALANCE),
     tradeUrl: user.tradeUrl || 'https://steamcommunity.com/tradeoffer/new/?partner=12345678',
     role: user.role || 'user'
   });
@@ -893,11 +931,16 @@ function wsSendToUser(userId, event, data) {
 }
 
 const inventoryBalancePayload = (user) => {
-  const amount = round2((user && user.balance) ?? START_BALANCE);
-  // Numbers everywhere, matching /api/users/me and the topup response. Sending
-  // `amount` as a pre-formatted string here while other endpoints sent a
-  // number is what let the displayed balance flip between renderings.
-  const payload = { amount, balance: amount, defuses: amount };
+  const amount = safeMoney((user && user.balance) ?? START_BALANCE);
+  // `amount` MUST stay a string here. The client reads it in two places and
+  // both are type-sensitive:
+  //   useInventoryBalanceQuery -> { amount: e.data.amount }
+  //   users.update_inventory_balance -> `typeof e.amount === 'string'` guard
+  // Sending a number makes the widget ignore the live update entirely.
+  // The string must also be plain decimal with no separators, or the client's
+  // formatAmount renders it as "0.00" - see moneyString() above.
+  const formatted = moneyString(amount);
+  const payload = { amount: formatted, balance: formatted, defuses: amount };
   // The api client exposes the raw body as `res.data`, and the client reads
   // `res.data.amount` -> the value must sit at the TOP level of the response.
   return { ...payload, success: true, data: payload };
@@ -1134,6 +1177,116 @@ function pickByOdds(cum) {
   return cum.length - 1;
 }
 
+// ---------------------------------------------------------------------------
+// Mystery upgrade.
+//
+// The prize used to be a uniform random pick from the whole 3290-item
+// catalogue, whose prices run from ~$4 to ~$2.17M with a mean of ~$30,486.
+// That made the wheel wildly wrong in both directions: 39% of wins were worth
+// less than the stake (felt like "it ate my items") while 12.8% were worth more
+// than 100x the stake (felt like "it gave away nonsense"), and the expected
+// payout was ~30,000% of the stake - the house would be ruined.
+//
+// Instead the prize is drawn from items priced in a band around the stake, and
+// weighted so the expected payout lands on the same RTP as everything else.
+// Losing outcomes and jackpots both stay possible.
+// ---------------------------------------------------------------------------
+const MYSTERY_MIN_MULT = 0.15; // cheapest possible prize, as a share of the stake
+const MYSTERY_MAX_MULT = 4;    // jackpot ceiling
+const MYSTERY_MIN_POOL = 12;   // widen the band if fewer candidates than this
+const MYSTERY_FALLBACK_POOL = 60;
+
+// Rounds the stake to two significant figures so repeated bets reuse one pool
+// instead of rebuilding it per request.
+function mysteryBucket(stake) {
+  if (!(stake > 0)) return 0;
+  const mag = Math.pow(10, Math.floor(Math.log10(stake)));
+  const ratio = stake / mag;                    // 1..10
+  return (Math.round(ratio * 10) / 10) * mag;   // two significant figures
+}
+
+/**
+ * Candidate prizes for a given stake: items in [stake*min, stake*max].
+ * If the band is too thin (very small or very large stakes) it falls back to
+ * the items closest to the stake in log-price terms, so a prize always exists.
+ */
+function mysteryPool(stake) {
+  const lo = stake * MYSTERY_MIN_MULT;
+  const hi = stake * MYSTERY_MAX_MULT;
+  const inBand = SHOP_ITEMS.filter((s) => s.price >= lo && s.price <= hi);
+  if (inBand.length >= MYSTERY_MIN_POOL) return inBand;
+
+  return SHOP_ITEMS
+    .slice()
+    .sort((a, b) => Math.abs(Math.log(a.price / stake)) - Math.abs(Math.log(b.price / stake)))
+    .slice(0, MYSTERY_FALLBACK_POOL);
+}
+
+/**
+ * Cumulative odds for the pool so the expected payout equals RTP * stake.
+ * Same price^-beta weighting as the case drops, so the house edge is the same
+ * number everywhere on the site.
+ */
+function mysteryOdds(pool, stake) {
+  const target = Math.max(0, stake * RTP);
+  const prices = pool.map((p) => Math.max(p.price, 0.01));
+
+  const expectedAt = (beta) => {
+    const w = prices.map((p) => Math.pow(p, -beta));
+    const Z = w.reduce((a, b) => a + b, 0) || 1;
+    return w.reduce((acc, wi, i) => acc + (wi / Z) * prices[i], 0);
+  };
+
+  // Uniform is already at or below the target: the pool is cheap enough, so
+  // there is no need to bias anything.
+  if (expectedAt(0) <= target) {
+    const n = pool.length;
+    return pool.map((_, i) => (i + 1) / n);
+  }
+
+  let lo = 0;
+  let hi = 60;
+  for (let k = 0; k < 60; k++) {
+    const mid = (lo + hi) / 2;
+    if (expectedAt(mid) > target) lo = mid;
+    else hi = mid;
+  }
+
+  const beta = (lo + hi) / 2;
+  const w = prices.map((p) => Math.pow(p, -beta));
+  const Z = w.reduce((a, b) => a + b, 0) || 1;
+  const cum = [];
+  let acc = 0;
+  for (const wi of w) {
+    acc += wi / Z;
+    cum.push(acc);
+  }
+  cum[cum.length - 1] = 1;
+  return cum;
+}
+
+const mysteryCache = new Map();
+
+/** Returns { item, isJackpot } for a mystery bet of the given stake. */
+function pickMysteryPrize(stake) {
+  if (!SHOP_ITEMS.length) return { item: SAMPLE_SKINS[0] || null, isJackpot: false };
+  if (!(stake > 0)) return { item: null, isJackpot: false };
+
+  const bucket = mysteryBucket(stake);
+  let entry = mysteryCache.get(bucket);
+  if (!entry) {
+    const pool = mysteryPool(bucket);
+    const cum = mysteryOdds(pool, bucket);
+    entry = { pool, cum };
+    mysteryCache.set(bucket, entry);
+  }
+
+  const idx = pickByOdds(entry.cum);
+  const item = entry.pool[idx];
+  // The original site calls a prize "rare" when it is worth 2x the stake.
+  return { item, isJackpot: !!item && item.price >= stake * 2 };
+}
+
 // Per-case cumulative odds, built lazily and cached for the process lifetime.
 const dropOddsCache = new Map();
 function getCaseOdds(caseData) {
@@ -1204,16 +1357,21 @@ const handleUpgradeBet = async (req, res) => {
   await store.removeInventoryItems(user.id, betEntries.map((e) => e.id));
 
   const targetVal = target ? parseFloat(target.price) || 0 : 0;
-  // Odds follow the real caser.one formula, with the multiplier driven by RTP so
-  // the house stays in profit. See UPGRADE_MULTIPLIER above.
-  const winChance = upgradeWinChance(targetVal, stake);
-  const winChancePercent = upgradeWinChancePercent(targetVal, stake);
-  const superDrop = isSuperDrop(targetVal, stake);
   const roll = randomUnit();
-  const isWin = roll < winChance;
+
+  // Mystery has no target, so there is nothing to compute a chance against -
+  // the real site shows no percentage in that mode either. The player always
+  // receives a card; the value of that card is where the edge lives.
+  const isMysteryBet = !!isMystery;
+  const isWin = isMysteryBet ? true : roll < upgradeWinChance(targetVal, stake);
+
+  const winChance = isMysteryBet ? 1 : upgradeWinChance(targetVal, stake);
+  const winChancePercent = isMysteryBet ? 50 : upgradeWinChancePercent(targetVal, stake);
+  const superDrop = isMysteryBet ? false : isSuperDrop(targetVal, stake);
 
   // Cash only moves by the addedBalance part; inventory value moves via items
   let balance = user.balance;
+  let mysteryJackpot = null;
   if (addedBalance > 0) {
     balance = (await store.addBalance(user.id, -addedBalance, 'upgrade', {
       stake,
@@ -1223,10 +1381,20 @@ const handleUpgradeBet = async (req, res) => {
 
   let wonEntry = null;
   if (isWin) {
-    const prize = isMystery ? SHOP_ITEMS[crypto.randomInt(0, SHOP_ITEMS.length)] : target;
+    // A mystery win draws from a band around the stake at the site RTP, instead
+    // of picking uniformly from a catalogue whose mean price is $30k.
+    const drawn = isMystery ? pickMysteryPrize(stake) : { item: target, isJackpot: false };
+    const prize = drawn.item;
+    if (!prize) {
+      // Should not happen - the catalogue always has items - but never crash
+      // and never hand out a null prize.
+      return res.status(500).json({ message: 'No prize available' });
+    }
+    if (isMystery && drawn.isJackpot) mysteryJackpot = drawn.item.price;
+
     wonEntry = await store.addInventoryItem(user.id, {
       id: store.newId('inv'),
-      price: parseFloat(prize.price) || 0,
+      price: round2(prize.price),
       status: 'available',
       canSell: true,
       canUpgrade: true,
@@ -1258,7 +1426,7 @@ const handleUpgradeBet = async (req, res) => {
     id: store.newId('bet'),
     status: isWin ? 'won' : 'lost',
     isMystery,
-    superDrop,
+    superDrop: isMysteryBet ? mysteryJackpot !== null : superDrop,
     targetItem: target,
     wonItem: wonEntry ? wonEntry.item : null,
     betItems: betEntries.map(toBetItemPayload),
@@ -1268,9 +1436,10 @@ const handleUpgradeBet = async (req, res) => {
     // is the true probability of the roll above, so the number shown to the
     // player is the number that was actually rolled.
     winChance: winChancePercent,
-    // null mirrors the original: no target, or the target is not worth more
-    // than the items being staked.
-    winChancePercent: hasDisplayableChance(targetVal, stakeFromItems) ? winChancePercent : null,
+    // null mirrors the original: no target (mystery), or the target is not
+    // worth more than the items being staked.
+    winChancePercent: isMysteryBet ? null
+      : (hasDisplayableChance(targetVal, stakeFromItems) ? winChancePercent : null),
     roll: roll * 100
   };
 
@@ -1504,6 +1673,11 @@ app.post('/api/admin/users/:id/balance', requireAdmin, async (req, res) => {
   const value = typeof raw === 'number' ? raw : parseFloat(raw);
   if (!Number.isFinite(value) || value < 0) {
     return res.status(400).json({ success: false, message: 'Invalid balance' });
+  }
+  // Above the cap the client would render the number as 0.00, which is worse
+  // than refusing the write.
+  if (value > MAX_MONEY) {
+    return res.status(400).json({ success: false, message: 'Balance exceeds the maximum' });
   }
 
   const before = await store.getUser(id);

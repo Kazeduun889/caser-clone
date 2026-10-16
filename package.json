@@ -8,15 +8,21 @@
   },
   "scripts": {
     "start": "node server.js",
-    "test": "node _test_withdrawal.js && node _test_rtp.js && node _test_odds.js",
+    "test": "node _test_withdrawal.js && node _test_rtp.js && node _test_odds.js && node _test_mystery.js",
     "test:store": "node _test_withdrawal.js",
     "test:rtp": "node _test_rtp.js",
     "test:odds": "node _test_odds.js",
+    "test:mystery": "node _test_mystery.js",
     "test:api": "node _test_api.js",
+    "test:balance": "node _test_balance.js",
+    "test:money": "node _test_money_format.js",
     "test:upgrade": "node _test_upgrade_live.js",
+    "test:mystery:live": "node _test_mystery_live.js",
     "test:resilience": "node _test_resilience.js",
     "probe:render": "node _probe_render.js",
-    "probe:assets": "node _probe_assets.js"
+    "probe:assets": "node _probe_assets.js",
+    "analyze:mystery": "node _analyze_mystery.js",
+    "cleanup:test-users": "node _cleanup_test_users.js"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",
