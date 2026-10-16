@@ -8,10 +8,12 @@
   },
   "scripts": {
     "start": "node server.js",
-    "test": "node _test_withdrawal.js && node _test_rtp.js",
+    "test": "node _test_withdrawal.js && node _test_rtp.js && node _test_odds.js",
     "test:store": "node _test_withdrawal.js",
     "test:rtp": "node _test_rtp.js",
-    "test:api": "node _test_api.js"
+    "test:odds": "node _test_odds.js",
+    "test:api": "node _test_api.js",
+    "test:upgrade": "node _test_upgrade_live.js"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",

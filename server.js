@@ -959,6 +959,59 @@ function randomUnit() {
 // RTP 0.80 -> the house keeps 20%. Override with the RTP env var.
 const RTP = Math.min(0.99, Math.max(0.01, parseFloat(process.env.RTP) || 0.8));
 
+// ---------------------------------------------------------------------------
+// Upgrade wheel odds.
+//
+// The real caser.one computes its chance in the client bundle (2mwsxxmwyqhg9.js):
+//
+//   chancePercent = clamp(stake / targetPrice * 103, 1, 80)
+//   superDrop     = rawChance < 1 || rawChance >= 80
+//   no chance is displayed when targetPrice <= sum(selected item prices)
+//   chance is 50 when the stake is 0
+//
+// UPGRADE_MULTIPLIER is that `103`. It defaults to RTP * 100 so the clone
+// keeps the same formula but stays house-favourable. Set it to 103 to get the
+// original numbers back - note that 103 is a *player* edge (RTP 103%), which is
+// what the live site runs on the wheel as a loss-leader.
+// ---------------------------------------------------------------------------
+const UPGRADE_MULTIPLIER = Math.min(
+  200,
+  Math.max(1, parseFloat(process.env.UPGRADE_MULTIPLIER) || RTP * 100)
+);
+
+// The real site never shows the player more than 80%.
+const UPGRADE_DISPLAY_MAX = 80;
+const UPGRADE_DISPLAY_MIN = 1;
+
+/** Raw win probability for an upgrade, as a fraction in [0, 1]. */
+function upgradeWinChance(targetValue, stake) {
+  if (!(targetValue > 0)) return 0.5; // real site: no valid target -> 50%
+  const raw = (stake / targetValue) * UPGRADE_MULTIPLIER;
+  return Math.min(1, Math.max(0, raw / 100));
+}
+
+/** What the UI shows, clamped exactly like the original: 1%..80%. */
+function upgradeWinChancePercent(targetValue, stake) {
+  if (!(targetValue > 0)) return 50;
+  const raw = (stake / targetValue) * UPGRADE_MULTIPLIER;
+  return Math.min(UPGRADE_DISPLAY_MAX, Math.max(UPGRADE_DISPLAY_MIN, raw));
+}
+
+/** True when the wheel should treat this as a "super drop". */
+function isSuperDrop(targetValue, stake) {
+  if (!(targetValue > 0)) return true;
+  const raw = (stake / targetValue) * UPGRADE_MULTIPLIER;
+  return raw < 1 || raw >= UPGRADE_DISPLAY_MAX;
+}
+
+/**
+ * The original hides the chance when the target is not worth more than the
+ * items being staked - there is nothing meaningful to show.
+ */
+function hasDisplayableChance(targetValue, stakeFromItems) {
+  return targetValue > 0 && targetValue > stakeFromItems;
+}
+
 /**
  * Builds cumulative drop odds for a case so the expected payout equals
  * RTP * casePrice. Items are weighted with w_i = price_i^(-beta); beta = 0 is
@@ -1072,10 +1125,11 @@ const handleUpgradeBet = async (req, res) => {
   await store.removeInventoryItems(user.id, betEntries.map((e) => e.id));
 
   const targetVal = target ? parseFloat(target.price) || 0 : 0;
-  // Chance = stake / targetPrice, scaled by the house edge (RTP) so the wheel
-  // is no longer a zero-expectation game. Capped to the 1%..80% band the UI
-  // accepts.
-  const winChance = targetVal > 0 ? Math.min(0.8, Math.max(0.01, (stake / targetVal) * RTP)) : 0.5;
+  // Odds follow the real caser.one formula, with the multiplier driven by RTP so
+  // the house stays in profit. See UPGRADE_MULTIPLIER above.
+  const winChance = upgradeWinChance(targetVal, stake);
+  const winChancePercent = upgradeWinChancePercent(targetVal, stake);
+  const superDrop = isSuperDrop(targetVal, stake);
   const roll = randomUnit();
   const isWin = roll < winChance;
 
@@ -1117,17 +1171,27 @@ const handleUpgradeBet = async (req, res) => {
   pushBalance({ ...user, balance });
   if (wonEntry) pushNewItems([wonEntry]);
 
+  const stakeFromItems = Number(
+    betEntries.reduce((sum, i) => sum + (parseFloat(i.price) || 0), 0).toFixed(2)
+  );
+
   const bet = {
     id: store.newId('bet'),
     status: isWin ? 'won' : 'lost',
     isMystery,
-    superDrop: null,
+    superDrop,
     targetItem: target,
     wonItem: wonEntry ? wonEntry.item : null,
     betItems: betEntries.map(toBetItemPayload),
     stake,
     addedBalance,
-    winChance: winChance * 100,
+    // The percentage the UI displays. Matches the original's 1%..80% clamp and
+    // is the true probability of the roll above, so the number shown to the
+    // player is the number that was actually rolled.
+    winChance: winChancePercent,
+    // null mirrors the original: no target, or the target is not worth more
+    // than the items being staked.
+    winChancePercent: hasDisplayableChance(targetVal, stakeFromItems) ? winChancePercent : null,
     roll: roll * 100
   };
 
@@ -1330,7 +1394,11 @@ app.get('/api/admin/stats', requireAdmin, async (req, res) => {
       caseOpens: store_.opens,
       online: wss.clients.size,
       withdrawals: { ...byStatus, paidOutValue: Number(paidOut.toFixed(2)), sampled: withdrawals.length },
-      rtp: RTP
+      rtp: RTP,
+      // Surfaced so the operator can confirm the wheel is running the numbers
+      // they think it is.
+      upgradeMultiplier: UPGRADE_MULTIPLIER,
+      upgradeDisplayRange: [UPGRADE_DISPLAY_MIN, UPGRADE_DISPLAY_MAX]
     }
   });
 });
