@@ -676,35 +676,36 @@
       '    <div class="caser-ident">',
       '      <div class="caser-nick"><span data-f="nick">—</span>',
       '        <span class="caser-author" hidden>Автор</span>',
-      '        <button class="caser-icon-btn" data-act="rename" title="Сменить никнейм">',
+      '        <button class="caser-icon-btn caser-pencil" data-act="rename" title="Сменить никнейм">',
       '          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>',
       '        </button>',
       '      </div>',
       '      <div class="caser-uid">ID:<span data-f="uid">—</span></div>',
       '    </div>',
       '    <div class="caser-player-actions">',
+      '      <button class="caser-icon-btn" data-act="settings" title="Настройки">',
+      ico(GEAR, 'caser-btn-ico') + '</button>',
       '      <button class="caser-icon-btn" data-act="logout" title="Выйти">',
-      '        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="m16 17 5-5-5-5"></path><path d="M21 12H9"></path></svg>',
-      '      </button>',
+      ico(EXIT, 'caser-btn-ico') + '</button>',
       '    </div>',
       '  </div>',
       '  <div class="caser-player-mid">',
       '    <span class="caser-mid-spacer"></span>',
-      '    <button class="caser-rating" data-act="rating">',
+      '    <button class="caser-rating" data-act="rating" style="background-image:url(' + RATING_BG + ')">',
       '      <span class="caser-slashes">//</span><b data-f="rating">0</b>',
       '      <em>CASER RATING »</em>',
       '    </button>',
       '  </div>',
       '  <div class="caser-player-bal">',
       '    <div><span class="caser-lbl">История баланса</span>',
-      '      <span class="caser-bal"><span data-f="balance">0.00</span>' + COIN_SVG + '</span>',
+      '      <span class="caser-bal"><span data-f="balance">0.00</span>' + ico(COIN, 'caser-coin') + '</span>',
       '    </div>',
-      '    <button class="caser-topup" data-act="topup">ПОПОЛНИТЬ +</button>',
+      '    <button class="caser-topup" data-act="topup">' + ico(PLUS_GREEN, 'caser-btn-ico') + '<span>ПОПОЛНИТЬ +</span></button>',
       '  </div>',
       '  <div class="caser-counters">',
-      '    <span>' + CASE_SVG + '<b data-f="cases">0</b></span>',
-      '    <span>' + HOUSE_SVG + '<b data-f="upgrades">0</b></span>',
-      '    <span>' + SPARK_SVG + '<b data-f="won">0</b></span>',
+      '    <span>' + ico(ICO_CASE, 'caser-ctr-ico') + '<b data-f="cases">0</b></span>',
+      '    <span>' + ico(ICO_UPGRADE, 'caser-ctr-ico') + '<b data-f="upgrades">0</b></span>',
+      '    <span>' + ico(ICO_BOLT, 'caser-ctr-ico') + '<b data-f="won">0</b></span>',
       '  </div>',
       '</div>',
 
@@ -715,7 +716,7 @@
       '    <div class="caser-best-meta">',
       '      <div class="caser-lbl">ИМЯ:</div>',
       '      <div class="caser-best-name" data-f="bestName">—</div>',
-      '      <div class="caser-best-price"><span data-f="bestPrice">0.00</span>' + COIN_SVG + '</div>',
+      '      <div class="caser-best-price"><span data-f="bestPrice">0.00</span>' + ico(COIN, 'caser-coin') + '</div>',
       '    </div>',
       '    <div class="caser-best-img"><img alt="" data-f="bestImage" hidden></div>',
       '  </div>',
@@ -723,13 +724,13 @@
 
       // --- withdrawn ---------------------------------------------------
       '<div class="caser-card caser-card-wd">',
-      '  <div class="caser-watermark">' + DIAL_SVG + '</div>',
+      '  <img class="caser-watermark" src="' + WD_WATERMARK + '" alt="">',
       '  <div class="caser-lbl">Выведено</div>',
-      '  <div class="caser-wd"><span data-f="withdrawn">0.00</span>' + COIN_SVG + '</div>',
+      '  <div class="caser-wd"><span data-f="withdrawn">0.00</span>' + ico(COIN, 'caser-coin') + '</div>',
       '  <div class="caser-wd-sub"><span data-f="wdCount">0</span> предмета</div>',
       '  <form class="caser-promo-form" autocomplete="off">',
       '    <input type="text" name="promo" placeholder="Персональный купон" spellcheck="false">',
-      '    <button type="submit" class="caser-topup">ПРИМЕНИТЬ</button>',
+      '    <button type="submit" class="caser-topup caser-topup-sm">ПРИМЕНИТЬ</button>',
       '  </form>',
       '  <div class="caser-promo-msg"></div>',
       '</div>'
@@ -761,6 +762,7 @@
       if (what === 'promo') openPromoModal();
       else if (what === 'rename') openNicknameEditor(strip);
       else if (what === 'topup') openPromoModal();
+      else if (what === 'settings') openSettings(strip);
       else if (what === 'logout') logout();
     });
 
@@ -806,6 +808,35 @@
   /** Whole-number formatting with thin thousands separators, as the rating tile shows. */
   function fmtCount(v) {
     return Math.round(Number(v) || 0).toLocaleString('ru-RU');
+  }
+
+  /** The gear: profile settings, same sheet the site's own settings button opens. */
+  function openSettings(strip) {
+    var existing = document.querySelector('.caser-promo-bg');
+    if (existing) { existing.classList.add('open'); return; }
+
+    var wrap = document.createElement('div');
+    wrap.className = 'caser-promo-bg open';
+    wrap.innerHTML =
+      '<div class="caser-promo">' +
+      '<div class="caser-promo-head">' +
+      '<span class="caser-lbl">Настройки профиля</span>' +
+      '<button class="caser-icon-btn" data-c="cancel">' + ico(CLOSE_ICO, 'caser-btn-ico') + '</button>' +
+      '</div>' +
+      '<div class="caser-set-row">' +
+      '<span>Никнейм</span><b data-s="nick">' +
+      (strip.querySelector('[data-f="nick"]') || {}).textContent + '</b></div>' +
+      '<div class="caser-set-row"><span>ID аккаунта</span><b data-s="uid">' +
+      (strip.querySelector('[data-f="uid"]') || {}).textContent + '</b></div>' +
+      '<div class="caser-set-row"><span>Автор</span><b data-s="creator">' +
+      (strip.querySelector('.caser-author').hidden ? 'нет' : 'да') + '</b></div>' +
+      '<div class="caser-promo-row">' +
+      '<button class="caser-topup caser-ghost" data-c="cancel">Закрыть</button></div>' +
+      '</div>';
+    document.body.appendChild(wrap);
+    wrap.addEventListener('click', function (e) {
+      if (e.target === wrap || e.target.closest('[data-c="cancel"]')) wrap.classList.remove('open');
+    });
   }
 
   /**
@@ -955,21 +986,32 @@
   /** Last payload, so a strip React re-created is filled without refetching. */
   var profileCache = null;
 
-  // Inline so the cards never depend on a CDN icon being present. The coin is
-  // the hexagonal one the original shows next to every money figure; the dial is
-  // the faint gauge watermark behind the withdrawn tile.
-  var COIN_SVG = '<svg class="caser-coin" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">'
-    + '<path d="M12 1.6 21 6.9v10.2L12 22.4 3 17.1V6.9Z"/>'
-    + '<path d="M12 6.2 16.6 8.9v5.2L12 16.8 7.4 14.1V8.9Z" fill="#0d1116" opacity=".85"/>'
-    + '</svg>';
-  var DIAL_SVG = '<svg viewBox="0 0 120 120" fill="none" stroke="currentColor" aria-hidden="true">'
-    + '<circle cx="60" cy="60" r="46" stroke-width="7"/>'
-    + '<circle cx="60" cy="60" r="20" stroke-width="7"/>'
-    + '<path d="M60 14v-9" stroke-width="9" stroke-linecap="round"/>'
-    + '</svg>';
-  var CASE_SVG = '<svg class="caser-ctr-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M3 9 5 4h14l2 5"/><path d="M10 9v12"/></svg>';
-  var HOUSE_SVG = '<svg class="caser-ctr-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7"/><path d="M5 9v11h14V9"/><path d="M10 20v-6h4v6"/></svg>';
-  var SPARK_SVG = '<svg class="caser-ctr-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5 14 9l6.5 2-6.5 2-2 6.5-2-6.5L3.5 11 10 9Z"/></svg>';
+  // The site's own artwork, served from the same CDN path it uses. Nothing here
+  // is drawn by hand: coin, gear, exit, case, upgrade, bolt, the plus inside the
+  // top-up button and the balance watermark all ship with the original.
+  var A = '/cdn/fa';
+  var COIN = A + '/icons/general/coin.svg';
+  var GEAR = A + '/icons/general/settingIcon.svg';
+  var EXIT = A + '/icons/general/exitIcon.svg';
+  var PLUS_GREEN = A + '/icons/general/plusGreenIcon.svg';
+  var ICO_CASE = A + '/icons/general/caseIcon.svg';
+  var ICO_UPGRADE = A + '/icons/upgrade/upgrade.svg';
+  var ICO_BOLT = A + '/icons/general/bolt.svg';
+  var WD_WATERMARK = A + '/icons/upgrade/balance-card-watermark.svg';
+  var RATING_BG = A + '/images/profile/ratingBg.webp';
+  var CLOSE_ICO = A + '/icons/general/closeIcon.svg';
+
+  /** Inline <img> for one of the site's icons. */
+  function ico(src, cls, alt) {
+    return '<img class="' + cls + '" src="' + src + '" alt="' + (alt || '') + '">';
+  }
+
+  /**
+   * The pencil is the one glyph with no equivalent on the original - caser.one
+   * ships no edit icon anywhere in its bundle, so there is nothing to copy and
+   * this has to be drawn. Everything around it is site artwork.
+   */
+  var PENCIL_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>';
 
   function applyProfile(strip, payload) {
     var u = payload.user, s = payload.stats;
