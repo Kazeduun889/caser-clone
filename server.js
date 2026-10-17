@@ -120,6 +120,8 @@ app.get('/healthz', async (req, res) => {
     shopItems: SHOP_ITEMS.length,
     online: wss.clients.size,
     storage: await store.stats(),
+    // Surfaced so a failing write is visible without reading the deploy log.
+    lastStoreError: lastStoreError.message,
     time: new Date().toISOString()
   });
 });
@@ -767,7 +769,14 @@ app.get('/api/live-drops', async (req, res) => {
   });
 });
 
-/** Called after a real win: persist the drop and tell every client. */
+/**
+ * Called after a real win: persist the drop and tell every client.
+ *
+ * Failures are recorded rather than swallowed: a drop that is in the feed but
+ * missing from the profile counters is exactly the kind of half-broken state
+ * that is invisible from the UI, so it surfaces on /healthz.
+ */
+const lastStoreError = { message: null, at: null };
 async function publishDrop(userId, item, price, source) {
   try {
     await store.recordDrop(userId, item, price, source);
@@ -778,7 +787,8 @@ async function publishDrop(userId, item, price, source) {
       wsBroadcast('live_drops.new', recent);
     }
   } catch (err) {
-    // A drop failing to publish must never break the bet that produced it.
+    lastStoreError.message = 'publishDrop: ' + err.message;
+    lastStoreError.at = new Date().toISOString();
     console.error('[live-drops]', err.message);
   }
 }

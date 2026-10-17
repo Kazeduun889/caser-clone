@@ -671,36 +671,66 @@ async function recordDrop(userId, item, price, source = 'case') {
     ]
   });
 
-  // best_drop is a running maximum, which the CASE keeps without a read.
-  // cases_opened / upgrades_made also increment here - the earlier version only
-  // inserted zeros, so the profile tiles stayed at 0 for real play.
-  await client.execute(
-    `INSERT INTO player_stats (user_id, cases_opened, upgrades_made, upgrades_won, best_drop, best_drop_name, best_drop_img, rating)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 0)
-     ON CONFLICT(user_id) DO UPDATE SET
-       cases_opened  = player_stats.cases_opened + excluded.cases_opened,
-       upgrades_made = player_stats.upgrades_made + excluded.upgrades_made,
-       upgrades_won  = player_stats.upgrades_won  + excluded.upgrades_won,
-       best_drop      = CASE WHEN excluded.best_drop > player_stats.best_drop
-                             THEN excluded.best_drop ELSE player_stats.best_drop END,
-       best_drop_name = CASE WHEN excluded.best_drop > player_stats.best_drop
-                             THEN excluded.best_drop_name ELSE player_stats.best_drop_name END,
-       best_drop_img  = CASE WHEN excluded.best_drop > player_stats.best_drop
-                             THEN excluded.best_drop_img ELSE player_stats.best_drop_img END,
-       rating         = player_stats.rating + excluded.rating`,
-    [
-      uid,
-      source === 'case' ? 1 : 0,
-      source === 'upgrade' ? 1 : 0,
-      source === 'upgrade' ? 1 : 0,
-      value,
-      (item && item.marketName) || null,
-      (item && item.image) || null,
-      0
-    ]
-  );
+  // The stats upsert is written as INSERT OR IGNORE + UPDATE rather than
+  // ON CONFLICT ... DO UPDATE with `excluded.` references. The upsert form is
+  // valid SQL and works on a local file, but Turso rejected it in production -
+  // the drop was stored and the counters stayed at 0, because this statement
+  // threw after the drops INSERT had already committed.
+  await upsertStats(uid, {
+    casesDelta: source === 'case' ? 1 : 0,
+    upgradesDelta: source === 'upgrade' ? 1 : 0,
+    upgradesWonDelta: source === 'upgrade' ? 1 : 0,
+    bestDrop: value,
+    bestDropName: (item && item.marketName) || null,
+    bestDropImage: (item && item.image) || null
+  });
 
   return { id, price: value, rarity };
+}
+
+/**
+ * Creates the stats row if needed, then applies the deltas with plain SQL.
+ * Splitting it this way keeps every statement portable and makes the running
+ * maximum explicit in JS rather than in a CASE expression.
+ */
+async function upsertStats(uid, delta) {
+  const cases = delta.casesDelta || 0;
+  const upgrades = delta.upgradesDelta || 0;
+  const won = delta.upgradesWonDelta || 0;
+  const rating = delta.ratingDelta || 0;
+
+  await client.execute('INSERT OR IGNORE INTO player_stats (user_id) VALUES (?)', [uid]);
+
+  // best_drop only ever moves up.
+  if (delta.bestDrop != null && delta.bestDrop > 0) {
+    const current = await client.execute({
+      sql: 'SELECT best_drop FROM player_stats WHERE user_id = ?', args: [uid]
+    });
+    const held = current.rows.length ? Number(current.rows[0].best_drop) || 0 : 0;
+    if (delta.bestDrop > held) {
+      await client.execute({
+        sql: `UPDATE player_stats
+              SET cases_opened = cases_opened + ?,
+                  upgrades_made = upgrades_made + ?,
+                  upgrades_won = upgrades_won + ?,
+                  rating = rating + ?,
+                  best_drop = ?, best_drop_name = ?, best_drop_img = ?
+              WHERE user_id = ?`,
+        args: [cases, upgrades, won, rating, delta.bestDrop, val(delta.bestDropName), val(delta.bestDropImage), uid]
+      });
+      return;
+    }
+  }
+
+  await client.execute({
+    sql: `UPDATE player_stats
+          SET cases_opened = cases_opened + ?,
+              upgrades_made = upgrades_made + ?,
+              upgrades_won = upgrades_won + ?,
+              rating = rating + ?
+          WHERE user_id = ?`,
+    args: [cases, upgrades, won, rating, uid]
+  });
 }
 
 async function bumpStatsMemory(uid, source, value, item) {
@@ -743,15 +773,12 @@ async function recordUpgradeAttempt(userId, won, expected = 0.8) {
     mem.stats.set(uid, s);
     return;
   }
-  await client.execute(
-    `INSERT INTO player_stats (user_id, cases_opened, upgrades_made, upgrades_won, best_drop, best_drop_name, best_drop_img, rating)
-     VALUES (?, 0, 1, ?, 0, NULL, NULL, ?)
-     ON CONFLICT(user_id) DO UPDATE SET
-       upgrades_made = player_stats.upgrades_made + 1,
-       upgrades_won  = player_stats.upgrades_won + ?,
-       rating        = player_stats.rating + ?`,
-    [uid, won ? 1 : 0, delta, won ? 1 : 0, delta]
-  );
+
+  await upsertStats(uid, {
+    upgradesDelta: 1,
+    upgradesWonDelta: won ? 1 : 0,
+    ratingDelta: delta
+  });
 }
 
 /** The newest real drops, joined with the player who won them. */
