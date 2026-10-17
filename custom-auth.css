@@ -805,3 +805,43 @@
 
 .caser-promo-row { display: flex; gap: 1.2rem; margin-top: 1.4rem; }
 .caser-promo-row > * { flex: 1; margin-top: 0; }
+
+/* ===========================================================================
+   œ–≈ƒÃ≈“€ / »—“Œ–»ﬂ / ¿œ√–≈…ƒ€ row
+
+   Injected as the first child of the inventory toolbar, which already uses
+   justify-between - so these sit on the left and the sell/sort groups stay
+   where the original puts them. Colours come from the site's own utility
+   classes (bg-black-450, bg-white, text-white) rather than hand-picked hex.
+   =========================================================================== */
+
+.caser-tabs { display: flex; align-items: center; gap: .6rem; }
+
+.caser-tab {
+  padding: 1.1rem 2rem; border: 0; border-radius: .2rem;
+  background-color: #00000073;
+  color: #fff;
+  font-family: var(--font-sofia-sans), "Sofia Sans", sans-serif;
+  font-size: 1.6rem; font-weight: 700; line-height: 2.2rem;
+  text-transform: uppercase; letter-spacing: .04em;
+  white-space: nowrap; cursor: pointer;
+  transition: background-color .15s, color .15s;
+}
+.caser-tab:hover { background-color: #ffffff26; }
+.caser-tab.is-active { background-color: #fff; color: #000; }
+.caser-tab.is-active:hover { background-color: #fff; }
+
+.caser-wip {
+  position: absolute; inset: 0; z-index: 2;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: .8rem;
+  font-family: var(--font-sofia-sans), "Sofia Sans", sans-serif;
+  color: #fff;
+  pointer-events: none;
+}
+.caser-wip[hidden] { display: none; }
+.caser-wip-title {
+  font-family: var(--font-oswald), Oswald, sans-serif;
+  font-size: 3rem; letter-spacing: .06em;
+}
+.caser-wip-sub { font-size: 1.8rem; color: #ffffffa6; }

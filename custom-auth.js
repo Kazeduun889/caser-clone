@@ -713,7 +713,7 @@
       '    <div class="caser-counters">',
       '      <span>' + ico(ICO_CASE, 'caser-ctr-ico') + '<b data-f="cases">0</b></span>',
       '      <span>' + ico(ICO_UPGRADE, 'caser-ctr-ico') + '<b data-f="upgrades">0</b></span>',
-      '      <span>' + ico(ICO_BOLT, 'caser-ctr-ico') + '<b data-f="won">0</b></span>',
+      '      <span>' + ico(ICO_MYSTERY, 'caser-ctr-ico') + '<b data-f="won">0</b></span>',
       '    </div>',
       '  </div>',
       '</div>',
@@ -1015,7 +1015,7 @@
   var PLUS_GREEN = A + '/icons/general/plusGreenIcon.svg';
   var ICO_CASE = A + '/icons/general/caseIcon.svg';
   var ICO_UPGRADE = A + '/icons/upgrade/upgrade.svg';
-  var ICO_BOLT = A + '/icons/general/bolt.svg';
+  var ICO_MYSTERY = A + '/icons/upgrade/mysteryMode.webp';
   var WD_WATERMARK = A + '/icons/upgrade/balance-card-watermark.svg';
   var STEAM_WATERMARK = A + '/icons/general/steamWhiteIcon.svg';
   var RATING_BG = A + '/images/profile/ratingBg.webp';
@@ -1151,6 +1151,82 @@
     f.focus();
   }
 
+  /**
+ * The ПРЕДМЕТЫ / ИСТОРИЯ / АПГРЕЙДЫ switch above the inventory grid.
+ *
+ * caser.one shows this row on the profile screen but the component is missing
+ * from this build, so the page had only the sell/sort controls on the right and
+ * nothing on the left. It is injected as the first child of the existing
+ * toolbar, which already lays its children out with justify-between, so the
+ * sell and sort groups stay exactly where they were.
+ *
+ * ПРЕДМЕТЫ is the live tab. The other two are not built yet and say so rather
+ * than silently doing nothing.
+ */
+  var TABS = [
+    { id: 'items', label: 'ПРЕДМЕТЫ', ready: true },
+    { id: 'history', label: 'ИСТОРИЯ', ready: false },
+    { id: 'upgrades', label: 'АПГРЕЙДЫ', ready: false }
+  ];
+
+  function ensureInventoryTabs() {
+    if (!/\/(profile|ru\/profile|ru\/inventory)/.test(location.pathname)) return;
+    if (document.querySelector('.caser-tabs')) return;
+
+    var page = document.querySelector('[data-testid="inventory-page"]');
+    if (!page) return;
+    var toolbar = page.querySelector(':scope > div.flex.items-center.justify-between');
+    if (!toolbar) return;
+
+    var group = document.createElement('div');
+    group.className = 'caser-tabs';
+    group.setAttribute('data-testid', 'inventory-tabs');
+    group.innerHTML = TABS.map(function (t) {
+      return '<button type="button" class="caser-tab" data-tab="' + t.id + '"'
+        + ' data-ready="' + (t.ready ? '1' : '0') + '">' + t.label + '</button>';
+    }).join('');
+
+    toolbar.insertBefore(group, toolbar.firstChild);
+
+    var notice = document.createElement('div');
+    notice.className = 'caser-wip';
+    notice.setAttribute('data-testid', 'inventory-wip');
+    notice.hidden = true;
+    notice.innerHTML =
+      '<span class="caser-wip-title">В РАЗРАБОТКЕ</span>'
+      + '<span class="caser-wip-sub">Открой свой первый кейс</span>';
+    page.appendChild(notice);
+
+    group.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-tab]');
+      if (!btn) return;
+      selectInventoryTab(btn.getAttribute('data-tab'), group, notice, page);
+    });
+  }
+
+  function selectInventoryTab(id, group, notice, page) {
+    group.querySelectorAll('[data-tab]').forEach(function (b) {
+      var on = b.getAttribute('data-tab') === id;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+
+    var tab = TABS.filter(function (t) { return t.id === id; })[0];
+    var grid = page.querySelector('[data-testid="inventory-items-list"]') ||
+      page.querySelector('[data-testid="upgrade-empty-inventory"]');
+
+    if (tab && tab.ready) {
+      notice.hidden = true;
+      if (grid) grid.hidden = false;
+      return;
+    }
+
+    // Not built yet: say so instead of showing stale items.
+    if (grid) grid.hidden = true;
+    notice.querySelector('.caser-wip-title').textContent = 'В РАЗРАБОТКЕ';
+    notice.hidden = false;
+  }
+
   // Init on DOM ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
@@ -1159,6 +1235,7 @@
       setupObserver();
       setupBalanceSync();
       setupProfileCards();
+      ensureInventoryTabs();
     });
   } else {
     injectAuthModal();
@@ -1166,6 +1243,7 @@
     setupObserver();
     setupBalanceSync();
     setupProfileCards();
+    ensureInventoryTabs();
   }
 
   // Export helper for debugging
