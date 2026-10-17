@@ -277,6 +277,12 @@ async function migrate() {
       best_drop_name TEXT,
       best_drop_img  TEXT,
       rating         REAL NOT NULL DEFAULT 0
+    )`,
+    // Sequential account numbers (1, 2, 3 ...). Kept as a row so concurrent
+    // signups cannot collide on a MAX(id)+1 read.
+    `CREATE TABLE IF NOT EXISTS counters (
+      name  TEXT PRIMARY KEY,
+      value INTEGER NOT NULL DEFAULT 0
     )`
   ];
   await client.batch(statements.map((sql) => ({ sql })), 'write');
@@ -297,6 +303,64 @@ async function migrate() {
   } catch (e) {
     if (!/duplicate column/i.test(e.message)) throw e;
   }
+
+  // Backfill rows recorded before the column existed, so an established
+  // player's best-drop frame tints correctly instead of staying grey.
+  try {
+    await client.execute(
+      `UPDATE player_stats
+          SET best_drop_rarity = (
+            SELECT d.rarity FROM drops d
+             WHERE d.user_id = player_stats.user_id
+               AND d.rarity IS NOT NULL
+             ORDER BY ABS(d.price - player_stats.best_drop) ASC
+             LIMIT 1
+          )
+        WHERE best_drop_rarity IS NULL AND best_drop > 0`
+    );
+  } catch (e) {
+    // A missing drops table is not fatal; the frame just stays at the default.
+  }
+}
+
+/**
+ * Hands out account numbers 1, 2, 3 ... so the profile can show a plain
+ * "ID:242408" like the original instead of a random slug.
+ *
+ * The counter is a row rather than a SELECT MAX(id)+1 so two visitors joining
+ * at the same moment cannot be handed the same number. Concurrent bumps are
+ * retried until one actually advances the row.
+ */
+async function nextUserId() {
+  if (mode === 'memory') {
+    mem.counters = mem.counters || { user_seq: 0 };
+    mem.counters.user_seq += 1;
+    return String(mem.counters.user_seq);
+  }
+
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const cur = await client.execute({
+      sql: "SELECT value FROM counters WHERE name = 'user_seq'"
+    });
+    const now = cur.rows.length ? Number(cur.rows[0].value) || 0 : 0;
+    const next = now + 1;
+
+    const bumped = await client.execute({
+      sql: `UPDATE counters SET value = ? WHERE name = 'user_seq' AND value = ?`,
+      args: [next, now]
+    });
+    if (bumped.rowsAffected) return String(next);
+
+    // Someone else moved it first; read again and retry.
+    const created = await client.execute({
+      sql: "INSERT OR IGNORE INTO counters (name, value) VALUES ('user_seq', ?)",
+      args: [next]
+    });
+    if (created.rowsAffected) return String(next);
+  }
+
+  // Should not happen; a unique id is better than a failed registration.
+  return newId('player');
 }
 
 // ---------------------------------------------------------------------------
@@ -723,7 +787,12 @@ async function recordDrop(userId, item, price, source = 'case') {
     upgradesWonDelta: source === 'upgrade' ? 1 : 0,
     bestDrop: value,
     bestDropName: (item && item.marketName) || null,
-    bestDropImage: (item && item.image) || null
+    bestDropImage: (item && item.image) || null,
+    // The profile tints the best-drop frame with this; without it the tile
+    // always fell back to the default grey.
+    bestDropRarity: (item && item.rarity != null && item.rarity !== '')
+      ? String(item.rarity)
+      : null
   });
 
   return { id, price: value, rarity };
@@ -1548,6 +1617,7 @@ module.exports = {
   removeInventoryItems,
   setInventoryStatus,
   totalInventoryValue,
+  nextUserId,
   recordCaseOpen,
   countCaseOpens,
   // Withdrawals

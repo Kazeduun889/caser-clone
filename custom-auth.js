@@ -666,9 +666,18 @@
 
     var strip = document.createElement('div');
     strip.className = 'caser-profile-strip';
+    // Colours come from the site's own utility classes, which are present in
+    // the shipped stylesheet and resolve through the runtime theme tokens:
+    //   bg-black-250 / border-white-150  -> tile surface and hairline
+    //   text-white-450                  -> the muted captions
+    //   bg-brand-button-primary + text-brand-button-primary-text
+    //     + border-brand-button-primary-border
+    //     + shadow-[var(--brand-button-primary-shadow)]  -> the green button
+    // Hard-coding hex here is what made the top-up button look like a different
+    // shade of green: the site paints it with a flat #13432C, not a gradient.
     strip.innerHTML = [
       // --- player -------------------------------------------------------
-      '<div class="caser-card caser-card-player">',
+      '<div class="caser-card caser-card-player bg-black-250 border-[0.1rem] border-solid border-white-150 rounded-[0.2rem]">',
       '  <div class="caser-player-top">',
       '    <div class="caser-avatar"><img alt=""><span class="caser-tick" hidden>',
       '      <svg viewBox="0 0 24 24" fill="none" stroke="#0a1a12" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>',
@@ -680,7 +689,7 @@
       '          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>',
       '        </button>',
       '      </div>',
-      '      <div class="caser-uid">ID:<span data-f="uid">—</span></div>',
+      '      <div class="caser-uid text-white-450">ID:<span data-f="uid">—</span></div>',
       '    </div>',
       '    <div class="caser-player-actions">',
       '      <button class="caser-icon-btn" data-act="settings" title="Настройки">',
@@ -690,27 +699,27 @@
       '    </div>',
       '  </div>',
       '  <div class="caser-player-mid">',
-      '    <span class="caser-mid-spacer"></span>',
-      '    <button class="caser-rating" data-act="rating" style="background-image:url(' + RATING_BG + ')">',
-      '      <span class="caser-slashes">//</span><b data-f="rating">0</b>',
-      '      <em>CASER RATING »</em>',
-      '    </button>',
+      '    <span class="caser-slashes">//</span><b data-f="rating">0</b>',
+      '    <button class="caser-rating" data-act="rating">CASER RATING »</button>',
       '  </div>',
-      '  <div class="caser-player-bal">',
-      '    <div><span class="caser-lbl">История баланса</span>',
-      '      <span class="caser-bal"><span data-f="balance">0.00</span>' + ico(COIN, 'caser-coin') + '</span>',
+      // The lower half sits on its own darker plate, split by a hairline.
+      '  <div class="caser-plate">',
+      '    <div class="caser-player-bal">',
+      '      <div><span class="caser-lbl">История баланса</span>',
+      '        <span class="caser-bal"><span data-f="balance">0.00</span>' + ico(COIN, 'caser-coin') + '</span>',
+      '      </div>',
+      '      <button class="caser-btn-primary" data-act="topup">ПОПОЛНИТЬ' + ico(PLUS_GREEN, 'caser-btn-ico') + '</button>',
       '    </div>',
-      '    <button class="caser-topup" data-act="topup">' + ico(PLUS_GREEN, 'caser-btn-ico') + '<span>ПОПОЛНИТЬ +</span></button>',
-      '  </div>',
-      '  <div class="caser-counters">',
-      '    <span>' + ico(ICO_CASE, 'caser-ctr-ico') + '<b data-f="cases">0</b></span>',
-      '    <span>' + ico(ICO_UPGRADE, 'caser-ctr-ico') + '<b data-f="upgrades">0</b></span>',
-      '    <span>' + ico(ICO_BOLT, 'caser-ctr-ico') + '<b data-f="won">0</b></span>',
+      '    <div class="caser-counters">',
+      '      <span>' + ico(ICO_CASE, 'caser-ctr-ico') + '<b data-f="cases">0</b></span>',
+      '      <span>' + ico(ICO_UPGRADE, 'caser-ctr-ico') + '<b data-f="upgrades">0</b></span>',
+      '      <span>' + ico(ICO_BOLT, 'caser-ctr-ico') + '<b data-f="won">0</b></span>',
+      '    </div>',
       '  </div>',
       '</div>',
 
       // --- best drop ---------------------------------------------------
-      '<div class="caser-card caser-card-best">',
+      '<div class="caser-card caser-card-best bg-black-250 border-[0.1rem] border-solid border-white-150 rounded-[0.2rem]">',
       '  <div class="caser-lbl">Лучший дроп</div>',
       '  <div class="caser-best-body">',
       '    <div class="caser-best-meta">',
@@ -723,14 +732,15 @@
       '</div>',
 
       // --- withdrawn ---------------------------------------------------
-      '<div class="caser-card caser-card-wd">',
-      '  <img class="caser-watermark" src="' + WD_WATERMARK + '" alt="">',
+      '<div class="caser-card caser-card-wd bg-black-250 border-[0.1rem] border-solid border-white-150 rounded-[0.2rem]">',
+      '  <img class="caser-watermark" src="' + STEAM_WATERMARK + '" alt="">',
       '  <div class="caser-lbl">Выведено</div>',
       '  <div class="caser-wd"><span data-f="withdrawn">0.00</span>' + ico(COIN, 'caser-coin') + '</div>',
-      '  <div class="caser-wd-sub"><span data-f="wdCount">0</span> предмета</div>',
+      '  <div class="caser-wd-sub text-white-650"><span data-f="wdCount">0</span> предмета</div>',
       '  <form class="caser-promo-form" autocomplete="off">',
       '    <input type="text" name="promo" placeholder="Персональный купон" spellcheck="false">',
-      '    <button type="submit" class="caser-topup caser-topup-sm">ПРИМЕНИТЬ</button>',
+      // deliberately neutral: the apply button is not a primary green action
+      '    <button type="submit" class="caser-btn-ghost">ПРИМЕНИТЬ</button>',
       '  </form>',
       '  <div class="caser-promo-msg"></div>',
       '</div>'
@@ -810,33 +820,42 @@
     return Math.round(Number(v) || 0).toLocaleString('ru-RU');
   }
 
-  /** The gear: profile settings, same sheet the site's own settings button opens. */
+  /**
+   * The settings sheet: gear glyph beside the title, close on the right, then
+   * the account's own fields. Laid out as in the reference screenshot.
+   */
   function openSettings(strip) {
-    var existing = document.querySelector('.caser-promo-bg');
+    var existing = document.querySelector('.caser-sheet');
     if (existing) { existing.classList.add('open'); return; }
 
     var wrap = document.createElement('div');
-    wrap.className = 'caser-promo-bg open';
+    wrap.className = 'caser-sheet';
     wrap.innerHTML =
-      '<div class="caser-promo">' +
-      '<div class="caser-promo-head">' +
-      '<span class="caser-lbl">Настройки профиля</span>' +
-      '<button class="caser-icon-btn" data-c="cancel">' + ico(CLOSE_ICO, 'caser-btn-ico') + '</button>' +
-      '</div>' +
-      '<div class="caser-set-row">' +
-      '<span>Никнейм</span><b data-s="nick">' +
-      (strip.querySelector('[data-f="nick"]') || {}).textContent + '</b></div>' +
-      '<div class="caser-set-row"><span>ID аккаунта</span><b data-s="uid">' +
-      (strip.querySelector('[data-f="uid"]') || {}).textContent + '</b></div>' +
-      '<div class="caser-set-row"><span>Автор</span><b data-s="creator">' +
-      (strip.querySelector('.caser-author').hidden ? 'нет' : 'да') + '</b></div>' +
-      '<div class="caser-promo-row">' +
-      '<button class="caser-topup caser-ghost" data-c="cancel">Закрыть</button></div>' +
-      '</div>';
+      '<div class="caser-sheet-panel">'
+      + '<div class="caser-sheet-head">'
+      + '<span class="caser-sheet-title">'
+      + '<img class="caser-btn-ico" src="' + GEAR + '" alt="">'
+      + '<span>НАСТРОЙКИ</span></span>'
+      + '<button class="caser-icon-btn" data-c="cancel" aria-label="Закрыть">'
+      + '<img class="caser-btn-ico" src="' + CLOSE_ICO + '" alt=""></button>'
+      + '</div>'
+      + '<label class="caser-field"><span>Никнейм</span>'
+      + '<input type="text" data-f="s-nick" maxlength="24" spellcheck="false"></label>'
+      + '<label class="caser-field"><span>Трейд-ссылка</span>'
+      + '<input type="text" data-f="s-link" spellcheck="false"></label>'
+      + '<div class="caser-promo-msg"></div>'
+      + '<div class="caser-promo-row">'
+      + '<button class="caser-btn-primary" data-c="cancel">Закрыть</button></div>'
+      + '</div>';
     document.body.appendChild(wrap);
+
+    wrap.querySelector('[data-f="s-nick"]').value = (strip.querySelector('[data-f="nick"]') || {}).textContent || '';
+    wrap.querySelector('[data-f="s-link"]').value = (strip.querySelector('[data-f="trade"]') || {}).textContent || '';
+
     wrap.addEventListener('click', function (e) {
       if (e.target === wrap || e.target.closest('[data-c="cancel"]')) wrap.classList.remove('open');
     });
+    wrap.addEventListener('submit', function (e) { e.preventDefault(); });
   }
 
   /**
@@ -998,6 +1017,7 @@
   var ICO_UPGRADE = A + '/icons/upgrade/upgrade.svg';
   var ICO_BOLT = A + '/icons/general/bolt.svg';
   var WD_WATERMARK = A + '/icons/upgrade/balance-card-watermark.svg';
+  var STEAM_WATERMARK = A + '/icons/general/steamWhiteIcon.svg';
   var RATING_BG = A + '/images/profile/ratingBg.webp';
   var CLOSE_ICO = A + '/icons/general/closeIcon.svg';
 

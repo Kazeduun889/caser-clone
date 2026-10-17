@@ -395,7 +395,9 @@ async function resolveUser(req) {
   }
 
   // No known identity yet: mint a stable demo account for this browser.
-  const id = candidates[0] || store.newId('player');
+  // The number comes from a sequential counter, so the profile shows a plain
+  // "ID:242408" rather than a random slug.
+  const id = candidates[0] || await store.nextUserId();
   const user = await store.ensureUser({
     id,
     nickname: 'CaserPlayer',
@@ -925,7 +927,22 @@ function pushBalance(user) {
   const amount = parseFloat(user.balance) || 0;
   if (!Number.isFinite(amount)) return;
   wsSendToUser(user.id, 'users.update_balance', amount);
-  wsSendToUser(user.id, 'users.update_inventory_balance', { amount: amount.toFixed(2) });
+}
+
+/**
+ * Pushes the value of the items the player owns to the header's second figure.
+ *
+ * Kept separate from pushBalance on purpose: that one is the coin balance, and
+ * sending it here too made the header print the same number in both slots.
+ */
+async function pushInventoryBalance(userId) {
+  if (!userId) return;
+  try {
+    const total = await store.totalInventoryValue(userId);
+    wsSendToUser(userId, 'users.update_inventory_balance', { amount: moneyString(safeMoney(total)) });
+  } catch (e) {
+    // Never let a cosmetic update take down the request that triggered it.
+  }
 }
 
 /**
@@ -935,6 +952,7 @@ function pushBalance(user) {
 function pushNewItems(userId, items) {
   if (!userId || !Array.isArray(items) || !items.length) return;
   wsSendToUser(userId, 'inventory.new_items', { items: items.map((i) => ({ id: String(i.id) })) });
+  pushInventoryBalance(userId);
 }
 
 /**
@@ -954,8 +972,14 @@ function wsSendToUser(userId, event, data) {
   }
 }
 
-const inventoryBalancePayload = (user) => {
-  const amount = safeMoney((user && user.balance) ?? START_BALANCE);
+/**
+ * The header shows two separate figures side by side: the value of the items
+ * you own (blue, "header-inventory-balance-desktop") and your coin balance
+ * (green, "header-coin-balance-desktop"). This used to send the coin balance
+ * for both, which made the header print the same number twice.
+ */
+const inventoryBalancePayload = (amount) => {
+  const value = safeMoney(amount);
   // `amount` MUST stay a string here. The client reads it in two places and
   // both are type-sensitive:
   //   useInventoryBalanceQuery -> { amount: e.data.amount }
@@ -963,8 +987,8 @@ const inventoryBalancePayload = (user) => {
   // Sending a number makes the widget ignore the live update entirely.
   // The string must also be plain decimal with no separators, or the client's
   // formatAmount renders it as "0.00" - see moneyString() above.
-  const formatted = moneyString(amount);
-  const payload = { amount: formatted, balance: formatted, defuses: amount };
+  const formatted = moneyString(value);
+  const payload = { amount: formatted, balance: formatted, defuses: value };
   // The api client exposes the raw body as `res.data`, and the client reads
   // `res.data.amount` -> the value must sit at the TOP level of the response.
   return { ...payload, success: true, data: payload };
@@ -997,7 +1021,7 @@ app.get('/items/inventory', handleInventory);
 
 const handleInventoryBalance = async (req, res) => {
   const user = await resolveUser(req);
-  res.json(inventoryBalancePayload((await store.getUser(user.id)) || user));
+  res.json(inventoryBalancePayload(await store.totalInventoryValue(user.id)));
 };
 app.get('/api/items/inventory/balance', handleInventoryBalance);
 app.get('/items/inventory/balance', handleInventoryBalance);
@@ -1045,6 +1069,7 @@ const handleSell = async (req, res) => {
 
   const { totalAmount, balance } = await sellInventoryEntries(user, entries);
   pushBalance({ ...user, balance });
+  pushInventoryBalance(user.id);
 
   const payload = {
     totalAmount,
@@ -1065,6 +1090,7 @@ const handleSellAll = async (req, res) => {
   const { totalAmount, balance } = await sellInventoryEntries(user, entries);
 
   pushBalance({ ...user, balance });
+  pushInventoryBalance(user.id);
 
   const payload = {
     totalAmount,
@@ -1567,6 +1593,7 @@ app.post('/api/items/withdraw', async (req, res) => {
     id: result.withdrawal.inventoryItemId,
     status: 'locked_for_withdrawal'
   });
+  pushInventoryBalance(user.id);
 
   res.json({ success: true, data: result.withdrawal });
 });

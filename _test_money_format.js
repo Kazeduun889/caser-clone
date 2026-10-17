@@ -88,10 +88,26 @@ async function main() {
     check(`${c.label}: /api/users/me renders`, okMe, meVal);
     check(`${c.label}: /inventory/balance renders`, okInv, invVal);
 
-    // Whatever happens, the value on screen must equal the value stored.
+    // The header shows two separate figures: the coin balance and the value of
+    // the items you own. This used to assert they matched, which is the bug -
+    // /items/inventory/balance was echoing the coin balance, so the header
+    // printed the same number twice. What must hold now is that the inventory
+    // figure tracks the items and is independent of the coin balance.
     if (okMe && okInv) {
-      const same = Math.abs(Number(meVal) - Number(invVal)) < 0.005;
-      check(`${c.label}: both endpoints agree`, same, { meVal, invVal });
+      // The list endpoint paginates, so ask for a page big enough to hold
+      // everything - otherwise this sums only the first slice.
+      const list = await call('GET', '/api/items/inventory?limit=500', undefined, null, cookie);
+      const rows = (list.json && list.json.items) || [];
+      const itemTotal = rows
+        .filter((r) => (r.status || 'available') === 'available')
+        .reduce((a, r) => a + (Number(r.price) || 0), 0);
+      const invNum = Number(invVal);
+      const matchesItems = Math.abs(invNum - itemTotal) < 0.005;
+      check(`${c.label}: inventory figure tracks items, not coins`, matchesItems, {
+        invVal: invNum,
+        itemTotal: Number(itemTotal.toFixed(2)),
+        coinBalance: Number(meVal)
+      });
     }
   }
 
