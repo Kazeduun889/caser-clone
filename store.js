@@ -37,7 +37,9 @@ const mem = {
   withdrawals: [],
   notifications: [],
   promos: [],
-  promoRedemptions: []
+  promoRedemptions: [],
+  drops: [],
+  stats: new Map()
 };
 
 // Mirrors MAX_MONEY in server.js. Kept here so the store never writes a
@@ -236,7 +238,33 @@ async function migrate() {
       created_at TEXT NOT NULL
     )`,
     'CREATE INDEX IF NOT EXISTS idx_promo_red_user ON promo_redemptions(user_id, code)',
-    'CREATE UNIQUE INDEX IF NOT EXISTS idx_promo_once ON promo_redemptions(user_id, code)'
+    'CREATE UNIQUE INDEX IF NOT EXISTS idx_promo_once ON promo_redemptions(user_id, code)',
+    // Every item a player actually wins, so the live feed and the profile
+    // stats reflect real play instead of a generated loop.
+    `CREATE TABLE IF NOT EXISTS drops (
+      id          TEXT PRIMARY KEY,
+      user_id     TEXT NOT NULL,
+      item_id     TEXT,
+      market_name TEXT,
+      image       TEXT,
+      price       REAL NOT NULL DEFAULT 0,
+      rarity      TEXT,
+      source      TEXT NOT NULL DEFAULT 'case',
+      created_at  TEXT NOT NULL
+    )`,
+    'CREATE INDEX IF NOT EXISTS idx_drops_recent ON drops(created_at DESC)',
+    'CREATE INDEX IF NOT EXISTS idx_drops_user ON drops(user_id, price DESC)',
+    // Counts upgrades separately from case opens for the profile tiles.
+    `CREATE TABLE IF NOT EXISTS player_stats (
+      user_id        TEXT PRIMARY KEY,
+      cases_opened   INTEGER NOT NULL DEFAULT 0,
+      upgrades_made  INTEGER NOT NULL DEFAULT 0,
+      upgrades_won   INTEGER NOT NULL DEFAULT 0,
+      best_drop      REAL NOT NULL DEFAULT 0,
+      best_drop_name TEXT,
+      best_drop_img  TEXT,
+      rating         REAL NOT NULL DEFAULT 0
+    )`
   ];
   await client.batch(statements.map((sql) => ({ sql })), 'write');
 
@@ -304,8 +332,39 @@ async function createUser(user) {
 }
 
 /** Returns the existing user or creates one with the starting balance. */
+/**
+ * Returns the account, creating it if needed, and keeps the profile fields in
+ * sync when the client sends them.
+ *
+ * It used to be `getUser(id) || createUser(user)`, which meant an account that
+ * had been created by an earlier /api/users/me call never picked up the
+ * nickname, avatar or trade link the client had sent since - every player
+ * stayed "CaserPlayer" forever.
+ */
 async function ensureUser(user) {
-  return (await getUser(user.id)) || createUser(user);
+  const existing = await getUser(user.id);
+  if (!existing) return createUser(user);
+
+  const nickname = user.nickname || existing.nickname;
+  const image = user.image || existing.image;
+  const tradeUrl = user.tradeUrl !== undefined ? user.tradeUrl : existing.tradeUrl;
+  const role = user.role || existing.role;
+
+  if (nickname === existing.nickname && image === existing.image
+      && tradeUrl === existing.tradeUrl && role === existing.role) {
+    return existing;
+  }
+
+  if (mode === 'memory') {
+    const u = mem.users.get(String(user.id));
+    Object.assign(u, { nickname, image, tradeUrl, role });
+    return { ...u };
+  }
+  await client.execute({
+    sql: 'UPDATE users SET nickname = ?, image = ?, trade_url = ?, role = ?, updated_at = ? WHERE id = ?',
+    args: [val(nickname), val(image), val(tradeUrl), role, now(), String(user.id)]
+  });
+  return getUser(user.id);
 }
 
 async function setBalance(userId, value) {
@@ -549,6 +608,239 @@ async function countCaseOpens(userId) {
   if (mode === 'memory') return mem.opens.filter((o) => o.user_id === String(userId)).length;
   const res = await client.execute({ sql: 'SELECT COUNT(*) AS c FROM case_opens WHERE user_id = ?', args: [String(userId)] });
   return Number(res.rows[0].c);
+}
+
+// ---------------------------------------------------------------------------
+// Drops and player stats (the live feed + the profile tiles)
+// ---------------------------------------------------------------------------
+
+const RARITY_BAND = (price) => {
+  if (price >= 1000) return 'extraordinary';
+  if (price >= 250) return 'covert';
+  if (price >= 60) return 'classified';
+  if (price >= 15) return 'restricted';
+  return 'consumer';
+};
+
+/**
+ * Records a won item. Drives three things at once: the live feed every client
+ * sees, the "best drop" tile and the CS rating on the profile.
+ */
+async function recordDrop(userId, item, price, source = 'case') {
+  const uid = String(userId);
+  const id = newId('drop');
+  const value = Number(price) || 0;
+  const rarity = RARITY_BAND(value);
+  const ts = now();
+
+  if (mode === 'memory') {
+    mem.drops = mem.drops || [];
+    mem.drops.unshift({
+      id, user_id: uid, item_id: item && item.id ? String(item.id) : null,
+      market_name: (item && item.marketName) || null,
+      image: (item && item.image) || null,
+      price: value, rarity, source, created_at: ts
+    });
+    if (mem.drops.length > 500) mem.drops.pop();
+    await bumpStatsMemory(uid, source, value, item);
+    return { id, price: value, rarity };
+  }
+
+  await client.execute({
+    sql: `INSERT INTO drops (id, user_id, item_id, market_name, image, price, rarity, source, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [
+      id, uid,
+      item && item.id != null ? String(item.id) : null,
+      item && item.marketName ? String(item.marketName) : null,
+      item && item.image ? String(item.image) : null,
+      value, rarity, String(source), ts
+    ]
+  });
+
+  // best_drop is a running maximum, which the CASE keeps without a read.
+  // cases_opened / upgrades_made also increment here - the earlier version only
+  // inserted zeros, so the profile tiles stayed at 0 for real play.
+  await client.execute(
+    `INSERT INTO player_stats (user_id, cases_opened, upgrades_made, upgrades_won, best_drop, best_drop_name, best_drop_img, rating)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+     ON CONFLICT(user_id) DO UPDATE SET
+       cases_opened  = player_stats.cases_opened + excluded.cases_opened,
+       upgrades_made = player_stats.upgrades_made + excluded.upgrades_made,
+       upgrades_won  = player_stats.upgrades_won  + excluded.upgrades_won,
+       best_drop      = CASE WHEN excluded.best_drop > player_stats.best_drop
+                             THEN excluded.best_drop ELSE player_stats.best_drop END,
+       best_drop_name = CASE WHEN excluded.best_drop > player_stats.best_drop
+                             THEN excluded.best_drop_name ELSE player_stats.best_drop_name END,
+       best_drop_img  = CASE WHEN excluded.best_drop > player_stats.best_drop
+                             THEN excluded.best_drop_img ELSE player_stats.best_drop_img END,
+       rating         = player_stats.rating + excluded.rating`,
+    [
+      uid,
+      source === 'case' ? 1 : 0,
+      source === 'upgrade' ? 1 : 0,
+      source === 'upgrade' ? 1 : 0,
+      value,
+      (item && item.marketName) || null,
+      (item && item.image) || null,
+      0
+    ]
+  );
+
+  return { id, price: value, rarity };
+}
+
+async function bumpStatsMemory(uid, source, value, item) {
+  mem.stats = mem.stats || new Map();
+  const s = mem.stats.get(uid) || {
+    cases_opened: 0, upgrades_made: 0, upgrades_won: 0,
+    best_drop: 0, best_drop_name: null, best_drop_img: null, rating: 0
+  };
+  if (source === 'case') s.cases_opened += 1;
+  else if (source === 'upgrade') { s.upgrades_made += 1; s.upgrades_won += 1; }
+  if (value > s.best_drop) {
+    s.best_drop = value;
+    s.best_drop_name = (item && item.marketName) || null;
+    s.best_drop_img = (item && item.image) || null;
+  }
+  mem.stats.set(uid, s);
+}
+
+/**
+ * Counts an upgrade attempt and moves the CS rating.
+ *
+ * The rating is outcome-minus-expectation: at RTP 0.8 a win is worth +0.2 and
+ * a loss -0.8, so a player who breaks even converges on 0.000 and a player who
+ * does well climbs. A fresh account is 0.000, which is what the reference
+ * screen shows.
+ */
+async function recordUpgradeAttempt(userId, won, expected = 0.8) {
+  const uid = String(userId);
+  const delta = won ? 1 - expected : -expected;
+
+  if (mode === 'memory') {
+    mem.stats = mem.stats || new Map();
+    const s = mem.stats.get(uid) || {
+      cases_opened: 0, upgrades_made: 0, upgrades_won: 0,
+      best_drop: 0, best_drop_name: null, best_drop_img: null, rating: 0
+    };
+    s.upgrades_made += 1;
+    if (won) s.upgrades_won += 1;
+    s.rating += delta;
+    mem.stats.set(uid, s);
+    return;
+  }
+  await client.execute(
+    `INSERT INTO player_stats (user_id, cases_opened, upgrades_made, upgrades_won, best_drop, best_drop_name, best_drop_img, rating)
+     VALUES (?, 0, 1, ?, 0, NULL, NULL, ?)
+     ON CONFLICT(user_id) DO UPDATE SET
+       upgrades_made = player_stats.upgrades_made + 1,
+       upgrades_won  = player_stats.upgrades_won + ?,
+       rating        = player_stats.rating + ?`,
+    [uid, won ? 1 : 0, delta, won ? 1 : 0, delta]
+  );
+}
+
+/** The newest real drops, joined with the player who won them. */
+async function listRecentDrops(limit = 40) {
+  const n = Math.min(200, Math.max(1, parseInt(limit, 10) || 40));
+  if (mode === 'memory') {
+    const list = (mem.drops || []).slice(0, n);
+    return list.map((d) => decorateDrop(d));
+  }
+  const res = await client.execute({
+    sql: `SELECT d.*, u.nickname, u.image AS user_image
+          FROM drops d LEFT JOIN users u ON u.id = d.user_id
+          ORDER BY d.created_at DESC, d.rowid DESC LIMIT ?`,
+    args: [n]
+  });
+  return res.rows.map((r) => decorateDrop({
+    id: r.id, user_id: r.user_id, item_id: r.item_id, market_name: r.market_name,
+    image: r.image, price: r.price, rarity: r.rarity, source: r.source,
+    created_at: r.created_at, nickname: r.nickname, user_image: r.user_image
+  }));
+}
+
+function decorateDrop(d) {
+  return {
+    id: d.id,
+    item: {
+      id: d.item_id,
+      marketName: d.market_name,
+      price: d.price,
+      image: d.image,
+      rarity: d.rarity,
+      source: d.source
+    },
+    user: {
+      id: d.user_id,
+      nickname: d.nickname || 'Игрок',
+      image: d.user_image || null
+    },
+    createdAt: d.created_at
+  };
+}
+
+/**
+ * Everything the profile header needs in one round trip.
+ * `withdrawn` comes from completed withdrawals, which is the honest number to
+ * show next to "Выведено".
+ */
+async function playerStats(userId) {
+  const uid = String(userId);
+  const empty = {
+    casesOpened: 0, upgradesMade: 0, upgradesWon: 0,
+    bestDrop: 0, bestDropName: null, bestDropImage: null,
+    rating: 0, withdrawn: 0, withdrawnItems: 0,
+    inventoryValue: 0, inventoryCount: 0
+  };
+
+  if (mode === 'memory') {
+    const s = mem.stats && mem.stats.get(uid);
+    const inv = mem.inventory.get(uid) || [];
+    const done = mem.withdrawals.filter((w) => w.user_id === uid && w.status === 'completed');
+    return {
+      ...empty,
+      casesOpened: s ? s.cases_opened : 0,
+      upgradesMade: s ? s.upgrades_made : 0,
+      upgradesWon: s ? s.upgrades_won : 0,
+      bestDrop: s ? s.best_drop : 0,
+      bestDropName: s ? s.best_drop_name : null,
+      bestDropImage: s ? s.best_drop_img : null,
+      rating: s ? s.rating : 0,
+      withdrawn: done.reduce((a, w) => a + (Number(w.price) || 0), 0),
+      withdrawnItems: done.length,
+      inventoryCount: inv.length,
+      inventoryValue: inv.reduce((a, e) => a + (Number(e.price) || 0), 0)
+    };
+  }
+
+  const res = await client.execute({ sql: 'SELECT * FROM player_stats WHERE user_id = ?', args: [uid] });
+  const s = res.rows.length ? res.rows[0] : null;
+
+  const wd = await client.execute({
+    sql: `SELECT COUNT(*) AS c, COALESCE(SUM(price), 0) AS total
+          FROM withdrawals WHERE user_id = ? AND status = 'completed'`,
+    args: [uid]
+  });
+  const inv = await client.execute({
+    sql: 'SELECT COUNT(*) AS c, COALESCE(SUM(price), 0) AS total FROM inventory_items WHERE user_id = ?',
+    args: [uid]
+  });
+
+  return {
+    casesOpened: s ? Number(s.cases_opened) : 0,
+    upgradesMade: s ? Number(s.upgrades_made) : 0,
+    upgradesWon: s ? Number(s.upgrades_won) : 0,
+    bestDrop: s ? Number(s.best_drop) : 0,
+    bestDropName: s ? s.best_drop_name : null,
+    bestDropImage: s ? s.best_drop_img : null,
+    rating: s ? Number(s.rating) : 0,
+    withdrawn: Number(wd.rows[0].total) || 0,
+    withdrawnItems: Number(wd.rows[0].c) || 0,
+    inventoryCount: Number(inv.rows[0].c) || 0,
+    inventoryValue: Number(inv.rows[0].total) || 0
+  };
 }
 
 /**
@@ -1152,6 +1444,11 @@ module.exports = {
   setPromoActive,
   redeemPromoCode,
   listPromoRedemptions,
+  // Drops and stats
+  recordDrop,
+  recordUpgradeAttempt,
+  listRecentDrops,
+  playerStats,
   listTransactions,
   listInventory,
   countInventory,

@@ -358,29 +358,12 @@ const AVATARS = [
   'https://avatars.steamstatic.com/fd5be41c9a765b8ccc16726ee7686d391031be40_full.jpg'
 ];
 
-function generateDrop(id) {
-  const skin = SAMPLE_SKINS[Math.floor(Math.random() * SAMPLE_SKINS.length)];
-  const nick = NICKNAMES[Math.floor(Math.random() * NICKNAMES.length)];
-  const avatar = AVATARS[Math.floor(Math.random() * AVATARS.length)];
-  return {
-    id: String(id || Date.now() + Math.floor(Math.random() * 10000)),
-    item: {
-      id: skin.id,
-      marketName: skin.marketName,
-      price: skin.price,
-      image: skin.image,
-      rarity: skin.rarity === '14' ? 'covert' : 'classified',
-      exterior: 'FT'
-    },
-    user: {
-      id: String(Math.floor(Math.random() * 900000) + 100000),
-      nickname: nick,
-      image: avatar
-    }
-  };
-}
+// Live drops are real now. `liveDropsList` is only a warm cache for the
+// homepage widget; /api/live-drops reads the drops table.
+let liveDropsList = [];
 
-let liveDropsList = Array.from({ length: 20 }, (_, i) => generateDrop(1000 + i));
+/** Warms the in-process cache so a freshly booted server can answer at once. */
+store.listRecentDrops(30).then((drops) => { liveDropsList = drops; }).catch(() => {});
 
 // Serve Custom Auth CSS & JS directly
 app.get('/custom-auth.css', (req, res) => {
@@ -735,6 +718,11 @@ const handleOpenCase = async (req, res) => {
     pushNewItems(user.id, createdEntries);
     pushBalance({ ...user, balance });
 
+    // Real drops for the live feed every visitor watches.
+    for (const entry of createdEntries) {
+      await publishDrop(user.id, entry.item, entry.price, 'case');
+    }
+
     res.json({
       items: wonItems,
       balance,
@@ -764,12 +752,36 @@ app.get('/api/statistics', (req, res) => {
   });
 });
 
-app.get('/api/live-drops', (req, res) => {
+/**
+ * The live feed is real play now: every item a player wins is written to the
+ * `drops` table and pushed to every connected client. The old version generated
+ * a random skin every three seconds, so the feed was fiction.
+ */
+app.get('/api/live-drops', async (req, res) => {
+  const limit = clampInt(req.query.limit, 1, 100, 40);
+  const drops = await store.listRecentDrops(limit);
   res.json({
-    liveDrops: liveDropsList,
-    hotDrops: liveDropsList.filter(d => d.item.rarity === 'covert' || d.item.rarity === 'extraordinary')
+    liveDrops: drops,
+    hotDrops: drops.filter((d) => d.item.rarity === 'covert' || d.item.rarity === 'extraordinary'),
+    online: wss.clients.size
   });
 });
+
+/** Called after a real win: persist the drop and tell every client. */
+async function publishDrop(userId, item, price, source) {
+  try {
+    await store.recordDrop(userId, item, price, source);
+    const [recent] = await store.listRecentDrops(30);
+    if (recent) {
+      liveDropsList.unshift(recent);
+      if (liveDropsList.length > 60) liveDropsList.length = 60;
+      wsBroadcast('live_drops.new', recent);
+    }
+  } catch (err) {
+    // A drop failing to publish must never break the bet that produced it.
+    console.error('[live-drops]', err.message);
+  }
+}
 
 app.get('/api/game/cases', (req, res) => {
   res.json({
@@ -1420,6 +1432,10 @@ const handleUpgradeBet = async (req, res) => {
   pushBalance({ ...user, balance });
   if (wonEntry) pushNewItems(user.id, [wonEntry]);
 
+  // Counts the attempt either way, then publishes a real drop on a win.
+  await store.recordUpgradeAttempt(user.id, isWin, isMysteryBet ? 1 : winChance);
+  if (wonEntry) await publishDrop(user.id, wonEntry.item, wonEntry.price, 'upgrade');
+
   const stakeFromItems = Number(
     betEntries.reduce((sum, i) => sum + (parseFloat(i.price) || 0), 0).toFixed(2)
   );
@@ -1835,6 +1851,51 @@ app.get('/api/promo/:code', async (req, res) => {
 // ----------------------------------------------------
 // NOTIFICATIONS
 // ----------------------------------------------------
+// Everything the profile header shows, in one request.
+app.get('/api/users/profile', async (req, res) => {
+  const user = await resolveUser(req);
+  const stats = await store.playerStats(user.id);
+  res.json({
+    success: true,
+    data: {
+      user: {
+        id: user.id,
+        nickname: user.nickname,
+        image: user.image,
+        isCreator: !!user.isCreator,
+        balance: safeMoney(user.balance),
+        tradeUrl: user.tradeUrl || null,
+        createdAt: user.createdAt || null
+      },
+      stats: {
+        // Rendered as 0 on a fresh account, exactly like the original.
+        withdrawn: round2(stats.withdrawn),
+        withdrawnItems: stats.withdrawnItems,
+        bestDrop: round2(stats.bestDrop),
+        bestDropName: stats.bestDropName,
+        bestDropImage: stats.bestDropImage,
+        // CS rating, 3 decimals.
+        rating: Number(stats.rating || 0).toFixed(3),
+        casesOpened: stats.casesOpened,
+        upgradesMade: stats.upgradesMade,
+        upgradesWon: stats.upgradesWon,
+        inventoryCount: stats.inventoryCount,
+        inventoryValue: round2(stats.inventoryValue)
+      }
+    }
+  });
+});
+
+// The player's own drop history (the "История" tab).
+app.get('/api/users/drops', async (req, res) => {
+  const user = await resolveUser(req);
+  const limit = clampInt(req.query.limit, 1, 100, 28);
+  const offset = clampInt(req.query.offset, 0, 1e6, 0);
+  const items = await store.listRecentDrops(200);
+  const mine = items.filter((d) => d.user.id === user.id).slice(offset, offset + limit);
+  res.json({ success: true, items: mine, total: mine.length });
+});
+
 app.get('/api/notifications', async (req, res) => {
   const user = await resolveUser(req);
   const limit = clampInt(req.query.limit, 1, 100, 20);
@@ -2144,19 +2205,11 @@ wss.on('connection', (ws, wsReq) => {
     } catch (e) {}
   });
 
-  // Push new drops every 3 seconds
+  // Real drops are broadcast by publishDrop() when a player actually wins one,
+  // so there is no timer generating fake entries any more. This interval only
+  // keeps the site-wide counters moving.
   const dropInterval = setInterval(() => {
     if (ws.readyState === WebSocket.OPEN) {
-      const newDrop = generateDrop();
-      liveDropsList.unshift(newDrop);
-      if (liveDropsList.length > 30) liveDropsList.pop();
-
-      ws.send(JSON.stringify({
-        event: 'live_drops.new',
-        data: newDrop
-      }));
-
-      // Fluctuate online
       const currentOnline = 3850 + Math.floor(Math.sin(Date.now() / 20000) * 35) + Math.floor(Math.random() * 8);
       ws.send(JSON.stringify({
         event: 'statistics.counters',
