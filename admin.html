@@ -265,7 +265,14 @@
   // ---------- stats ----------
   function renderStats(d) {
     var w = d.withdrawals || {};
+    var st = d.storage || {};
+    // Storage first, and loud when it is not durable - that single fact
+    // explains "my balances reset after every deploy".
+    var storageLabel = st.mode === 'turso' ? 'Turso (сохраняется)'
+      : st.mode === 'local' ? 'файл (стирается!)'
+      : 'ПАМЯТЬ (стирается!)';
     var cards = [
+      ['Хранилище', storageLabel, st.durable ? 'ok' : 'warn'],
       ['Ожидают', w.pending || 0, 'warn'],
       ['Trade offer', w.ready || 0, ''],
       ['Выполнено', w.completed || 0, 'ok'],
@@ -274,9 +281,7 @@
       ['RTP', Math.round((d.rtp || 0) * 100) + '%', 'warn'],
       ['Игроков', d.users || 0, ''],
       ['Открытий кейсов', d.caseOpens || 0, ''],
-      ['Онлайн', d.online || 0, ''],
-      ['Хранилище', d.storage && d.storage.mode === 'memory' ? 'память' : (d.storage && d.storage.mode) || '—',
-        d.storage && d.storage.mode === 'memory' ? 'warn' : '']
+      ['Онлайн', d.online || 0, '']
     ];
     $('stats').innerHTML = cards.map(function (c) {
       return '<div class="stat ' + c[2] + '"><div class="k">' + esc(c[0]) +

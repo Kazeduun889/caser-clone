@@ -1653,7 +1653,7 @@ app.get('/api/admin/stats', requireAdmin, async (req, res) => {
   res.json({
     success: true,
     data: {
-      storage: { mode: store_.mode, error: store_.error },
+      storage: { mode: store_.mode, error: store_.error, durable: store_.mode === 'turso' },
       users: store_.users,
       inventoryItems: store_.inventory,
       transactions: store_.transactions,

@@ -66,10 +66,17 @@ async function init() {
       mode = 'local';
     }
 
-    // Concurrent readers should not block the single writer, and a blocked
-    // writer should wait instead of throwing SQLITE_BUSY straight away.
-    await client.execute('PRAGMA busy_timeout = 10000');
-    await client.execute('PRAGMA journal_mode = WAL');
+    // PRAGMAs are local-SQLite only. libSQL over HTTP rejects them outright:
+    //   SQL_PARSE_ERROR: SQL not allowed statement: PRAGMA busy_timeout = 10000
+    // Running them against Turso made init() throw, the store silently fell
+    // back to `memory`, and every balance, inventory and promo code was lost
+    // on each restart - which looked like "the deploy wipes my data".
+    if (!isRemote) {
+      // Concurrent readers should not block the single writer, and a blocked
+      // writer should wait instead of throwing SQLITE_BUSY straight away.
+      await client.execute('PRAGMA busy_timeout = 10000');
+      await client.execute('PRAGMA journal_mode = WAL');
+    }
 
     await migrate();
     // Fail fast on a bad connection instead of erroring on the first request
