@@ -1713,9 +1713,16 @@ app.post('/api/admin/users/:id/balance', requireAdmin, async (req, res) => {
   res.json({ success: true, data: { id, balance: round2(balance), previous: round2(before.balance) } });
 });
 
-// The player profile. Standalone page, served raw like /admin.
+/**
+ * The profile IS the real caser.one inventory screen.
+ *
+ * Serving our own hand-written page here was the wrong call: the site already
+ * ships the original markup under ru/inventory, with the exact layout, the live
+ * drop rail and the footer. /profile now serves that file, and the endpoints
+ * below fill in the cards it expects.
+ */
 app.get(['/profile', '/profile/', '/ru/profile'], (req, res) => {
-  res.sendFile(path.join(SITE_DIR, 'profile.html'));
+  sendInjectedHtml(path.join(SITE_DIR, 'ru/inventory/index.html'), res);
 });
 
 // The operator panel. Served raw - it has its own token login, so it does not
@@ -1790,7 +1797,7 @@ app.post('/api/admin/promos/:code/enable', requireAdmin, async (req, res) => {
  * redemption row is written, and both happen inside one serialised write
  * transaction - a crash between them cannot lose the code or double the money.
  */
-app.post('/api/promo/redeem', async (req, res) => {
+const redeemPromoHandler = async (req, res) => {
   const user = await resolveUser(req);
   const code = req.body && req.body.code;
 
@@ -1822,13 +1829,39 @@ app.post('/api/promo/redeem', async (req, res) => {
       remaining: result.promo ? result.promo.remaining : 0
     }
   });
-});
+};
+
+app.post('/api/promo/redeem', redeemPromoHandler);
 
 /** Codes this account has already used, so the UI can grey them out. */
 app.get('/api/promo/mine', async (req, res) => {
   const user = await resolveUser(req);
   const items = await store.listPromoRedemptions(user.id, 50);
   res.json({ success: true, items });
+});
+
+// The deposit modal calls these names, so both spellings are served.
+app.get('/promocodes/:code/info', async (req, res) => {
+  await resolveUser(req);
+  const promo = await store.getPromoCode(req.params.code);
+  if (!promo) return res.status(404).json({ success: false, message: 'This promo code does not exist' });
+  res.json({
+    success: true,
+    data: {
+      code: promo.code,
+      amount: promo.amount,
+      bonusPercent: promo.amount > 0 ? promo.amount : 0,
+      remainingActivations: promo.remaining,
+      isActive: promo.isActive,
+      expiresAt: promo.expiresAt
+    }
+  });
+});
+
+app.post('/promocodes/activate', async (req, res) => {
+  // Reuse the redemption path rather than duplicating the limits logic.
+  req.url = '/api/promo/redeem';
+  return redeemPromoHandler(req, res);
 });
 
 /** Peek at a code without spending an activation. */
@@ -1851,7 +1884,68 @@ app.get('/api/promo/:code', async (req, res) => {
 // ----------------------------------------------------
 // NOTIFICATIONS
 // ----------------------------------------------------
-// Everything the profile header shows, in one request.
+// --- The profile screen's own contract -----------------------------------
+// The inventory page renders its cards from these, so their shapes are fixed
+// by the client bundle (see useUserStatsQuery in 2b0jyrka0h02i.js):
+
+//   GET /users/:id/stats -> { success, data: { bestDrop, withdrawnAmount,
+//       withdrawnItemsCount, upgradesMade, casesOpened, mysteryUpgrades } }
+
+const PUBLIC_PROFILE_FIELDS = (user) => ({
+  id: user.id,
+  nickname: user.nickname,
+  image: user.image,
+  balance: safeMoney(user.balance),
+  tradeUrl: user.tradeUrl || null,
+  role: user.role,
+  isCreator: !!user.isCreator,
+  createdAt: user.createdAt || null
+});
+
+app.get('/users/:id', async (req, res) => {
+  const user = await store.getUser(req.params.id);
+  if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+  res.json({ success: true, data: PUBLIC_PROFILE_FIELDS(user) });
+});
+
+app.get('/api/users/:id', async (req, res) => {
+  const user = await store.getUser(req.params.id);
+  if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+  res.json({ success: true, data: PUBLIC_PROFILE_FIELDS(user) });
+});
+
+const usersStatsHandler = async (req, res) => {
+  const user = await store.getUser(req.params.id);
+  if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+  const s = await store.playerStats(user.id);
+  // bestDrop is an item object on the original, not a bare number. Every field
+  // the card might read is present, and it is null while nothing has dropped.
+  const bestDrop = s.bestDrop > 0 ? {
+    id: null,
+    image: s.bestDropImage || null,
+    marketName: s.bestDropName || null,
+    name: s.bestDropName || null,
+    price: round2(s.bestDrop)
+  } : null;
+
+  res.json({
+    success: true,
+    data: {
+      bestDrop,
+      withdrawnAmount: round2(s.withdrawn),
+      withdrawnItemsCount: s.withdrawnItems,
+      upgradesMade: s.upgradesMade,
+      casesOpened: s.casesOpened,
+      mysteryUpgrades: 0
+    }
+  });
+};
+
+app.get('/users/:id/stats', usersStatsHandler);
+app.get('/api/users/:id/stats', usersStatsHandler);
+
+/** Public profile: balance, avatar, id - what the header and cards need. */
 app.get('/api/users/profile', async (req, res) => {
   const user = await resolveUser(req);
   const stats = await store.playerStats(user.id);

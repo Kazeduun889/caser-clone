@@ -76,6 +76,12 @@ async function init() {
     await client.execute('SELECT 1');
     ready = true;
     console.log(`[store] ready (${mode}) -> ${isRemote ? REMOTE_URL : DATA_DIR}`);
+    if (!isRemote && (process.env.RENDER || process.env.RAILWAY_ENVIRONMENT || process.env.FLY_APP_NAME)) {
+      console.warn('[store] WARNING: local SQLite file on a host with an ephemeral filesystem.');
+      console.warn('[store]          Balances, inventories, withdrawals, promo codes and drops are');
+      console.warn('[store]          WIPED on every deploy, restart or spin-down. Set DATABASE_URL');
+      console.warn('[store]          and DATABASE_AUTH_TOKEN to a Turso database to keep them.');
+    }
   } catch (err) {
     initError = err.message;
     mode = 'memory';

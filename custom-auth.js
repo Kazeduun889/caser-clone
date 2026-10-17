@@ -4,6 +4,61 @@
  */
 (function() {
   'use strict';
+
+  /**
+   * Keeps the session consistent across everything the app reads.
+   *
+   * There are two stores: `caser_user` (ours) and `user` (the app's zustand
+   * persist key). They were written at different moments and could disagree -
+   * one holding an old id while the other held the current one. The app then
+   * rendered against a user id the server knew nothing about, so the profile
+   * cards never requested their stats.
+   *
+   * The cookie wins, because that is what the server actually reads. Both keys
+   * are rewritten from it, so the app and the API always agree.
+   */
+  function reconcileSession() {
+    try {
+      const cookie = document.cookie.match(/(?:^|;\s*)caser_user_id=([^;]+)/);
+      const cookieId = cookie ? decodeURIComponent(cookie[1]) : null;
+
+      let ours = null;
+      try { ours = JSON.parse(localStorage.getItem('caser_user') || 'null'); } catch (e) { ours = null; }
+
+      let theirs = null;
+      try { theirs = JSON.parse(localStorage.getItem('user') || 'null'); } catch (e) { theirs = null; }
+
+      const id = cookieId || (ours && ours.id) || (theirs && theirs.state && theirs.state.user && theirs.state.user.id);
+      if (!id) return null;
+
+      const base = (theirs && theirs.state && theirs.state.user) || (ours && ours.id === id ? ours : null) || {
+        id: id, nickname: 'CaserPlayer', image: null, role: 'user'
+      };
+      const user = Object.assign({}, base, { id: id, balance: (ours && ours.id === id) ? ours.balance : base.balance });
+      if (ours && ours.isCreator !== undefined) user.isCreator = ours.isCreator;
+
+      localStorage.setItem('caser_user', JSON.stringify(user));
+      localStorage.setItem('auth_token', 'token_' + id);
+      localStorage.setItem('refresh_token', 'refresh_' + id);
+      localStorage.setItem('user', JSON.stringify({
+        state: {
+          user: user,
+          token: 'token_' + id,
+          refreshToken: 'refresh_' + id,
+          isAuthenticated: true,
+          isLoading: false
+        },
+        version: 0
+      }));
+      document.cookie = 'auth_flag=1; path=/; max-age=31536000';
+      return user;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  reconcileSession();
+
   // Auto-initialize demo/player session so cases and features are immediately accessible
   try {
     if (!localStorage.getItem('auth_token') || !localStorage.getItem('caser_user')) {
