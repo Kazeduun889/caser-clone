@@ -56,7 +56,8 @@ async function main() {
 
     const bet = await req('POST', '/api/game/upgrade/bet', {
       betInventoryItemIds: [String(item.id)],
-      isMystery: true
+      isMystery: true,
+      body: {}
     });
     if (bet.status !== 200) { check('mystery bet accepted', false, bet.json); break; }
 

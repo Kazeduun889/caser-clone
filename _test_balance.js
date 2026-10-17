@@ -16,6 +16,7 @@ const HOST = '127.0.0.1', PORT = 3000;
 const ADMIN = 'caser_user_id=player_10001';
 
 let failed = 0;
+const activeCookies = new Map();
 function check(label, ok, detail) {
   if (!ok) failed++;
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}` + (!ok && detail !== undefined ? `\n        ${JSON.stringify(detail).slice(0, 400)}` : ''));
@@ -35,9 +36,21 @@ function req(method, p, { body, cookie } = {}) {
     const r = http.request({ host: HOST, port: PORT, path: p, method, headers }, (res) => {
       let b = '';
       res.on('data', (c) => { b += c; });
-      res.on('end', () => { let j; try { j = JSON.parse(b); } catch (e) { j = b; } resolve({ status: res.statusCode, json: j }); });
+      res.on('end', () => {
+        const setCookie = res.headers['set-cookie'];
+        let nextCookie = null;
+        if (setCookie && setCookie.length) {
+          for (const c of setCookie) {
+            const idx = c.indexOf('=');
+            const name = c.slice(0, idx).trim();
+            const val = c.slice(idx + 1).split(';')[0].trim();
+            if (name === 'caser_user_id') { nextCookie = 'caser_user_id=' + val; break; }
+          }
+        }
+        resolve({ status: res.statusCode, json: j, setCookie: setCookie && setCookie.length ? [...setCookie] : undefined });
+      });
     });
-    r.on('error', (e) => resolve({ status: 0, json: String(e) }));
+    r.on('error', (e) => resolve({ status: 0, json: String(e), setCookie: undefined }));
     if (data) r.write(data);
     r.end();
   });
@@ -60,20 +73,27 @@ async function balanceOf(cookie) {
   return parseFloat(me.json.balance);
 }
 
+// Call once per user to create the account and store the Set-Cookie so subsequent
+// calls hit the same identity instead of minting a fresh one each time.
+async function createUser(userId) {
+  await activeCookieFor(userId, 'GET', '/api/users/me', {});
+  activeCookies.set(userId, null); // placeholder; the setCookie value is updated on response
+}
+
 async function main() {
   // Two distinct players.
   const a = `player_bal_a_${Date.now().toString(36)}`;
   const b = `player_bal_b_${Date.now().toString(36)}`;
 
-  await req('GET', '/api/users/me', { cookie: `caser_user_id=${a}` });
-  await req('GET', '/api/users/me', { cookie: `caser_user_id=${b}` });
+  await createUser(a);
+  await createUser(b);
 
   // Give them wildly different balances - 500x apart - so any leak is obvious.
-  await req('POST', '/api/users/balance/topup', { cookie: `caser_user_id=${a}`, body: { amount: 6999999 } });
-  await req('POST', '/api/users/balance/topup', { cookie: `caser_user_id=${b}`, body: { amount: 137 } });
+  await activeCookieFor(a, 'POST', '/api/users/balance/topup', { amount: 6999999 });
+  await activeCookieFor(b, 'POST', '/api/users/balance/topup', { amount: 137 });
 
-  const aBal = await balanceOf(`caser_user_id=${a}`);
-  const bBal = await balanceOf(`caser_user_id=${b}`);
+  const aBal = await balanceOf(activeCookies.get(a));
+  const bBal = await balanceOf(activeCookies.get(b));
   console.log(`\n  player A balance: ${aBal}`);
   console.log(`  player B balance: ${bBal}`);
   console.log(`  ratio: ${(aBal / bBal).toFixed(1)}x\n`);
