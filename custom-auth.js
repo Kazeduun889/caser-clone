@@ -667,45 +667,71 @@
     var strip = document.createElement('div');
     strip.className = 'caser-profile-strip';
     strip.innerHTML = [
+      // --- player -------------------------------------------------------
       '<div class="caser-card caser-card-player">',
-      '  <div class="caser-card-body">',
+      '  <div class="caser-player-top">',
       '    <div class="caser-avatar"><img alt=""><span class="caser-tick" hidden>',
       '      <svg viewBox="0 0 24 24" fill="none" stroke="#0a1a12" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>',
       '    </span></div>',
       '    <div class="caser-ident">',
-      '      <div class="caser-nick"><span data-f="nick">—</span><span class="caser-author" hidden>Автор</span></div>',
-      '      <div class="caser-uid" data-f="uid">—</div>',
-      '      <div class="caser-rating">CASER RATING <b data-f="rating">0.000</b></div>',
+      '      <div class="caser-nick"><span data-f="nick">—</span>',
+      '        <span class="caser-author" hidden>Автор</span>',
+      '        <button class="caser-icon-btn" data-act="rename" title="Сменить никнейм">',
+      '          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>',
+      '        </button>',
+      '      </div>',
+      '      <div class="caser-uid">ID:<span data-f="uid">—</span></div>',
       '    </div>',
-      '    <div class="caser-wallet">',
-      '      <div><span class="caser-lbl">Баланс</span><span class="caser-bal" data-f="balance">0.00</span></div>',
+      '    <div class="caser-player-actions">',
+      '      <button class="caser-icon-btn" data-act="logout" title="Выйти">',
+      '        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="m16 17 5-5-5-5"></path><path d="M21 12H9"></path></svg>',
+      '      </button>',
       '    </div>',
       '  </div>',
+      '  <div class="caser-player-mid">',
+      '    <span class="caser-mid-spacer"></span>',
+      '    <button class="caser-rating" data-act="rating">',
+      '      <span class="caser-slashes">//</span><b data-f="rating">0</b>',
+      '      <em>CASER RATING »</em>',
+      '    </button>',
+      '  </div>',
+      '  <div class="caser-player-bal">',
+      '    <div><span class="caser-lbl">История баланса</span>',
+      '      <span class="caser-bal"><span data-f="balance">0.00</span>' + COIN_SVG + '</span>',
+      '    </div>',
+      '    <button class="caser-topup" data-act="topup">ПОПОЛНИТЬ +</button>',
+      '  </div>',
+      '  <div class="caser-counters">',
+      '    <span>' + CASE_SVG + '<b data-f="cases">0</b></span>',
+      '    <span>' + HOUSE_SVG + '<b data-f="upgrades">0</b></span>',
+      '    <span>' + SPARK_SVG + '<b data-f="won">0</b></span>',
+      '  </div>',
       '</div>',
-      '<div class="caser-card">',
+
+      // --- best drop ---------------------------------------------------
+      '<div class="caser-card caser-card-best">',
       '  <div class="caser-lbl">Лучший дроп</div>',
-      '  <div class="caser-best"><img alt="" hidden><div><div class="caser-best-name" data-f="bestName">—</div><div class="caser-best-price" data-f="bestPrice">0.00</div></div></div>',
+      '  <div class="caser-best-body">',
+      '    <div class="caser-best-meta">',
+      '      <div class="caser-lbl">ИМЯ:</div>',
+      '      <div class="caser-best-name" data-f="bestName">—</div>',
+      '      <div class="caser-best-price"><span data-f="bestPrice">0.00</span>' + COIN_SVG + '</div>',
+      '    </div>',
+      '    <div class="caser-best-img"><img alt="" data-f="bestImage" hidden></div>',
+      '  </div>',
       '</div>',
-      '<div class="caser-card">',
+
+      // --- withdrawn ---------------------------------------------------
+      '<div class="caser-card caser-card-wd">',
+      '  <div class="caser-watermark">' + DIAL_SVG + '</div>',
       '  <div class="caser-lbl">Выведено</div>',
-      '  <div class="caser-wd" data-f="withdrawn">0.00</div>',
+      '  <div class="caser-wd"><span data-f="withdrawn">0.00</span>' + COIN_SVG + '</div>',
       '  <div class="caser-wd-sub"><span data-f="wdCount">0</span> предмета</div>',
       '  <form class="caser-promo-form" autocomplete="off">',
-      '    <input type="text" name="promo" placeholder="ВВЕДИТЕ ПРОМОКОД" spellcheck="false">',
-      '    <button type="submit" class="caser-topup">АКТИВИРОВАТЬ</button>',
+      '    <input type="text" name="promo" placeholder="Персональный купон" spellcheck="false">',
+      '    <button type="submit" class="caser-topup">ПРИМЕНИТЬ</button>',
       '  </form>',
       '  <div class="caser-promo-msg"></div>',
-      '</div>',
-      '<div class="caser-card caser-card-wide">',
-      '  <div class="caser-lbl">Статистика</div>',
-      '  <table class="caser-table"><tbody>',
-      '    <tr><th>Открыто кейсов</th><td data-f="cases">0</td></tr>',
-      '    <tr><th>Апгрейдов сделано</th><td data-f="upgrades">0</td></tr>',
-      '    <tr><th>Апгрейдов выиграно</th><td data-f="won">0</td></tr>',
-      '    <tr><th>Предметов в инвентаре</th><td data-f="invCount">0</td></tr>',
-      '    <tr><th>Стоимость инвентаря</th><td data-f="invValue">0.00</td></tr>',
-      '    <tr><th>Выведено предметов</th><td data-f="wdCount2">0</td></tr>',
-      '  </tbody></table>',
       '</div>'
     ].join('');
 
@@ -729,8 +755,17 @@
     }
 
     strip.addEventListener('click', function (e) {
-      if (e.target.closest('[data-act="promo"]')) openPromoModal();
+      var act = e.target.closest('[data-act]');
+      if (!act) return;
+      var what = act.dataset.act;
+      if (what === 'promo') openPromoModal();
+      else if (what === 'rename') openNicknameEditor(strip);
+      else if (what === 'topup') openPromoModal();
+      else if (what === 'logout') logout();
     });
+
+    // Live nickname edits from the server's own broadcast.
+    listenForProfileUpdates(strip);
 
     // Inline promo field. Uses the same endpoint as the modal so both paths
     // share one code path and one set of validation messages.
@@ -768,6 +803,141 @@
     return Number(v || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2 });
   }
 
+  /** Whole-number formatting with thin thousands separators, as the rating tile shows. */
+  function fmtCount(v) {
+    return Math.round(Number(v) || 0).toLocaleString('ru-RU');
+  }
+
+  /**
+   * Nickname editor, opened from the pencil.
+   *
+   * Inline rather than a modal so the card does not jump, and optimistic so the
+   * name lands the moment the server accepts it. Validation lives on the server
+   * (PASSWORD-free NICKNAME_RE); this only stops an obviously empty submit.
+   */
+  function openNicknameEditor(strip) {
+    var existing = document.querySelector('.caser-nick-input');
+    if (existing) { existing.focus(); existing.select(); return; }
+
+    var holder = strip.querySelector('.caser-ident');
+    var nickEl = strip.querySelector('[data-f="nick"]');
+    if (!holder || !nickEl) return;
+
+    var form = document.createElement('form');
+    form.className = 'caser-nick-form';
+    form.innerHTML =
+      '<input class="caser-nick-input" maxlength="24" spellcheck="false" autocomplete="off">' +
+      '<div class="caser-nick-hint"></div>';
+    form.querySelector('input').value = nickEl.textContent === '—' ? '' : nickEl.textContent;
+
+    var hint = form.querySelector('.caser-nick-hint');
+    var input = form.querySelector('input');
+    var done = false;
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      commit();
+    });
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); commit(); }
+      if (e.key === 'Escape') { e.preventDefault(); close(); }
+    });
+    input.addEventListener('blur', function () {
+      // Let a click on the confirm button land before the editor tears down.
+      setTimeout(function () { if (!done) close(); }, 160);
+    });
+
+    function close() {
+      done = true;
+      if (form.parentNode) form.parentNode.removeChild(form);
+      nickEl.style.display = '';
+      var btn = strip.querySelector('[data-act="rename"]');
+      if (btn) btn.style.display = '';
+    }
+
+    function commit() {
+      var value = input.value.trim();
+      if (value.length < 2) { fail('Минимум 2 символа'); return; }
+      hint.className = 'caser-nick-hint';
+      hint.textContent = 'Сохраняем...';
+      fetch('/api/users/me/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nickname: value })
+      }).then(function (r) {
+        return r.json().then(function (b) {
+          if (!r.ok || !b.success) throw new Error((b && b.message) || 'Не удалось сохранить');
+          return b.data;
+        });
+      }).then(function (profile) {
+        applyNickname(profile.nickname);
+        close();
+      }).catch(function (err) { fail(err.message); });
+    }
+
+    function fail(msg) {
+      hint.className = 'caser-nick-hint err';
+      hint.textContent = msg;
+    }
+
+    nickEl.style.display = 'none';
+    var pencil = strip.querySelector('[data-act="rename"]');
+    if (pencil) pencil.style.display = 'none';
+    nickEl.parentNode.insertBefore(form, nickEl);
+    input.focus();
+    input.select();
+  }
+
+  /** Writes the nickname everywhere it is already rendered, plus the cache. */
+  function applyNickname(name) {
+    if (!name) return;
+    if (profileCache) profileCache.user.nickname = name;
+
+    document.querySelectorAll('.caser-profile-strip [data-f="nick"]').forEach(function (el) {
+      el.textContent = name;
+    });
+    document.querySelectorAll('.caser-nick-editor-text').forEach(function (el) {
+      el.textContent = name;
+    });
+
+    // Keep the stored session in step, otherwise the next reconcileSession()
+    // would push the old name back over the new one.
+    try {
+      var user = getStoredUser();
+      if (user) {
+        user.nickname = name;
+        localStorage.setItem('caser_user', JSON.stringify(user));
+      }
+    } catch (e) { /* storage disabled */ }
+  }
+
+  /** Subscribes to the server's profile broadcast for this account. */
+  function listenForProfileUpdates(strip) {
+    if (strip.dataset.listening) return;
+    strip.dataset.listening = '1';
+    // Reuse the page-wide socket if one is already open.
+    if (window.__caserWs && window.__caserWs.readyState === 1) {
+      hookWsProfile(window.__caserWs);
+    }
+  }
+
+  var hookedSockets = [];
+  function hookWsProfile(ws) {
+    if (hookedSockets.indexOf(ws) !== -1) return;
+    hookedSockets.push(ws);
+    ws.addEventListener('message', function (ev) {
+      var msg;
+      try { msg = JSON.parse(ev.data); } catch (e) { return; }
+      if (!msg || msg.event !== 'users.update_profile') return;
+      applyNickname(msg.data && msg.data.nickname);
+    });
+  }
+
+  function logout() {
+    fetch('/api/auth/logout', { method: 'POST' }).catch(function () { });
+    if (window.caserAuth && window.caserAuth.hide) window.caserAuth.hide();
+  }
+
   /** Shared by the inline field and the modal. Throws with the server message. */
   function redeemPromo(code) {
     return fetch('/api/promo/redeem', {
@@ -785,31 +955,51 @@
   /** Last payload, so a strip React re-created is filled without refetching. */
   var profileCache = null;
 
+  // Inline so the cards never depend on a CDN icon being present. The coin is
+  // the hexagonal one the original shows next to every money figure; the dial is
+  // the faint gauge watermark behind the withdrawn tile.
+  var COIN_SVG = '<svg class="caser-coin" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">'
+    + '<path d="M12 1.6 21 6.9v10.2L12 22.4 3 17.1V6.9Z"/>'
+    + '<path d="M12 6.2 16.6 8.9v5.2L12 16.8 7.4 14.1V8.9Z" fill="#0d1116" opacity=".85"/>'
+    + '</svg>';
+  var DIAL_SVG = '<svg viewBox="0 0 120 120" fill="none" stroke="currentColor" aria-hidden="true">'
+    + '<circle cx="60" cy="60" r="46" stroke-width="7"/>'
+    + '<circle cx="60" cy="60" r="20" stroke-width="7"/>'
+    + '<path d="M60 14v-9" stroke-width="9" stroke-linecap="round"/>'
+    + '</svg>';
+  var CASE_SVG = '<svg class="caser-ctr-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M3 9 5 4h14l2 5"/><path d="M10 9v12"/></svg>';
+  var HOUSE_SVG = '<svg class="caser-ctr-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7"/><path d="M5 9v11h14V9"/><path d="M10 20v-6h4v6"/></svg>';
+  var SPARK_SVG = '<svg class="caser-ctr-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5 14 9l6.5 2-6.5 2-2 6.5-2-6.5L3.5 11 10 9Z"/></svg>';
+
   function applyProfile(strip, payload) {
     var u = payload.user, s = payload.stats;
     var q = function (k) { return strip.querySelector('[data-f="' + k + '"]'); };
+
     q('nick').textContent = u.nickname || 'Игрок';
     q('uid').textContent = u.id;
     q('balance').textContent = fmtMoney(u.balance);
-    q('rating').textContent = s.rating;
-    q('cases').textContent = s.casesOpened;
-    q('upgrades').textContent = s.upgradesMade;
-    q('won').textContent = s.upgradesWon;
-    q('invCount').textContent = s.inventoryCount;
-    q('invValue').textContent = fmtMoney(s.inventoryValue);
+    // The original shows the rating as a whole number with separators.
+    q('rating').textContent = fmtCount(s.rating);
+    q('cases').textContent = fmtCount(s.casesOpened);
+    q('upgrades').textContent = fmtCount(s.upgradesMade);
+    q('won').textContent = fmtCount(s.upgradesWon);
     q('withdrawn').textContent = fmtMoney(s.withdrawn);
     q('wdCount').textContent = s.withdrawnItems;
-    q('wdCount2').textContent = s.withdrawnItems;
+
     if (s.bestDrop > 0) {
       q('bestName').textContent = s.bestDropName || '—';
-      q('bestPrice').textContent = '$' + fmtMoney(s.bestDrop);
-      var bimg = strip.querySelector('.caser-best img');
+      q('bestPrice').textContent = fmtMoney(s.bestDrop);
+      var bimg = q('bestImage');
       bimg.src = s.bestDropImage || '';
       bimg.hidden = false;
+      var frame = strip.querySelector('.caser-best-img');
+      if (frame) frame.style.setProperty('--drop-color', s.bestDropColor || '#B0C3D9');
     }
+
     var img = strip.querySelector('.caser-avatar img');
     img.src = u.image || '';
     img.onerror = function () { img.style.visibility = 'hidden'; };
+
     var creator = !!u.isCreator;
     strip.querySelector('.caser-tick').hidden = !creator;
     strip.querySelector('.caser-author').hidden = !creator;

@@ -470,153 +470,284 @@
   margin-left: 6px;
 }
 
-/* ---------------------------------------------------------------------------
-   Horizontal overflow guard
+/* ===========================================================================
+   Profile strip, matched to the reference screen
+   ---------------------------------------------------------------------------
+   Three tiles in one row: player, best drop, withdrawn. Everything here is the
+   site's own visual language - the black-250 surface, white-150 hairlines, the
+   0.2rem radius, Oswald for numerals and --brand-accent / --brand-nav-active
+   straight from the stylesheets. The original renders this block behind a
+   login and it is not present in this build, so the markup is composed here
+   rather than copied.
 
-   The case list's scroll container measures 1767px wide inside a 554px column,
-   so the cards spill sideways and the page grows a stray horizontal scrollbar.
-   The elements that overflow are the site's own compact-track graphics, which
-   are sized for a desktop column. Clipping at the document level keeps the
-   vertical scrolling exactly as the site intends.
-   --------------------------------------------------------------------------- */
-html, body {
-  max-width: 100vw;
-  overflow-x: hidden;
-}
+   SIZING NOTE. The page scales its root font: 1rem is viewport/195, so at a
+   1000px window 1rem measures about 5.1px, not 16px. Every value below is
+   therefore a small number on purpose - writing "1.6rem" for a 10px caption is
+   correct here, and a naive 1rem label would render 5px tall.
+   =========================================================================== */
 
-/* ---------------------------------------------------------------------------
-   Profile strip (player / best drop / withdrawn)
-
-   Built from the site's own tokens: black-250 #00000040 surfaces, white-150
-   borders, the 0.2rem radius, Oswald for numerals, --brand-accent and
-   --brand-nav-active. This is the inventory screen the original renders behind
-   a login; that markup is not in this build, so the block is composed here in
-   the site's design language rather than copied.
-   --------------------------------------------------------------------------- */
 .caser-profile-strip {
   display: grid;
-  grid-template-columns: 1.25fr 1fr .9fr;
-  gap: 1.2rem;
-  max-width: 80rem;
-  margin: 1.6rem auto 0;
-  padding: 0 2rem;
+  grid-template-columns: 1.3fr 1fr .9fr;
+  gap: 1.5rem;
+  width: 100%;
+  max-width: 100%;
+  margin: 2rem auto 0;
+  padding: 0 3.4rem;
+  box-sizing: border-box;
   font-family: var(--font-sofia-sans), "Sofia Sans", sans-serif;
   color: #fff;
 }
-@media (max-width: 1100px) { .caser-profile-strip { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 760px)  { .caser-profile-strip { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .caser-profile-strip { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 640px) { .caser-profile-strip { grid-template-columns: 1fr; padding: 0 1.6rem; } }
 
 .caser-card {
+  position: relative;
+  overflow: hidden;
   background: #00000040;
-  border: 0.1rem solid #ffffff26;
-  border-radius: 0.2rem;
-  padding: 1.2rem;
+  border: .1rem solid #ffffff26;
+  border-radius: .2rem;
+  padding: 1.9rem 2.2rem 2rem;
   min-width: 0;
 }
 
 .caser-lbl {
-  font-size: 1rem;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: #ffffff73;
-  margin-bottom: .8rem;
+  font-size: 1.9rem;
+  font-weight: 500;
+  line-height: 2.5rem;
+  color: #ffffffa6;
 }
 
-.caser-card-body { display: flex; gap: 1.2rem; align-items: flex-start; }
+/* --- the hexagonal coin the original puts after every money figure --- */
+.caser-coin { width: 2.9rem; height: 2.9rem; flex: none; color: #fff; }
+
+/* =========================== player tile ================================= */
+
+.caser-player-top { display: flex; align-items: flex-start; gap: 1.9rem; }
 
 .caser-avatar {
   position: relative;
-  width: 8rem; height: 8rem; flex: none;
+  width: 10.5rem; height: 10.5rem; flex: none;
   border-radius: .2rem;
-  border: .2rem solid #a855f7;
+  border: .15rem solid #a855f7;
   background: #00000073;
   overflow: visible;
 }
-.caser-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: .2rem; display: block; }
+.caser-avatar img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  border-radius: .1rem;
+  display: block;
+}
 .caser-tick {
-  position: absolute; right: -.7rem; bottom: -.7rem;
-  width: 2.4rem; height: 2.4rem; border-radius: 50%;
+  position: absolute; right: -1.2rem; bottom: -1.2rem;
+  width: 4.2rem; height: 4.2rem; border-radius: 50%;
   background: var(--brand-accent, #44C987);
   border: .2rem solid #000;
   display: flex; align-items: center; justify-content: center;
 }
-.caser-tick svg { width: 1.3rem; height: 1.3rem; }
+.caser-tick svg { width: 2.2rem; height: 2.2rem; }
 
-.caser-ident { min-width: 0; flex: 1; }
+.caser-ident { min-width: 0; flex: 1; padding-top: .3rem; }
 .caser-nick {
-  display: flex; align-items: center; gap: .6rem;
+  display: flex; align-items: center; gap: .9rem;
   font-family: var(--font-oswald), Oswald, sans-serif;
-  font-size: 1.8rem; text-transform: uppercase;
+  font-size: 3.4rem; line-height: 4.2rem;
+  text-transform: uppercase;
+  white-space: nowrap; overflow: hidden;
 }
+.caser-uid {
+  color: #ffffff73;
+  font-size: 1.7rem; font-weight: 500; line-height: 2.3rem;
+  word-break: break-all;
+}
+
 .caser-author {
   display: inline-flex; align-items: center;
   background: rgba(68,201,135,.15);
   border: .1rem solid var(--brand-accent, #44C987);
   color: var(--brand-accent, #44C987);
-  border-radius: 999px; padding: .1rem .7rem;
-  font-size: 1rem; font-weight: 700; letter-spacing: .05em;
-}
-.caser-uid { color: #ffffff73; font-size: 1.1rem; word-break: break-all; }
-.caser-rating {
-  display: inline-block; margin-top: .8rem;
-  padding: .3rem .8rem; border-radius: .2rem;
-  background: #00000073; border: .1rem solid #ffffff26;
-  font-size: 1.1rem; letter-spacing: .06em; color: #ffffff8c;
-}
-.caser-rating b {
-  color: var(--brand-nav-active, #83D8FF);
-  font-family: var(--font-oswald), Oswald, sans-serif;
-  font-size: 1.3rem;
+  border-radius: 999px; padding: .1rem 1rem;
+  font-family: var(--font-sofia-sans), "Sofia Sans", sans-serif;
+  font-size: 1.5rem; font-weight: 700; letter-spacing: .04em;
+  white-space: nowrap;
 }
 
-.caser-wallet { margin-left: auto; text-align: right; }
-.caser-bal {
-  display: block;
-  font-family: var(--font-oswald), Oswald, sans-serif;
-  font-size: 1.8rem; color: var(--brand-nav-active, #83D8FF);
+/* pencil / logout cluster */
+.caser-player-actions { display: flex; gap: .5rem; flex: none; }
+.caser-icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 4.4rem; height: 4.4rem;
+  background: transparent; border: 0; border-radius: .2rem;
+  color: #ffffffa6; cursor: pointer;
+  padding: 0;
+  transition: color .15s, background .15s;
 }
+.caser-icon-btn svg { width: 3rem; height: 3rem; }
+.caser-icon-btn:hover { color: #fff; background: #ffffff14; }
+
+.caser-nick [data-act="rename"] { width: 3.4rem; height: 3.4rem; color: #ffffff73; }
+.caser-nick [data-act="rename"] svg { width: 2.2rem; height: 2.2rem; }
+.caser-nick [data-act="rename"]:hover { color: var(--brand-accent, #44C987); }
+
+/* nickname editor */
+.caser-nick-form { flex: 1; min-width: 0; }
+.caser-nick-input {
+  width: 100%; padding: .4rem 1rem;
+  background: #00000073; border: .1rem solid var(--brand-accent, #44C987);
+  border-radius: .2rem; color: #fff;
+  font-family: var(--font-oswald), Oswald, sans-serif;
+  font-size: 3rem; text-transform: uppercase;
+}
+.caser-nick-input:focus { outline: none; }
+.caser-nick-hint {
+  margin-top: .5rem; font-size: 1.5rem; line-height: 2rem;
+  color: #ffffff73;
+}
+.caser-nick-hint.err { color: #ff6b6b; }
+
+/* the `//  4,443   CASER RATING »` block, right-aligned like the original */
+.caser-player-mid {
+  display: flex; align-items: flex-end; justify-content: flex-end;
+  gap: 1.5rem; margin-top: 1.5rem;
+}
+.caser-mid-spacer { flex: 1; }
+.caser-rating {
+  display: flex; align-items: baseline; gap: .8rem;
+  background: #00000073; border: .1rem solid #ffffff26;
+  border-radius: .2rem;
+  padding: .7rem 1.4rem;
+  cursor: pointer;
+  font-family: var(--font-sofia-sans), "Sofia Sans", sans-serif;
+}
+.caser-rating:hover { border-color: var(--brand-accent, #44C987); }
+.caser-slashes {
+  color: #ffffff4d;
+  font-family: var(--font-oswald), Oswald, sans-serif;
+  font-size: 2.6rem; font-weight: 700; letter-spacing: -.15em;
+}
+.caser-rating b {
+  font-family: var(--font-oswald), Oswald, sans-serif;
+  font-size: 3rem; color: #fff;
+}
+.caser-rating em {
+  font-style: normal; font-size: 1.45rem; font-weight: 700;
+  letter-spacing: .06em; color: var(--brand-nav-active, #83D8FF);
+  white-space: nowrap;
+}
+
+/* balance row + top-up */
+.caser-player-bal {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1.5rem; margin-top: 1.4rem;
+  padding-top: 1.4rem;
+  border-top: .1rem solid #ffffff1a;
+}
+.caser-player-bal > div { display: flex; flex-direction: column; gap: .2rem; min-width: 0; }
+.caser-bal {
+  display: flex; align-items: center; gap: .7rem;
+  font-family: var(--font-oswald), Oswald, sans-serif;
+  font-size: 3.2rem; line-height: 3.8rem; color: #fff;
+}
+
 .caser-topup {
-  margin-top: .6rem; padding: .7rem 1.3rem;
-  border-radius: .2rem; cursor: pointer;
+  padding: 1.2rem 2.4rem; border-radius: .2rem; cursor: pointer;
   background: linear-gradient(180deg, #13432C 0%, #0F2E20 100%);
   border: .1rem solid var(--brand-accent, #44C987);
   color: var(--brand-accent, #44C987);
-  font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  font-family: var(--font-sofia-sans), "Sofia Sans", sans-serif;
+  font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  white-space: nowrap;
   box-shadow: inset 0 0 1.66rem rgba(68,201,135,.4);
+  transition: filter .15s;
 }
-.caser-topup:hover { background: linear-gradient(180deg, #1D5A3A 0%, #13432C 100%); }
+.caser-topup:hover { filter: brightness(1.25); }
 
+/* three counters under the tile */
 .caser-counters {
-  display: flex; gap: 2rem; flex-wrap: wrap;
-  margin-top: 1.2rem; padding-top: 1rem;
-  border-top: .1rem solid #ffffff26;
-  font-size: 1.2rem; color: #ffffffa6;
+  display: flex; gap: 4rem; flex-wrap: wrap;
+  margin-top: 1.4rem; padding-top: 1.4rem;
+  border-top: .1rem solid #ffffff1a;
 }
-.caser-counters b { font-family: var(--font-oswald), Oswald, sans-serif; color: #fff; }
-
-.caser-best { display: flex; gap: 1rem; align-items: center; }
-.caser-best img {
-  width: 11rem; height: 8rem; flex: none;
-  object-fit: contain; background: #00000073; border-radius: .2rem;
-}
-.caser-best-name { font-family: var(--font-oswald), Oswald, sans-serif; font-size: 1.5rem; }
-.caser-best-price {
+.caser-counters > span {
+  display: inline-flex; align-items: center; gap: .9rem;
+  color: #fff;
   font-family: var(--font-oswald), Oswald, sans-serif;
-  font-size: 1.4rem; color: var(--brand-nav-active, #83D8FF);
+  font-size: 2.6rem;
 }
+.caser-ctr-ico { width: 3.2rem; height: 3.2rem; color: #ffffffa6; }
+
+/* =========================== best drop tile =============================== */
+
+.caser-card-best { display: flex; flex-direction: column; }
+.caser-best-body {
+  display: flex; align-items: stretch; justify-content: space-between;
+  gap: 1.5rem; margin-top: .8rem; flex: 1;
+}
+.caser-best-meta {
+  display: flex; flex-direction: column; justify-content: flex-end;
+  gap: .3rem; min-width: 0; padding-bottom: .5rem;
+}
+.caser-best-name {
+  font-family: var(--font-oswald), Oswald, sans-serif;
+  font-size: 3.1rem; line-height: 3.9rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.caser-best-price {
+  display: flex; align-items: center; gap: .7rem;
+  font-family: var(--font-oswald), Oswald, sans-serif;
+  font-size: 2.6rem; line-height: 3.2rem; color: #fff; margin-top: .5rem;
+}
+/* The frame is tinted with the item's own rarity colour, as on the original. */
+.caser-best-img {
+  --drop-color: #B0C3D9;
+  flex: none;
+  width: 17rem;
+  border-radius: .2rem;
+  background: #00000073;
+  border-bottom: .9rem solid var(--drop-color);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.caser-best-img img { max-width: 100%; max-height: 20rem; object-fit: contain; }
+
+/* ========================== withdrawn tile =============================== */
+
+.caser-card-wd { display: flex; flex-direction: column; }
+/* faint gauge behind the figure, exactly as on the reference */
+.caser-watermark {
+  position: absolute; right: -2.5rem; top: 50%;
+  transform: translateY(-50%);
+  width: 27rem; height: 27rem;
+  color: #ffffff0f;
+  pointer-events: none;
+}
+.caser-watermark svg { width: 100%; height: 100%; }
 
 .caser-wd {
-  font-family: var(--font-oswald), Oswald, sans-serif; font-size: 2.8rem;
+  display: flex; align-items: center; gap: .9rem;
+  font-family: var(--font-oswald), Oswald, sans-serif;
+  font-size: 5.2rem; line-height: 6rem; color: #fff;
+  margin-top: .3rem;
 }
-.caser-wd-sub { color: #ffffff8c; font-size: 1.2rem; margin: .3rem 0 1rem; }
-.caser-ghost {
-  width: 100%; padding: .7rem; border-radius: .2rem; cursor: pointer;
-  background: #00000073; border: .1rem solid #ffffff26; color: #fff;
-  font-size: 1.1rem; text-transform: uppercase; letter-spacing: .05em;
-}
-.caser-ghost:hover { border-color: var(--brand-accent, #44C987); }
+.caser-wd .caser-coin { width: 4rem; height: 4rem; }
+.caser-wd-sub { color: #ffffffa6; font-size: 1.9rem; margin: .3rem 0 1.8rem; }
 
-/* --- promo modal --- */
+.caser-promo-form { display: flex; gap: .8rem; margin-top: auto; }
+.caser-promo-form input {
+  flex: 1; min-width: 0; padding: 1.3rem 1.6rem; border-radius: .2rem;
+  background: #00000073; border: .1rem solid #ffffff26; color: #fff;
+  font-family: var(--font-sofia-sans), "Sofia Sans", sans-serif;
+  font-size: 1.8rem; font-weight: 600;
+}
+.caser-promo-form input::placeholder { color: #ffffff73; }
+.caser-promo-form input:focus { outline: none; border-color: var(--brand-accent, #44C987); }
+.caser-promo-form .caser-topup { padding: 1.3rem 2rem; }
+.caser-promo-msg { margin-top: .9rem; font-size: 1.6rem; min-height: 2.2rem; }
+.caser-promo-msg.ok { color: var(--brand-accent, #44C987); }
+.caser-promo-msg.err { color: #ff6b6b; }
+
+/* --- the standalone promo modal, still reachable from the top-up button --- */
 .caser-promo-bg {
   position: fixed; inset: 0; z-index: 120;
   display: none; align-items: center; justify-content: center;
@@ -640,40 +771,3 @@ html, body {
 .caser-promo-msg.err { color: #ff5252; }
 .caser-promo-row { display: flex; gap: 1rem; margin-top: 1.2rem; }
 .caser-promo-row > * { flex: 1; margin-top: 0; }
-
-/* --- fix: the strip lives inside a display:contents parent, so it is laid out
-   as a flex item and would shrink-wrap. Force it to fill the row. --- */
-.caser-profile-strip { width: 100%; box-sizing: border-box; }
-
-.caser-card-wide { grid-column: 1 / -1; }
-
-.caser-table { width: 100%; border-collapse: collapse; font-size: 1.2rem; }
-.caser-table th, .caser-table td {
-  padding: .7rem .4rem;
-  text-align: left;
-  border-bottom: .1rem solid #ffffff1a;
-  font-weight: 400;
-  color: #ffffffa6;
-}
-.caser-table tr:last-child th, .caser-table tr:last-child td { border-bottom: 0; }
-.caser-table td {
-  text-align: right;
-  color: #fff;
-  font-family: var(--font-oswald), Oswald, sans-serif;
-  font-size: 1.3rem;
-}
-@media (min-width: 900px) {
-  .caser-table { display: grid; grid-template-columns: repeat(3, 1fr); column-gap: 2.5rem; }
-  .caser-table tbody { display: contents; }
-  .caser-table tr { display: flex; justify-content: space-between; align-items: baseline; }
-}
-
-.caser-promo-form { display: flex; gap: .6rem; }
-.caser-promo-form input {
-  flex: 1; min-width: 0; padding: .8rem 1rem; border-radius: .2rem;
-  background: #00000073; border: .1rem solid #ffffff26; color: #fff;
-  font: inherit; text-transform: uppercase; letter-spacing: .1em; font-weight: 600;
-}
-.caser-promo-form input:focus { outline: none; border-color: var(--brand-accent, #44C987); }
-.caser-promo-form .caser-topup { margin-top: 0; padding: .8rem 1rem; white-space: nowrap; }
-.caser-promo-form + .caser-promo-msg { margin-top: .8rem; }

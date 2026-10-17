@@ -472,10 +472,10 @@ app.post('/api/users/balance/topup', async (req, res) => {
   const raw = req.body && req.body.amount;
   const amount = typeof raw === 'number' ? raw : parseFloat(raw);
   if (!Number.isFinite(amount) || amount <= 0) {
-    return res.status(400).json({ success: false, message: 'Invalid amount' });
+    return res.status(400).json({ success: false, message: 'Неверная сумма' });
   }
   if (amount > MAX_MONEY) {
-    return res.status(400).json({ success: false, message: 'Amount exceeds the maximum balance' });
+    return res.status(400).json({ success: false, message: 'Сумма превышает максимальный баланс' });
   }
   const balance = (await store.addBalance(user.id, amount, 'topup', { amount })) ?? user.balance;
   const safe = safeMoney(balance);
@@ -652,7 +652,7 @@ const handleOpenCase = async (req, res) => {
     if (balance == null) {
       return res.status(400).json({
         success: false,
-        message: 'Insufficient balance',
+        message: 'Недостаточно средств',
         balance: parseFloat(user.balance) || 0
       });
     }
@@ -1106,6 +1106,17 @@ function randomUnit() {
 const RTP = Math.min(0.99, Math.max(0.01, parseFloat(process.env.RTP) || 0.8));
 
 // ---------------------------------------------------------------------------
+// Case drop shape.
+//
+// The width of the outcome band around the case price, in log space.
+//   DROP_SIGMA small -> outcomes bunch near the price, rare items very rare
+//   DROP_SIGMA large -> a thin, frequent band and a fat tail of big wins
+// DROP_BLEND is the uniform floor mixed in so every item keeps some chance of
+// appearing at all. Both are tuned by _tune_odds.js and overridable per deploy.
+const DROP_SIGMA = Math.min(3, Math.max(0.05, parseFloat(process.env.DROP_SIGMA) || 0.9));
+const DROP_BLEND = Math.min(0.5, Math.max(0, parseFloat(process.env.DROP_BLEND) || 0.02));
+
+// ---------------------------------------------------------------------------
 // Upgrade wheel odds.
 //
 // The real caser.one computes its chance in the client bundle (2mwsxxmwyqhg9.js):
@@ -1159,40 +1170,89 @@ function hasDisplayableChance(targetValue, stakeFromItems) {
 }
 
 /**
- * Builds cumulative drop odds for a case so the expected payout equals
- * RTP * casePrice. Items are weighted with w_i = price_i^(-beta); beta = 0 is
- * uniform, larger beta pushes probability towards cheaper items (lower RTP).
- * Returns null when even uniform odds are already below the target.
+ * Normal density over log(value / casePrice).
+ *
+ * A power law over raw price is the obvious way to hit a target RTP, but it
+ * piles almost all mass onto the cheapest item whenever a case spans a wide
+ * price range. Measured across all 151 cases that left 64% of them with a
+ * median outcome below 0.4x the case price - nearly every open felt like a
+ * total loss. Working in log space puts the mode near the price instead, and
+ * still reaches the rare items through the tail.
+ *
+ * Sigma sets the width of the band, blend keeps a uniform floor so nothing is
+ * unreachable, and mu is bisected so the expectation lands on the RTP.
+ * Returns cumulative probabilities for pickByOdds.
  */
 function buildDropOdds(items, casePrice, rtp = RTP) {
-  const target = Math.max(0, casePrice * rtp);
-  const prices = items.map((i) => Math.max(parseFloat(i.price) || 0, 0.01));
-  const expected = (beta) => {
-    const w = prices.map((p) => Math.pow(p, -beta));
+  const n = items.length;
+  if (!n) return [];
+
+  const price = Math.max(parseFloat(casePrice) || 0, 0.01);
+  const ratios = items.map((i) => Math.max(parseFloat(i.price) || 0, 0.01) / price);
+
+  const density = (mu) => {
+    const d2 = ratios.map((r) => {
+      const l = Math.log(r);
+      return (l - mu) * (l - mu);
+    });
+    // Exponentiate relative to the nearest item. A wide sigma drives every raw
+    // weight to zero, the normaliser collapses, and the mixture silently
+    // degenerates into a flat one that pays out far above the RTP.
+    const nearest = Math.min.apply(null, d2);
+    const w = d2.map((d) => Math.exp(-(d - nearest) / (2 * DROP_SIGMA * DROP_SIGMA)));
     const Z = w.reduce((a, b) => a + b, 0) || 1;
-    return w.reduce((acc, wi, i) => acc + (wi / Z) * prices[i], 0);
+    const unif = 1 / n;
+    return w.map((x) => (1 - DROP_BLEND) * (x / Z) + DROP_BLEND * unif);
   };
-  if (target <= 0 || expected(0) <= target) {
-    const n = items.length;
-    return items.map((_, i) => (i + 1) / n);
+  const expectation = (p) => p.reduce((acc, pi, i) => acc + pi * ratios[i], 0);
+
+  const LO = -12;
+  const HI = 12;
+  let p;
+  if (expectation(density(LO)) >= rtp || expectation(density(HI)) <= rtp) {
+    // The RTP sits outside what this family can reach (every item already
+    // above it, or none). The power law spans the widest range, so use it.
+    p = powerLawShape(ratios, rtp);
+  } else {
+    let lo = LO;
+    let hi = HI;
+    for (let k = 0; k < 60; k++) {
+      const mid = (lo + hi) / 2;
+      if (expectation(density(mid)) < rtp) lo = mid;
+      else hi = mid;
+    }
+    p = density((lo + hi) / 2);
   }
+
+  const cum = [];
+  let acc = 0;
+  for (const pi of p) {
+    acc += pi;
+    cum.push(acc);
+  }
+  cum[n - 1] = 1;
+  return cum;
+}
+
+/** Fallback shape: w = ratio^-beta, beta bisected. Used only when the RTP is unreachable. */
+function powerLawShape(ratios, rtp) {
+  const n = ratios.length;
+  const expect = (beta) => {
+    const w = ratios.map((r) => Math.pow(r, -beta));
+    const Z = w.reduce((a, b) => a + b, 0) || 1;
+    return w.reduce((acc, wi, i) => acc + (wi / Z) * ratios[i], 0);
+  };
+  if (expect(0) <= rtp) return ratios.map(() => 1 / n);
   let lo = 0;
   let hi = 60;
   for (let k = 0; k < 60; k++) {
     const mid = (lo + hi) / 2;
-    if (expected(mid) > target) lo = mid;
+    if (expect(mid) > rtp) lo = mid;
     else hi = mid;
   }
-  const w = prices.map((p) => Math.pow(p, -(lo + hi) / 2));
+  const w = ratios.map((r) => Math.pow(r, -(lo + hi) / 2));
   const Z = w.reduce((a, b) => a + b, 0) || 1;
-  const cum = [];
-  let acc = 0;
-  for (const wi of w) {
-    acc += wi / Z;
-    cum.push(acc);
-  }
-  cum[cum.length - 1] = 1;
-  return cum;
+  return w.map((x) => x / Z);
 }
 
 function pickByOdds(cum) {
@@ -1353,7 +1413,7 @@ const handleUpgradeBet = async (req, res) => {
       SHOP_ITEMS.find((s) => String(s.id) === wantedId) ||
       SAMPLE_SKINS.find((s) => String(s.id) === wantedId) ||
       null;
-    if (!target) return res.status(400).json({ message: 'Unknown target item' });
+    if (!target) return res.status(400).json({ message: 'Неизвестный предмет' });
   }
 
   // Resolve the real bet items belonging to this user
@@ -1370,11 +1430,11 @@ const handleUpgradeBet = async (req, res) => {
 
   if (!(stake > 0)) {
     await refund();
-    return res.status(400).json({ message: 'Nothing to bet' });
+    return res.status(400).json({ message: 'Нечего ставить' });
   }
   if ((parseFloat(user.balance) || 0) + 1e-9 < addedBalance) {
     await refund();
-    return res.status(400).json({ message: 'Insufficient balance' });
+    return res.status(400).json({ message: 'Недостаточно средств' });
   }
 
   // Items leave the inventory for good once the bet is accepted
@@ -1412,7 +1472,7 @@ const handleUpgradeBet = async (req, res) => {
     if (!prize) {
       // Should not happen - the catalogue always has items - but never crash
       // and never hand out a null prize.
-      return res.status(500).json({ message: 'No prize available' });
+      return res.status(500).json({ message: 'Приз недоступен' });
     }
     if (isMystery && drawn.isJackpot) mysteryJackpot = drawn.item.price;
 
@@ -1493,7 +1553,7 @@ async function notify(userId, type, content) {
 app.post('/api/items/withdraw', async (req, res) => {
   const user = await resolveUser(req);
   const { inventoryItemId } = req.body || {};
-  if (!inventoryItemId) return res.status(400).json({ success: false, message: 'Item id required' });
+  if (!inventoryItemId) return res.status(400).json({ success: false, message: 'Не указан предмет' });
 
   const result = await store.createWithdrawal(user.id, inventoryItemId);
   if (result.error) return res.status(400).json({ success: false, message: result.error });
@@ -1705,7 +1765,7 @@ app.post('/api/admin/users/:id/balance', requireAdmin, async (req, res) => {
   // Above the cap the client would render the number as 0.00, which is worse
   // than refusing the write.
   if (value > MAX_MONEY) {
-    return res.status(400).json({ success: false, message: 'Balance exceeds the maximum' });
+    return res.status(400).json({ success: false, message: 'Баланс превышает максимум' });
   }
 
   const before = await store.getUser(id);
@@ -1819,7 +1879,7 @@ const redeemPromoHandler = async (req, res) => {
   });
   if (balance == null) {
     // The account vanished mid-flight; undo the activation so the slot returns.
-    res.status(400).json({ success: false, message: 'Could not credit the balance' });
+    res.status(400).json({ success: false, message: 'Не удалось зачислить на баланс' });
     return;
   }
 
@@ -1854,7 +1914,7 @@ app.get('/api/promo/mine', async (req, res) => {
 app.get('/promocodes/:code/info', async (req, res) => {
   await resolveUser(req);
   const promo = await store.getPromoCode(req.params.code);
-  if (!promo) return res.status(404).json({ success: false, message: 'This promo code does not exist' });
+  if (!promo) return res.status(404).json({ success: false, message: '������ ��������� �� ����������' });
   res.json({
     success: true,
     data: {
@@ -1878,7 +1938,7 @@ app.post('/promocodes/activate', async (req, res) => {
 app.get('/api/promo/:code', async (req, res) => {
   await resolveUser(req);
   const promo = await store.getPromoCode(req.params.code);
-  if (!promo) return res.status(404).json({ success: false, message: 'This promo code does not exist' });
+  if (!promo) return res.status(404).json({ success: false, message: '������ ��������� �� ����������' });
   res.json({
     success: true,
     data: {
@@ -1929,6 +1989,7 @@ const ownProfileHandler = async (req, res) => {
         bestDrop: round2(stats.bestDrop),
         bestDropName: stats.bestDropName,
         bestDropImage: stats.bestDropImage,
+        bestDropColor: store.rarityColorFor({ marketName: stats.bestDropName, rarity: stats.bestDropRarity }),
         rating: Number(stats.rating || 0).toFixed(3),
         casesOpened: stats.casesOpened,
         upgradesMade: stats.upgradesMade,
@@ -1942,6 +2003,41 @@ const ownProfileHandler = async (req, res) => {
 
 app.get('/api/users/profile', ownProfileHandler);
 app.get('/users/me/profile', ownProfileHandler);
+
+// Nicknames are player-editable from the pencil on the profile card.
+// Letters, digits, spaces, _ and - only, so a nickname can never inject markup
+// into the live feed, the admin panel or another player's inventory view.
+const NICKNAME_RE = /^[A-Za-z0-9_][A-Za-z0-9_\-. ]{1,23}$/;
+
+app.patch('/api/users/me/profile', async (req, res) => {
+  const user = await resolveUser(req);
+  const nickname = String((req.body && req.body.nickname) || '').trim();
+
+  if (!nickname) return res.status(400).json({ success: false, message: 'Введите никнейм' });
+  if (nickname.length < 2) return res.status(400).json({ success: false, message: 'Минимум 2 символа' });
+  if (nickname.length > 24) return res.status(400).json({ success: false, message: 'Максимум 24 символа' });
+  if (!NICKNAME_RE.test(nickname)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Только латиница, цифры, пробел, дефис и подчёркивание'
+    });
+  }
+  if (nickname === user.nickname) {
+    return res.json({ success: true, data: PUBLIC_PROFILE_FIELDS(user) });
+  }
+
+  await store.ensureUser({ id: user.id, nickname });
+  const updated = await store.getUser(user.id);
+
+  // Push it to every tab the player has open, so the header follows without
+  // a reload, and broadcast so their name in the live feed corrects too.
+  wsSendToUser(user.id, 'users.update_profile', {
+    id: user.id,
+    nickname: updated.nickname
+  });
+
+  res.json({ success: true, data: PUBLIC_PROFILE_FIELDS(updated) });
+});
 
 const publicUserHandler = async (req, res) => {
   const user = await store.getUser(req.params.id);

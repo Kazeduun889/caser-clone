@@ -289,6 +289,14 @@ async function migrate() {
   } catch (e) {
     if (!/duplicate column/i.test(e.message)) throw e;
   }
+
+  // The best-drop frame is tinted with the item's own rarity colour, so the
+  // tier has to be remembered next to the name and image.
+  try {
+    await client.execute('ALTER TABLE player_stats ADD COLUMN best_drop_rarity TEXT');
+  } catch (e) {
+    if (!/duplicate column/i.test(e.message)) throw e;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -747,9 +755,11 @@ async function upsertStats(uid, delta) {
                   upgrades_made = upgrades_made + ?,
                   upgrades_won = upgrades_won + ?,
                   rating = rating + ?,
-                  best_drop = ?, best_drop_name = ?, best_drop_img = ?
+                  best_drop = ?, best_drop_name = ?, best_drop_img = ?,
+                  best_drop_rarity = ?
               WHERE user_id = ?`,
-        args: [cases, upgrades, won, rating, delta.bestDrop, val(delta.bestDropName), val(delta.bestDropImage), uid]
+        args: [cases, upgrades, won, rating, delta.bestDrop, val(delta.bestDropName),
+          val(delta.bestDropImage), val(delta.bestDropRarity), uid]
       });
       return;
     }
@@ -778,6 +788,7 @@ async function bumpStatsMemory(uid, source, value, item) {
     s.best_drop = value;
     s.best_drop_name = (item && item.marketName) || null;
     s.best_drop_img = (item && item.image) || null;
+    s.best_drop_rarity = (item && item.rarity != null) ? String(item.rarity) : null;
   }
   mem.stats.set(uid, s);
 }
@@ -867,7 +878,7 @@ async function playerStats(userId) {
   const uid = String(userId);
   const empty = {
     casesOpened: 0, upgradesMade: 0, upgradesWon: 0,
-    bestDrop: 0, bestDropName: null, bestDropImage: null,
+    bestDrop: 0, bestDropName: null, bestDropImage: null, bestDropRarity: null,
     rating: 0, withdrawn: 0, withdrawnItems: 0,
     inventoryValue: 0, inventoryCount: 0
   };
@@ -884,6 +895,7 @@ async function playerStats(userId) {
       bestDrop: s ? s.best_drop : 0,
       bestDropName: s ? s.best_drop_name : null,
       bestDropImage: s ? s.best_drop_img : null,
+      bestDropRarity: s ? s.best_drop_rarity : null,
       rating: s ? s.rating : 0,
       withdrawn: done.reduce((a, w) => a + (Number(w.price) || 0), 0),
       withdrawnItems: done.length,
@@ -912,6 +924,7 @@ async function playerStats(userId) {
     bestDrop: s ? Number(s.best_drop) : 0,
     bestDropName: s ? s.best_drop_name : null,
     bestDropImage: s ? s.best_drop_img : null,
+    bestDropRarity: s ? s.best_drop_rarity : null,
     rating: s ? Number(s.rating) : 0,
     withdrawn: Number(wd.rows[0].total) || 0,
     withdrawnItems: Number(wd.rows[0].c) || 0,
@@ -1012,7 +1025,7 @@ async function createPromoCode({ code, amount, maxActivations = 1, expiresAt = n
   const id = newId('promo');
 
   if (mode === 'memory') {
-    if (mem.promos.some((p) => p.code === clean)) return { error: 'Code already exists' };
+    if (mem.promos.some((p) => p.code === clean)) return { error: 'Такой промокод уже есть' };
     const record = {
       id, code: clean, amount: value, max_activations: max, activations: 0,
       is_active: 1, created_by: createdBy, expires_at: expiresAt, created_at: now()
@@ -1029,7 +1042,7 @@ async function createPromoCode({ code, amount, maxActivations = 1, expiresAt = n
       args: [id, clean, value, max, createdBy, expiresAt, now()]
     });
   } catch (e) {
-    if (/UNIQUE/i.test(e.message)) return { error: 'Code already exists' };
+    if (/UNIQUE/i.test(e.message)) return { error: 'Такой промокод уже есть' };
     throw e;
   }
   return { promo: await getPromoCode(clean) };
@@ -1049,7 +1062,7 @@ async function setPromoActive(code, isActive) {
   const flag = isActive ? 1 : 0;
   if (mode === 'memory') {
     const promo = mem.promos.find((p) => p.code === clean);
-    if (!promo) return { error: 'Code not found' };
+    if (!promo) return { error: 'Промокод не найден' };
     promo.is_active = flag;
     return { promo: rowToPromo(promo) };
   }
@@ -1057,7 +1070,7 @@ async function setPromoActive(code, isActive) {
     sql: 'UPDATE promo_codes SET is_active = ? WHERE code = ?',
     args: [flag, clean]
   });
-  if (!res.rowsAffected) return { error: 'Code not found' };
+  if (!res.rowsAffected) return { error: 'Промокод не найден' };
   return { promo: await getPromoCode(clean) };
 }
 
@@ -1088,7 +1101,7 @@ async function listPromoCodes({ limit = 50, offset = 0 } = {}) {
 async function redeemPromoCode(code, userId) {
   const clean = normaliseCode(code);
   const uid = String(userId);
-  if (!clean) return { error: 'Enter a promo code' };
+  if (!clean) return { error: 'Введите промокод' };
 
   const memoRedeemed = (promo, amount) => {
     mem.promoRedemptions = mem.promoRedemptions || [];
@@ -1097,14 +1110,14 @@ async function redeemPromoCode(code, userId) {
 
   if (mode === 'memory') {
     const promo = mem.promos.find((p) => p.code === clean);
-    if (!promo) return { error: 'This promo code does not exist' };
-    if (!promo.is_active) return { error: 'This promo code is no longer active' };
+    if (!promo) return { error: 'Такого промокода не существует' };
+    if (!promo.is_active) return { error: 'Промокод больше не активен' };
     if (promo.expires_at && new Date(promo.expires_at).getTime() < Date.now()) {
-      return { error: 'This promo code has expired' };
+      return { error: 'Срок действия промокода истёк' };
     }
-    if (promo.activations >= promo.max_activations) return { error: 'This promo code has no activations left' };
+    if (promo.activations >= promo.max_activations) return { error: 'Промокод больше не активируется' };
     if (memo.promoRedemptions.some((r) => r.user_id === uid && r.code === clean)) {
-      return { error: 'You have already used this promo code' };
+      return { error: 'Вы уже использовали этот промокод' };
     }
     const amount = Number(promo.amount);
     promo.activations += 1;
@@ -1125,12 +1138,12 @@ async function redeemPromoCode(code, userId) {
     // Distinguish "does not exist" from "used up" so the player gets a useful
     // message instead of a generic failure.
     const promo = await getPromoCode(clean);
-    if (!promo) return { error: 'This promo code does not exist' };
-    if (!promo.isActive) return { error: 'This promo code is no longer active' };
+    if (!promo) return { error: 'Такого промокода не существует' };
+    if (!promo.isActive) return { error: 'Промокод больше не активен' };
     if (promo.expiresAt && new Date(promo.expiresAt).getTime() < Date.now()) {
-      return { error: 'This promo code has expired' };
+      return { error: 'Срок действия промокода истёк' };
     }
-    return { error: 'This promo code has no activations left' };
+    return { error: 'Промокод больше не активируется' };
   }
 
   const promo = await getPromoCode(clean);
@@ -1150,7 +1163,7 @@ async function redeemPromoCode(code, userId) {
         sql: 'UPDATE promo_codes SET activations = activations - 1 WHERE code = ? AND activations > 0',
         args: [clean]
       });
-      return { error: 'You have already used this promo code' };
+      return { error: 'Вы уже использовали этот промокод' };
     }
     throw e;
   }
@@ -1264,8 +1277,8 @@ function rowToWithdrawal(r) {
 async function createWithdrawal(userId, inventoryItemId) {
   const uid = String(userId);
   const entry = await getInventoryEntry(uid, inventoryItemId);
-  if (!entry) return { error: 'Item not found' };
-  if (entry.status !== 'available') return { error: 'Item is not available' };
+  if (!entry) return { error: 'Предмет не найден' };
+  if (entry.status !== 'available') return { error: 'Предмет недоступен' };
 
   const id = newId('wd');
   const ts = now();
@@ -1297,7 +1310,7 @@ async function createWithdrawal(userId, inventoryItemId) {
     return true;
   });
 
-  if (!ok) return { error: 'Item is not available' };
+  if (!ok) return { error: 'Предмет недоступен' };
 
   return { withdrawal: await getWithdrawal(id) };
 }

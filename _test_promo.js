@@ -115,7 +115,7 @@ async function main() {
 
   const again = await call('POST', '/api/promo/redeem', { body: { code: code1 }, cookie: p1.cookie });
   check('same account cannot redeem twice', again.status, 400);
-  check('second attempt explains why', /already used/i.test(again.json.message), true);
+  check('second attempt explains why', /уже использовали/i.test(again.json.message), true);
   near('balance unchanged after the refused second try', await balanceOf(p1.cookie), b0 + 1234.56);
 
   // Case-insensitive.
@@ -132,12 +132,12 @@ async function main() {
   const p1d = await newPlayer('p1d');
   const fourth = await call('POST', '/api/promo/redeem', { body: { code: code1 }, cookie: p1d.cookie });
   check('fourth activation refused', fourth.status, 400);
-  check('refusal says it is used up', /no activations left/i.test(fourth.json.message), true);
+  check('refusal says it is used up', /больше не активируется/i.test(fourth.json.message), true);
   near('refused player was not paid', await balanceOf(p1d.cookie), START);
 
   const unknown = await call('POST', '/api/promo/redeem', { body: { code: 'NOPE123' }, cookie: p1d.cookie });
   check('unknown code refused', unknown.status, 404 === unknown.status ? 404 : unknown.status);
-  check('unknown code message', /does not exist/i.test(unknown.json.message), true);
+  check('unknown code message', /не существует/i.test(unknown.json.message), true);
 
   // ---------- concurrency: the limit must hold ----------
   const hot = uniqueCode('HOT');
@@ -181,7 +181,7 @@ async function main() {
   await call('POST', `/api/admin/promos/${offCode}/disable`, { token: TOKEN });
   const offRes = await call('POST', '/api/promo/redeem', { body: { code: offCode }, cookie: pOff.cookie });
   check('disabled code is refused', offRes.status, 400);
-  check('disabled message', /no longer active/i.test(offRes.json.message), true);
+  check('disabled message', /больше не активен/i.test(offRes.json.message), true);
   await call('POST', `/api/admin/promos/${offCode}/enable`, { token: TOKEN });
   check('re-enabled code works again', (await call('POST', '/api/promo/redeem', { body: { code: offCode }, cookie: pOff.cookie })).status, 200);
 

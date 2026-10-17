@@ -65,10 +65,10 @@ async function main() {
 
   // Double submit must be refused (the guard, not a race).
   const dupe = await store.createWithdrawal(USER, entryId);
-  check('second submit refused', dupe.error, 'Item is not available');
+  check('second submit refused', dupe.error, 'Предмет недоступен');
 
   // Unknown item.
-  check('unknown item refused', (await store.createWithdrawal(USER, 'nope')).error, 'Item not found');
+  check('unknown item refused', (await store.createWithdrawal(USER, 'nope')).error, 'Предмет не найден');
 
   // --- ready ---------------------------------------------------------------
   const wdId = created.withdrawal.id;
