@@ -627,13 +627,44 @@ async function countCaseOpens(userId) {
 // Drops and player stats (the live feed + the profile tiles)
 // ---------------------------------------------------------------------------
 
-const RARITY_BAND = (price) => {
-  if (price >= 1000) return 'extraordinary';
-  if (price >= 250) return 'covert';
-  if (price >= 60) return 'classified';
-  if (price >= 15) return 'restricted';
-  return 'consumer';
+// caser.one's own rarity palette, read from the client bundle
+// (getItemRarityColorByFlatItem, chunks/2b0jyrka0h02i.js).
+//
+// It accepts either the numeric tier the API ships or one of these names.
+// Inventing a band name is what made every feed row render grey: the lookup
+// returned the default #B0C3D9 for anything it did not recognise.
+const RARITY_DEFAULT = '#B0C3D9';
+
+const RARITY_BY_NUMBER = {
+  1: '#B0C3D9', 2: '#4B69FF', 3: '#8847FF', 4: '#EB4B4B', 5: '#D32CE6',
+  6: '#D32CE6', 7: '#EB4B4B', 8: '#4B69FF', 9: '#8847FF', 10: '#EB4B4B',
+  11: '#FFAE39', 12: '#D32CE6', 13: '#B0C3D9', 14: '#5E98D9', 15: '#4B69FF',
+  16: '#8847FF'
 };
+
+const RARITY_BY_NAME = {
+  common: '#B0C3D9', uncommon: '#5E98D9', rare: '#4B69FF', mythical: '#8847FF',
+  legendary: '#D32CE6', ancient: '#EB4B4B', immortal: '#FFAE39'
+};
+
+/** Port of the site's getItemRarityColorByFlatItem. */
+function rarityColorFor(item) {
+  if (!item) return RARITY_DEFAULT;
+  const marketName = String(item.marketName || '');
+  const skin = String(item.skin || '');
+  const type = Number(item.type);
+
+  // Knives and M4A4 | Howl are always gold on the original.
+  if (marketName.includes('★')
+    || (marketName.includes('M4A4') && skin.toLowerCase() === 'howl')
+    || marketName.includes('M4A4 | Howl')) return '#FFAE39';
+  if (type === 13 || marketName.startsWith('Sticker')) return '#8847FF';
+
+  const rarity = item.rarity;
+  if (rarity == null || rarity === '') return RARITY_DEFAULT;
+  if (/^\d+$/.test(String(rarity))) return RARITY_BY_NUMBER[Number(rarity)] || RARITY_DEFAULT;
+  return RARITY_BY_NAME[String(rarity).toLowerCase()] || RARITY_DEFAULT;
+}
 
 /**
  * Records a won item. Drives three things at once: the live feed every client
@@ -643,7 +674,9 @@ async function recordDrop(userId, item, price, source = 'case') {
   const uid = String(userId);
   const id = newId('drop');
   const value = Number(price) || 0;
-  const rarity = RARITY_BAND(value);
+  // The item's OWN tier, so the site can colour the row. A price band would
+  // not map onto the site's palette.
+  const rarity = item && item.rarity != null && item.rarity !== '' ? String(item.rarity) : null;
   const ts = now();
 
   if (mode === 'memory') {
@@ -652,7 +685,7 @@ async function recordDrop(userId, item, price, source = 'case') {
       id, user_id: uid, item_id: item && item.id ? String(item.id) : null,
       market_name: (item && item.marketName) || null,
       image: (item && item.image) || null,
-      price: value, rarity, source, created_at: ts
+      price: value, rarity, source, created_at: ts, item: item || null
     });
     if (mem.drops.length > 500) mem.drops.pop();
     await bumpStatsMemory(uid, source, value, item);
@@ -802,16 +835,20 @@ async function listRecentDrops(limit = 40) {
 }
 
 function decorateDrop(d) {
+  const item = {
+    id: d.item_id,
+    marketName: d.market_name,
+    price: d.price,
+    image: d.image,
+    // The raw tier the site expects, plus the colour it resolves to, so a
+    // consumer that does not run the site's own palette still renders right.
+    rarity: d.rarity != null ? d.rarity : undefined,
+    color: rarityColorFor(d.item || { marketName: d.market_name, rarity: d.rarity }),
+    source: d.source
+  };
   return {
     id: d.id,
-    item: {
-      id: d.item_id,
-      marketName: d.market_name,
-      price: d.price,
-      image: d.image,
-      rarity: d.rarity,
-      source: d.source
-    },
+    item,
     user: {
       id: d.user_id,
       nickname: d.nickname || 'Игрок',
@@ -1489,6 +1526,7 @@ module.exports = {
   recordUpgradeAttempt,
   listRecentDrops,
   playerStats,
+  rarityColorFor,
   listTransactions,
   listInventory,
   countInventory,

@@ -33,7 +33,17 @@ function formatAmount(e, t = 2) {
 let failed = 0;
 const bad = [];
 function probe(input, note) {
-  const out = formatAmount(input);
+  let out;
+  try {
+    out = formatAmount(input);
+  } catch (e) {
+    // The original throws outright rather than degrading, which is worse for a
+    // component than a wrong number: the whole render dies instead of the tile.
+    out = 'THREW ' + e.constructor.name;
+    bad.push({ input: String(input), out, note });
+    console.log(`  ${'THROWS'.padEnd(6)}  ${JSON.stringify(String(input)).padEnd(26)} -> ${out.padEnd(18)} ${note || ''}`);
+    return;
+  }
   const broke = out === "0.00" || out === "0";
   if (broke) bad.push({ input: String(input), out, note });
   console.log(`  ${broke ? 'BREAKS' : 'ok   '}  ${JSON.stringify(String(input)).padEnd(26)} -> ${out.padEnd(18)} ${note || ''}`);

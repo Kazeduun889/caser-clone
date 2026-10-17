@@ -525,6 +525,9 @@
   function setupObserver() {
     const observer = new MutationObserver(() => {
       updateHeaderUI();
+      // React owns the page subtree and discards nodes it did not render on
+      // every re-render, so the strip has to be re-attached when it goes.
+      ensureProfileStrip();
     });
     observer.observe(document.body, { childList: true, subtree: true });
   }
@@ -614,8 +617,20 @@
           try {
             const msg = JSON.parse(event.data);
             if (!msg || !msg.event) return;
-            if (msg.event === 'users.update_balance') apply(msg.data);
+            if (msg.event === 'users.update_balance') {
+              apply(msg.data);
+              var stripBal = document.querySelector('.caser-profile-strip [data-f="balance"]');
+              if (stripBal) {
+                var v = typeof msg.data === 'number' ? msg.data : parseFloat(msg.data);
+                if (isFinite(v)) stripBal.textContent = v.toLocaleString('ru-RU', { minimumFractionDigits: 2 });
+              }
+            }
             if (msg.event === 'users.update_creator') applyCreator(msg.data);
+            // Balance moves on a case open, a sale or a win: refresh the tiles.
+            if (msg.event === 'inventory.new_items' || msg.event === 'inventory.item_status_changed') {
+              var strip = document.querySelector('.caser-profile-strip');
+              if (strip && strip.dataset.ready) observeStrip(strip);
+            }
           } catch (e) { /* ignore malformed frames */ }
         };
         socket.onclose = () => {
@@ -629,6 +644,261 @@
     connect();
   }
 
+  /**
+   * Profile cards: avatar, best drop, withdrawn, CS rating and the promo field.
+   *
+   * These belong to the original's authenticated profile screen, which is not
+   * present in this build - useUserStatsQuery is defined but never rendered,
+   * and there is no /profile route in the static export. So this is the one
+   * block on the page that has no upstream markup to copy, and it is built from
+   * the site's own design language: the custom shades (black-250, black-450,
+   * white-150), the 0.2rem radius, Oswald for numerals, and --brand-accent /
+   * --brand-nav-active straight from the site stylesheets.
+   */
+  function setupProfileCards() {
+    ensureProfileStrip();
+  }
+
+  /** Creates the strip once, and puts it back if React removed it. */
+  function ensureProfileStrip() {
+    if (!/\/(profile|ru\/profile|ru\/inventory)/.test(location.pathname)) return;
+    if (document.querySelector('.caser-profile-strip')) return;
+
+    var strip = document.createElement('div');
+    strip.className = 'caser-profile-strip';
+    strip.innerHTML = [
+      '<div class="caser-card caser-card-player">',
+      '  <div class="caser-card-body">',
+      '    <div class="caser-avatar"><img alt=""><span class="caser-tick" hidden>',
+      '      <svg viewBox="0 0 24 24" fill="none" stroke="#0a1a12" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>',
+      '    </span></div>',
+      '    <div class="caser-ident">',
+      '      <div class="caser-nick"><span data-f="nick">—</span><span class="caser-author" hidden>Автор</span></div>',
+      '      <div class="caser-uid" data-f="uid">—</div>',
+      '      <div class="caser-rating">CASER RATING <b data-f="rating">0.000</b></div>',
+      '    </div>',
+      '    <div class="caser-wallet">',
+      '      <div><span class="caser-lbl">Баланс</span><span class="caser-bal" data-f="balance">0.00</span></div>',
+      '    </div>',
+      '  </div>',
+      '</div>',
+      '<div class="caser-card">',
+      '  <div class="caser-lbl">Лучший дроп</div>',
+      '  <div class="caser-best"><img alt="" hidden><div><div class="caser-best-name" data-f="bestName">—</div><div class="caser-best-price" data-f="bestPrice">0.00</div></div></div>',
+      '</div>',
+      '<div class="caser-card">',
+      '  <div class="caser-lbl">Выведено</div>',
+      '  <div class="caser-wd" data-f="withdrawn">0.00</div>',
+      '  <div class="caser-wd-sub"><span data-f="wdCount">0</span> предмета</div>',
+      '  <form class="caser-promo-form" autocomplete="off">',
+      '    <input type="text" name="promo" placeholder="ВВЕДИТЕ ПРОМОКОД" spellcheck="false">',
+      '    <button type="submit" class="caser-topup">АКТИВИРОВАТЬ</button>',
+      '  </form>',
+      '  <div class="caser-promo-msg"></div>',
+      '</div>',
+      '<div class="caser-card caser-card-wide">',
+      '  <div class="caser-lbl">Статистика</div>',
+      '  <table class="caser-table"><tbody>',
+      '    <tr><th>Открыто кейсов</th><td data-f="cases">0</td></tr>',
+      '    <tr><th>Апгрейдов сделано</th><td data-f="upgrades">0</td></tr>',
+      '    <tr><th>Апгрейдов выиграно</th><td data-f="won">0</td></tr>',
+      '    <tr><th>Предметов в инвентаре</th><td data-f="invCount">0</td></tr>',
+      '    <tr><th>Стоимость инвентаря</th><td data-f="invValue">0.00</td></tr>',
+      '    <tr><th>Выведено предметов</th><td data-f="wdCount2">0</td></tr>',
+      '  </tbody></table>',
+      '</div>'
+    ].join('');
+
+    // Put it directly above the page's own content. The site renders into plain
+    // divs (there is no <header> element), so anchor on the inventory toolbar
+    // or the live-drop rail and fall back to the app container.
+    var anchor = null;
+    var sellAll = Array.prototype.find.call(document.querySelectorAll('button'), function (b) {
+      return /продать все/i.test(b.textContent || '');
+    });
+    if (sellAll) anchor = sellAll;
+    if (!anchor) {
+      var live = document.querySelector('[data-testid="live-drop-list"]');
+      if (live) anchor = live;
+    }
+    var host = anchor && anchor.closest('div.relative, div.flex') ? anchor.closest('div.relative') : null;
+    if (host && host.parentNode) host.parentNode.insertBefore(strip, host);
+    else {
+      var page = document.querySelector('div.animate-page-in') || document.querySelector('#header-root') || document.body;
+      page.insertBefore(strip, page.firstChild);
+    }
+
+    strip.addEventListener('click', function (e) {
+      if (e.target.closest('[data-act="promo"]')) openPromoModal();
+    });
+
+    // Inline promo field. Uses the same endpoint as the modal so both paths
+    // share one code path and one set of validation messages.
+    var form = strip.querySelector('.caser-promo-form');
+    var msg = strip.querySelector('.caser-promo-msg');
+    if (form) {
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var code = form.promo.value.trim();
+        if (!code) {
+          msg.textContent = 'Введите промокод';
+          msg.className = 'caser-promo-msg err';
+          return;
+        }
+        msg.textContent = 'Проверяем...';
+        msg.className = 'caser-promo-msg';
+        redeemPromo(code).then(function (amount) {
+          msg.textContent = 'Код активирован: +' + fmtMoney(amount);
+          msg.className = 'caser-promo-msg ok';
+          form.promo.value = '';
+          var live = document.querySelector('.caser-profile-strip');
+          if (live) observeStrip(live);
+        }).catch(function (err) {
+          msg.textContent = err.message;
+          msg.className = 'caser-promo-msg err';
+        });
+      });
+    }
+
+    if (profileCache) applyProfile(strip, profileCache);
+    observeStrip(strip);
+  }
+
+  function fmtMoney(v) {
+    return Number(v || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2 });
+  }
+
+  /** Shared by the inline field and the modal. Throws with the server message. */
+  function redeemPromo(code) {
+    return fetch('/api/promo/redeem', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: code })
+    }).then(function (r) {
+      return r.json().then(function (b) {
+        if (!r.ok || !b.success) throw new Error((b && b.message) || 'Не удалось активировать код');
+        return b.data.amount;
+      });
+    });
+  }
+
+  /** Last payload, so a strip React re-created is filled without refetching. */
+  var profileCache = null;
+
+  function applyProfile(strip, payload) {
+    var u = payload.user, s = payload.stats;
+    var q = function (k) { return strip.querySelector('[data-f="' + k + '"]'); };
+    q('nick').textContent = u.nickname || 'Игрок';
+    q('uid').textContent = u.id;
+    q('balance').textContent = fmtMoney(u.balance);
+    q('rating').textContent = s.rating;
+    q('cases').textContent = s.casesOpened;
+    q('upgrades').textContent = s.upgradesMade;
+    q('won').textContent = s.upgradesWon;
+    q('invCount').textContent = s.inventoryCount;
+    q('invValue').textContent = fmtMoney(s.inventoryValue);
+    q('withdrawn').textContent = fmtMoney(s.withdrawn);
+    q('wdCount').textContent = s.withdrawnItems;
+    q('wdCount2').textContent = s.withdrawnItems;
+    if (s.bestDrop > 0) {
+      q('bestName').textContent = s.bestDropName || '—';
+      q('bestPrice').textContent = '$' + fmtMoney(s.bestDrop);
+      var bimg = strip.querySelector('.caser-best img');
+      bimg.src = s.bestDropImage || '';
+      bimg.hidden = false;
+    }
+    var img = strip.querySelector('.caser-avatar img');
+    img.src = u.image || '';
+    img.onerror = function () { img.style.visibility = 'hidden'; };
+    var creator = !!u.isCreator;
+    strip.querySelector('.caser-tick').hidden = !creator;
+    strip.querySelector('.caser-author').hidden = !creator;
+    strip.dataset.ready = '1';
+  }
+
+  /**
+   * Fills the strip, retrying until it lands.
+   *
+   * At DOMContentLoaded the app has not hydrated and has not written the
+   * session cookie yet, so the first request can come back for an account that
+   * is about to be replaced. Retrying a few times is more reliable than trying
+   * to order ourselves against React's boot.
+   */
+  function observeStrip(strip, attempt) {
+    attempt = attempt || 0;
+    return fetch('/api/users/profile', { headers: { 'X-Requested-With': 'fetch' } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d || !d.success) {
+          if (attempt < 6) return new Promise(function (res) { setTimeout(res, 700); }).then(function () {
+            return observeStrip(strip, attempt + 1);
+          });
+          return;
+        }
+        profileCache = d.data;
+        applyProfile(strip, d.data);
+      })
+      .catch(function () {
+        if (attempt < 6) return new Promise(function (res) { setTimeout(res, 700); }).then(function () {
+          return observeStrip(strip, attempt + 1);
+        });
+      });
+  }
+
+  // Promo modal, built once and reused.
+  var promoModal = null;
+  function openPromoModal() {
+    if (!promoModal) {
+      promoModal = document.createElement('div');
+      promoModal.className = 'caser-promo-bg';
+      promoModal.innerHTML =
+        '<div class="caser-promo">' +
+        '<div class="caser-lbl">Промокод</div>' +
+        '<input type="text" placeholder="ВВЕДИТЕ КОД" autocomplete="off" spellcheck="false">' +
+        '<div class="caser-promo-msg"></div>' +
+        '<div class="caser-promo-row">' +
+        '<button class="caser-ghost" data-c="cancel">Отмена</button>' +
+        '<button class="caser-topup" data-c="go">Применить</button>' +
+        '</div></div>';
+      document.body.appendChild(promoModal);
+
+      var input = promoModal.querySelector('input');
+      var msg = promoModal.querySelector('.caser-promo-msg');
+      promoModal.addEventListener('click', function (e) {
+        if (e.target === promoModal || e.target.dataset.c === 'cancel') {
+          promoModal.classList.remove('open');
+          return;
+        }
+        if (e.target.dataset.c !== 'go') return;
+        var code = input.value.trim();
+        if (!code) { msg.textContent = 'Введите код'; msg.className = 'caser-promo-msg err'; return; }
+        msg.textContent = 'Проверяем...'; msg.className = 'caser-promo-msg';
+        fetch('/api/promo/redeem', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: code })
+        }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, b: j }; }); })
+          .then(function (res) {
+            if (!res.ok || !res.b.success) throw new Error((res.b && res.b.message) || 'Не удалось');
+            msg.textContent = 'Код активирован: +' + res.b.data.amount.toLocaleString('ru-RU', { minimumFractionDigits: 2 });
+            msg.className = 'caser-promo-msg ok';
+            input.value = '';
+            var strip = document.querySelector('.caser-profile-strip');
+            if (strip) observeStrip(strip);
+            setTimeout(function () { promoModal.classList.remove('open'); }, 1400);
+          })
+          .catch(function (err) {
+            msg.textContent = err.message;
+            msg.className = 'caser-promo-msg err';
+          });
+      });
+    }
+    promoModal.classList.add('open');
+    var f = promoModal.querySelector('input');
+    f.value = '';
+    promoModal.querySelector('.caser-promo-msg').textContent = '';
+    f.focus();
+  }
+
   // Init on DOM ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
@@ -636,12 +906,14 @@
       updateHeaderUI();
       setupObserver();
       setupBalanceSync();
+      setupProfileCards();
     });
   } else {
     injectAuthModal();
     updateHeaderUI();
     setupObserver();
     setupBalanceSync();
+    setupProfileCards();
   }
 
   // Export helper for debugging

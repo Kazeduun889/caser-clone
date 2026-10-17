@@ -1912,17 +1912,45 @@ const PUBLIC_PROFILE_FIELDS = (user) => ({
   createdAt: user.createdAt || null
 });
 
-app.get('/users/:id', async (req, res) => {
-  const user = await store.getUser(req.params.id);
-  if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-  res.json({ success: true, data: PUBLIC_PROFILE_FIELDS(user) });
-});
+// Order matters: Express matches in registration order, so the literal
+// /api/users/profile has to be declared before /api/users/:id or the word
+// "profile" is read as a user id and every request answers "User not found".
+const ownProfileHandler = async (req, res) => {
+  const user = await resolveUser(req);
+  const stats = await store.playerStats(user.id);
+  res.json({
+    success: true,
+    data: {
+      user: PUBLIC_PROFILE_FIELDS(user),
+      stats: {
+        // Rendered as 0 on a fresh account, exactly like the reference screen.
+        withdrawn: round2(stats.withdrawn),
+        withdrawnItems: stats.withdrawnItems,
+        bestDrop: round2(stats.bestDrop),
+        bestDropName: stats.bestDropName,
+        bestDropImage: stats.bestDropImage,
+        rating: Number(stats.rating || 0).toFixed(3),
+        casesOpened: stats.casesOpened,
+        upgradesMade: stats.upgradesMade,
+        upgradesWon: stats.upgradesWon,
+        inventoryCount: stats.inventoryCount,
+        inventoryValue: round2(stats.inventoryValue)
+      }
+    }
+  });
+};
 
-app.get('/api/users/:id', async (req, res) => {
+app.get('/api/users/profile', ownProfileHandler);
+app.get('/users/me/profile', ownProfileHandler);
+
+const publicUserHandler = async (req, res) => {
   const user = await store.getUser(req.params.id);
   if (!user) return res.status(404).json({ success: false, message: 'User not found' });
   res.json({ success: true, data: PUBLIC_PROFILE_FIELDS(user) });
-});
+};
+
+app.get('/users/:id', publicUserHandler);
+app.get('/api/users/:id', publicUserHandler);
 
 const usersStatsHandler = async (req, res) => {
   const user = await store.getUser(req.params.id);
@@ -1954,41 +1982,6 @@ const usersStatsHandler = async (req, res) => {
 
 app.get('/users/:id/stats', usersStatsHandler);
 app.get('/api/users/:id/stats', usersStatsHandler);
-
-/** Public profile: balance, avatar, id - what the header and cards need. */
-app.get('/api/users/profile', async (req, res) => {
-  const user = await resolveUser(req);
-  const stats = await store.playerStats(user.id);
-  res.json({
-    success: true,
-    data: {
-      user: {
-        id: user.id,
-        nickname: user.nickname,
-        image: user.image,
-        isCreator: !!user.isCreator,
-        balance: safeMoney(user.balance),
-        tradeUrl: user.tradeUrl || null,
-        createdAt: user.createdAt || null
-      },
-      stats: {
-        // Rendered as 0 on a fresh account, exactly like the original.
-        withdrawn: round2(stats.withdrawn),
-        withdrawnItems: stats.withdrawnItems,
-        bestDrop: round2(stats.bestDrop),
-        bestDropName: stats.bestDropName,
-        bestDropImage: stats.bestDropImage,
-        // CS rating, 3 decimals.
-        rating: Number(stats.rating || 0).toFixed(3),
-        casesOpened: stats.casesOpened,
-        upgradesMade: stats.upgradesMade,
-        upgradesWon: stats.upgradesWon,
-        inventoryCount: stats.inventoryCount,
-        inventoryValue: round2(stats.inventoryValue)
-      }
-    }
-  });
-});
 
 // The player's own drop history (the "История" tab).
 app.get('/api/users/drops', async (req, res) => {
