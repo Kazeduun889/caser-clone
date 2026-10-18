@@ -833,8 +833,8 @@ app.get('/game/cases', (req, res) => {
 app.get('/api/game/free-cases', (req, res) => res.json({ cases: [] }));
 app.get('/game/free-cases', (req, res) => res.json({ cases: [] }));
 
-app.get('/api/game/giveaways/winners', (req, res) => res.json({ winners: [] }));
-app.get('/game/giveaways/winners', (req, res) => res.json({ winners: [] }));
+// (The winners feed itself is served further down, next to the rest of the
+// giveaway mocks, in the shape the Next.js bundle expects.)
 
 // Shop catalogue = every distinct skin known to the server (all cached cases + samples)
 BOOT.stage = 'building-catalogue';
@@ -2354,17 +2354,223 @@ app.get('/api/users/notifications/unread/count', async (req, res) => {
 
 app.post('/api/handshake', (req, res) => res.json({ status: 'ok' }));
 
-app.get('/api/game/giveaways', (req, res) => {
-  res.json([
-    { id: '1', cadence: 'hourly', prize: SAMPLE_SKINS[0], minDeposit: 600, participants: 38 },
-    { id: '2', cadence: 'daily', prize: SAMPLE_SKINS[3], minDeposit: 2000, participants: 417 },
-    { id: '3', cadence: 'weekly', prize: SAMPLE_SKINS[1], minDeposit: 5000, participants: 6621 }
-  ]);
+// The Next.js bundle reads these endpoints through an API wrapper that turns
+// the response into { data: <body>, success: <http ok> } - so the bodies below
+// are the INNER shapes the bundle expects: the weekly drop arrives flat, the
+// feeds carry a single `data`/`items` key, and payment categories are a plain
+// array. A wrong shape makes the rewards page keep its skeleton forever.
+
+// --- /api/game/giveaways (hourly / daily / weekly cards) -------------------
+const GAME_GIVEAWAY_BASE = { 1: 38, 2: 417, 3: 6621 };
+const GAME_GIVEAWAY_JOINS = { 1: 0, 2: 0, 3: 0 };
+const GAME_GIVEAWAY_JOINED = new Set();
+
+const GAME_GIVEAWAY_ROWS = [
+  { id: '1', cadence: 'hourly', title: 'Часовой розыгрыш', skin: SAMPLE_SKINS[0], minDeposit: 600 },
+  { id: '2', cadence: 'daily', title: 'Дневной розыгрыш', skin: SAMPLE_SKINS[3], minDeposit: 2000 },
+  { id: '3', cadence: 'weekly', title: 'Недельный розыгрыш', skin: SAMPLE_SKINS[1], minDeposit: 5000 }
+];
+const GAME_GIVEAWAY_PERIOD_MS = { hourly: 3600e3, daily: 24 * 3600e3, weekly: 7 * 24 * 3600e3 };
+
+app.get('/api/game/giveaways', async (req, res) => {
+  const user = await resolveUser(req);
+  const now = Date.now();
+  const iso = (ms) => new Date(ms).toISOString();
+  res.json({
+    data: GAME_GIVEAWAY_ROWS.map((row) => {
+      const joined = GAME_GIVEAWAY_JOINED.has(user.id + ':' + row.id);
+      return {
+        id: row.id,
+        cadence: row.cadence,
+        title: row.title,
+        minDeposit: row.minDeposit,
+        startsAt: iso(now - 5 * 60e3),
+        endsAt: iso(now + Math.round(GAME_GIVEAWAY_PERIOD_MS[row.cadence] * 0.6)),
+        serverTime: iso(now),
+        participantCount: GAME_GIVEAWAY_BASE[row.id] + GAME_GIVEAWAY_JOINS[row.id],
+        rulesText: 'Пополните баланс на сумму от ' + row.minDeposit
+          + ' ₽ в течение периода розыгрыша, чтобы участвовать в борьбе за приз.',
+        prize: { ...row.skin },
+        me: joined
+          ? { isParticipant: true, deposited: row.minDeposit.toFixed(2), remaining: '0.00' }
+          : { isParticipant: false, deposited: '0.00', remaining: null }
+      };
+    })
+  });
 });
 
-app.get('/api/game/weekly-drops/current', (req, res) => res.json({ drops: [] }));
-app.get('/api/game/weekly-drops/top-feed', (req, res) => res.json({ feed: [] }));
-app.get('/api/payments/categories', (req, res) => res.json([]));
+app.post('/api/game/giveaways/:id/join', async (req, res) => {
+  const user = await resolveUser(req);
+  const row = GAME_GIVEAWAY_ROWS.find((r) => r.id === String(req.params.id));
+  if (!row) return res.status(404).json({ success: false, status: 404, message: 'Not found' });
+  const key = user.id + ':' + row.id;
+  if (!GAME_GIVEAWAY_JOINED.has(key)) {
+    GAME_GIVEAWAY_JOINED.add(key);
+    GAME_GIVEAWAY_JOINS[row.id] += 1;
+  }
+  res.json({
+    joined: true,
+    participantCount: GAME_GIVEAWAY_BASE[row.id] + GAME_GIVEAWAY_JOINS[row.id]
+  });
+});
+
+app.get(['/api/game/giveaways/winners', '/game/giveaways/winners'], (req, res) => {
+  const now = Date.now();
+  const nicknames = [
+    'achilles7777', 'kotleta_tv', 'Дядя Витя', 'dropaholic', 'MurZik', 'NEFOS',
+    'tarkov_enjoyer', 'Гоша Рубчинский', 'skincase_ru', 'butterfly_overpay', 'Vto4ka', 'prosto_povezlo'
+  ];
+  const cadences = ['hourly', 'daily', 'hourly', 'weekly'];
+  res.json({
+    items: nicknames.map((nickname, i) => {
+      const skin = SAMPLE_SKINS[i % SAMPLE_SKINS.length];
+      return {
+        id: String(770000 + i),
+        cadence: cadences[i % cadences.length],
+        wonAt: new Date(now - (i + 1) * 13 * 60e3).toISOString(),
+        prizeValue: Number(skin.price).toFixed(2),
+        currency: 'RUB',
+        user: {
+          id: String(520000 + i * 17),
+          nickname,
+          image: DEFAULT_AVATARS[i % DEFAULT_AVATARS.length]
+        },
+        item: {
+          id: skin.id,
+          appId: skin.appId ?? 730,
+          marketName: skin.marketName,
+          price: Number(skin.price).toFixed(2),
+          image: skin.image,
+          rarity: skin.rarity ?? null
+        }
+      };
+    }),
+    hasMore: false
+  });
+});
+
+// --- weekly drop ("Награды" panel) -----------------------------------------
+// Resets on Wednesday 03:30 UTC - the schedule the page advertises as
+// "СРЕДА В 03:30". The bundle unpacks api.get().data as the payload itself,
+// so this endpoint answers with the flat drop object and no envelope; without
+// it the panel keeps its skeleton on screen forever.
+function nextWednesdayDropAt(now) {
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 3, 30, 0, 0));
+  let add = (3 - d.getUTCDay() + 7) % 7;
+  if (add === 0 && d.getTime() <= now.getTime()) add = 7;
+  d.setUTCDate(d.getUTCDate() + add);
+  return d;
+}
+
+app.get('/api/game/weekly-drops/current', (req, res) => {
+  const now = new Date();
+  const next = nextWednesdayDropAt(now);
+  // expires a week past the reset so the "claim window" banner (shown only
+  // in the last 24 hours before expiry) never covers the normal panel
+  const expires = new Date(next.getTime() + 7 * 24 * 3600 * 1000);
+  const slotSkins = [SAMPLE_SKINS[0], SAMPLE_SKINS[2], SAMPLE_SKINS[1], SAMPLE_SKINS[3]];
+  res.json({
+      state: 'locked_need_deposit',
+      progress: { current_week_deposits: 1240, unlock_target: 3000 },
+      next_drop_at: next.toISOString(),
+      drop: {
+        id: 'wd_' + next.toISOString().slice(0, 10),
+        expiresAt: expires.toISOString(),
+        claimedAt: null,
+        slots: slotSkins.map((skin, i) => ({
+          id: String(i + 1),
+          position: i + 1,
+          rewardType: 'item',
+          isSelected: false,
+          isConsumed: false,
+          consumedAt: null,
+          item: {
+            market_name: skin.marketName,
+            image: skin.image,
+            price: Number(skin.price),
+            rarity: skin.rarity ?? null
+          }
+        }))
+      },
+      claimed_slot_ids: []
+  });
+});
+
+app.post('/api/game/weekly-drops/:id/claim', (req, res) => {
+  // Rewards unlock through deposits; until then the client gets a clean
+  // validation answer instead of a 404.
+  res.status(422).json({ success: false, status: 422, message: 'Награды разблокируются пополнением баланса' });
+});
+
+app.get('/api/game/weekly-drops/top-feed', (req, res) => {
+  const now = Date.now();
+  // The wrapper already adds { data: <body> }, so one nested data key here is
+  // what the bundle ends up reading as body.data.items.
+  res.json({
+      data: {
+        items: Array.from({ length: 16 }, (_, i) => {
+          const skin = SAMPLE_SKINS[i % SAMPLE_SKINS.length];
+          return {
+            id: String(993000 + i),
+            price: Number(skin.price).toFixed(2),
+            currency: 'RUB',
+            claimedAt: new Date(now - (i + 1) * 9 * 60e3).toISOString(),
+            user: {
+              id: String(540000 + i * 23),
+              nickname: ['achilles7777', 'MurZik', 'Дядя Витя', 'dropaholic', 'NEFOS', 'Vto4ka', 'skincase_ru'][i % 7],
+              image: DEFAULT_AVATARS[i % DEFAULT_AVATARS.length]
+            },
+            item: {
+              id: skin.id,
+              appId: skin.appId ?? 730,
+              marketName: skin.marketName,
+              image: skin.image,
+              rarity: skin.rarity ?? null,
+              stattrak: null
+            }
+          };
+        })
+      }
+  });
+});
+
+app.get('/api/payments/categories', (req, res) => {
+  // The wrapper supplies success/data itself - the bundle wants the array
+  // back exactly as the original API returns it.
+  res.json([
+      {
+        id: 'cards',
+        name: 'Банковские карты',
+        children: [],
+        methods: [
+          { id: 'card_rub', name: 'Банковская карта', currency: 'RUB' },
+          { id: 'sbp_rub', name: 'СБП', currency: 'RUB' }
+        ]
+      },
+      {
+        id: 'crypto',
+        name: 'Криптовалюта',
+        children: [
+          {
+            id: 'usdt',
+            name: 'USDT',
+            symbol: 'USDT',
+            methods: [
+              { id: 'usdt_trc20', name: 'USDT TRC-20', currency: 'USDT' },
+              { id: 'usdt_erc20', name: 'USDT ERC-20', currency: 'USDT' }
+            ]
+          }
+        ],
+        methods: []
+      },
+      {
+        id: 'skins',
+        name: 'Скины',
+        children: [],
+        methods: [{ id: 'skins_steam', name: 'Продать скины', currency: 'RUB' }]
+      }
+  ]);
+});
 app.get('/api/fingerprint-pro/required', (req, res) => res.json({ required: false }));
 
 // Serves a static asset straight off disk. This is the hot path: a single page
