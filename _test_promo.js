@@ -34,7 +34,12 @@ function call(method, p, { body, cookie, token } = {}) {
     const r = http.request({ host: HOST, port: PORT, path: p, method, headers }, (res) => {
       let b = '';
       res.on('data', (c) => { b += c; });
-      res.on('end', () => { let j; try { j = JSON.parse(b); } catch (e) { j = b; } resolve({ status: res.statusCode, json: j }); });
+      res.on('end', () => {
+        let j; try { j = JSON.parse(b); } catch (e) { j = b; }
+        // Capture the cookie the server issues so callers can keep one identity.
+        const setCookie = res.headers['set-cookie'];
+        resolve({ status: res.statusCode, json: j, setCookie: setCookie && setCookie.map((c) => c.split(';')[0]).join('; ') });
+      });
     });
     r.on('error', (e) => resolve({ status: 0, json: String(e) }));
     if (data) r.write(data);
@@ -42,10 +47,19 @@ function call(method, p, { body, cookie, token } = {}) {
   });
 }
 
+/**
+ * Creates a visitor and reports the id the server actually issued.
+ *
+ * The cookie name is only a hint: an unknown identity is minted a fresh
+ * sequential number, so the id has to be read back from the account rather
+ * than assumed to match the cookie.
+ */
 async function newPlayer(tag) {
-  const id = `player_promo_${tag}_${Math.random().toString(36).slice(2, 8)}`;
-  await call('GET', '/api/users/me', { cookie: `caser_user_id=${id}` });
-  return { id, cookie: `caser_user_id=${id}` };
+  const cookie = `caser_user_id=player_promo_${tag}_${Math.random().toString(36).slice(2, 8)}`;
+  const res = await call('GET', '/api/users/me', { cookie });
+  // The server mints its own id and tells the browser what it is via Set-Cookie.
+  // Replaying the original hint would mint a fresh account on every request.
+  return { id: res.json && res.json.id, cookie: res.setCookie || cookie };
 }
 const balanceOf = async (cookie) => parseFloat((await call('GET', '/api/users/me', { cookie })).json.balance);
 const uniqueCode = (t) => `TEST${t}${Math.random().toString(36).slice(2, 7).toUpperCase()}`;

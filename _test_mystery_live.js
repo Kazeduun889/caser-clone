@@ -5,7 +5,8 @@
 const http = require('http');
 const HOST = '127.0.0.1', PORT = 3000;
 const RID = 'player_mystery_' + Date.now().toString(36);
-const COOKIE = 'caser_user_id=' + RID;
+// Follows the id the server issues; see req() below.
+let sessionCookie = 'caser_user_id=' + RID;
 
 let failed = 0;
 function check(label, ok, detail) {
@@ -16,12 +17,23 @@ function check(label, ok, detail) {
 function req(method, p, body) {
   return new Promise((resolve) => {
     const data = body === undefined ? null : JSON.stringify(body);
-    const h = { Cookie: COOKIE };
+    const h = { Cookie: sessionCookie };
     if (data) { h['Content-Type'] = 'application/json'; h['Content-Length'] = Buffer.byteLength(data); }
     const r = http.request({ host: HOST, port: PORT, path: p, method, headers: h }, (res) => {
       let b = '';
       res.on('data', (c) => { b += c; });
-      res.on('end', () => { let j; try { j = JSON.parse(b); } catch (e) { j = b; } resolve({ status: res.statusCode, json: j }); });
+      res.on('end', () => {
+        // The server mints its own account id and hands it back via Set-Cookie.
+        // Sticking to the original hint would create a brand-new account on
+        // every request, so the case opened on one id and the bet landed on
+        // another - which is why every bet reported "nothing to bet".
+        const setCookie = res.headers['set-cookie'];
+        if (setCookie && setCookie.length) {
+          sessionCookie = setCookie.map((c) => c.split(';')[0]).join('; ');
+        }
+        let j; try { j = JSON.parse(b); } catch (e) { j = b; }
+        resolve({ status: res.statusCode, json: j });
+      });
     });
     r.on('error', (e) => resolve({ status: 0, json: String(e) }));
     if (data) r.write(data);

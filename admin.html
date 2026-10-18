@@ -90,7 +90,8 @@
   .offer input { min-width: 230px; }
   .empty { text-align: center; color: var(--muted); padding: 40px 0; }
   .hint { color: var(--muted); font-size: 12px; }
-  .err { color: var(--red); font-size: 13px; min-height: 18px; }
+.err { color: var(--red); font-size: 13px; min-height: 18px; }
+  .danger { background: #3a1d1d; border-color: #7a2f2f; color: #ffb4b4; }
   code { background: var(--panel-2); padding: 1px 6px; border-radius: 4px; font-size: 12px; }
   label.lbl { display: block; font-size: 11px; color: var(--muted); margin: 0 0 6px; text-transform: uppercase; letter-spacing: .04em; }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; }
@@ -126,6 +127,12 @@
     <div class="card">
       <h2>Показатели</h2>
       <div class="stats" id="stats"></div>
+      <button class="danger" id="resetIds" style="margin-top:14px">
+        Сбросить аккаунты (ID с 1)
+      </button>
+      <p class="hint" style="margin-top:8px">
+        Стирает всех игроков, балансы, инвентари и историю. Сайт останавливается только на время запроса.
+      </p>
     </div>
 
     <div class="card">
@@ -162,6 +169,41 @@
         </table>
       </div>
       <div class="empty" id="promoEmpty" style="display:none">Промокодов пока нет</div>
+    </div>
+
+    <div class="card">
+      <h2>Розыгрыши</h2>
+      <p class="hint" style="margin:0 0 12px">
+        Открыт ровно один активный розыгрыш - остальные баннеры на сайте скрыты сами.
+      </p>
+      <div class="grid2">
+        <div>
+          <label class="lbl" for="gaPrize">Приз (название предмета)</label>
+          <input type="text" id="gaPrize" placeholder="Sticker | Please Be Patient" autocomplete="off" spellcheck="false">
+        </div>
+        <div>
+          <label class="lbl" for="gaSlots">Сколько победителей</label>
+          <input type="number" id="gaSlots" value="3" min="1" max="10" step="1">
+        </div>
+        <div>
+          <label class="lbl" for="gaHours">Через сколько часов итоги</label>
+          <input type="number" id="gaHours" value="3" min="1" max="720" step="1">
+        </div>
+        <div>
+          <label class="lbl" for="gaTitle">Заголовок баннера</label>
+          <input type="text" id="gaTitle" placeholder="Розыгрыш наклеек ПОТС">
+        </div>
+      </div>
+      <button class="primary" id="gaCreate" style="margin-top:14px">Создать розыгрыш</button>
+      <p class="err" id="gaErr"></p>      <div class="table-wrap" style="margin-top:16px">
+        <table>
+          <thead>
+            <tr><th>Заголовок</th><th class="num">Слотов</th><th class="num">Участников</th><th>Итоги</th><th>Статус</th><th></th></tr>
+          </thead>
+          <tbody id="gaRows"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="gaEmpty" style="display:none">Розыгрышей пока нет</div>
     </div>
 
     <div class="card">
@@ -355,6 +397,34 @@
       .then(function (d) { renderPromos(d.items || []); });
   }
 
+  // ---------- giveaways ----------
+  function renderGiveaways(items) {
+    var tb = $('gaRows');
+    $('gaEmpty').style.display = items.length ? 'none' : 'block';
+    tb.innerHTML = items.map(function (g) {
+      var ends = g.endsAt ? new Date(g.endsAt) : null;
+      var left = ends && g.live
+        ? Math.floor(g.secondsLeft / 3600) + ' ч ' + Math.floor((g.secondsLeft % 3600) / 60) + ' мин'
+        : '—';
+      return '<tr>' +
+        '<td>' + esc(g.title || '—') + '</td>' +
+        '<td class="num">' + esc(g.slots) + '</td>' +
+        '<td class="num">' + esc(g.entries) + '</td>' +
+        '<td class="hint">' + esc(left) + '</td>' +
+        '<td><span class="pill ' + esc(g.status) + '">' + esc(g.status) + '</span></td>' +
+        '<td class="actions">' +
+          (g.status === 'active'
+            ? '<button class="no" data-act="draw" data-id="' + esc(g.id) + '">Подвести итоги</button>'
+            : '<span class="hint">разыгран</span>') +
+        '</td></tr>';
+    }).join('');
+  }
+
+  function loadGiveaways() {
+    return api('GET', '/api/admin/giveaways?limit=50')
+      .then(function (d) { renderGiveaways(d.items || []); });
+  }
+
   // ---------- withdrawals ----------
   var current = '';
 
@@ -404,7 +474,7 @@
   }
 
   function refreshAll() {
-    return Promise.all([loadStats(), loadWithdrawals(), loadPlayers(), loadPromos()]).catch(function (e) {
+    return Promise.all([loadStats(), loadWithdrawals(), loadPlayers(), loadPromos(), loadGiveaways()]).catch(function (e) {
       // A rejected token should drop us back to the login screen.
       if (/admin|unauthor|forbidden|http 40/i.test(e.message)) {
         setToken('');
@@ -575,6 +645,42 @@
     btn.disabled = true;
     api('POST', '/api/admin/withdrawals/' + encodeURIComponent(id) + '/' + act, body)
       .then(refreshAll)
+      .catch(function (err) { alert(err.message); })
+      .finally(function () { btn.disabled = false; });
+  });
+
+  // ---------- giveaways ----------
+  $('gaCreate').onclick = function () {
+    var prize = $('gaPrize').value.trim();
+    if (!prize) { $('gaErr').textContent = 'Укажите приз'; return; }
+    $('gaErr').textContent = '';
+    $('gaCreate').disabled = true;
+    api('POST', '/api/admin/giveaways', {
+      title: $('gaTitle').value.trim() || 'Розыгрыш',
+      prizeName: prize,
+      slots: Number($('gaSlots').value) || 1,
+      hours: Number($('gaHours').value) || 3
+    })
+      .then(loadGiveaways)
+      .catch(function (err) { $('gaErr').textContent = err.message; })
+      .finally(function () { $('gaCreate').disabled = false; });
+  };
+
+  // ---------- reset ids ----------
+$('resetIds').onclick = function () {
+  if (!confirm('Стереть ВСЕ аккаунты, балансы, инвентарь и историю? ID начнутся с 1.')) return;
+  api('POST', '/api/admin/reset-ids', { confirm: 'СБРОС' })
+    .then(function (d) { alert(d.data && d.data.reset ? 'Готово: ID теперь выдаются с 1' : 'Не удалось'); })
+    .catch(function (err) { alert(err.message); });
+};
+
+document.addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-act="draw"]');
+    if (!btn) return;
+    if (!confirm('Подвести итоги досрочно? Победители выберутся случайно из участников.')) return;
+    btn.disabled = true;
+    api('POST', '/api/admin/giveaways/' + encodeURIComponent(btn.getAttribute('data-id')) + '/draw')
+      .then(loadGiveaways)
       .catch(function (err) { alert(err.message); })
       .finally(function () { btn.disabled = false; });
   });

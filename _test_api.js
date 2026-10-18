@@ -114,21 +114,54 @@ async function main() {
   const got = await winAnItem(playerCookieOnly);
   ok('opened a case and won an item', !!got, 'case open failed');
   if (got) {
-    // Make sure the item is sellable/withdrawable.
     const before = await call('GET', '/api/items/inventory', { cookie: playerCookieOnly });
     const entry = (before.json.items || []).find((i) => String(i.id) === got.entryId);
     ok('item is in the inventory', !!entry, (before.json.items || []).map((i) => i.id));
 
-    const created = await call('POST', '/api/items/withdraw', {
+    // Only giveaway prizes are withdrawable, so a plain case win must be
+    // refused before the lifecycle below runs on a real prize.
+    const refused = await call('POST', '/api/items/withdraw', {
       cookie: playerCookieOnly, body: { inventoryItemId: got.entryId }
+    });
+    ok('case item withdraw refused',
+      refused.status === 400 && /розыгрыша/.test(String(refused.json && refused.json.message)),
+      refused.json);
+
+    // Run a real giveaway so the player earns a withdrawable prize.
+    const adminCookie = 'caser_user_id=' + ADMIN_ID;
+    const ga = await call('POST', '/api/admin/giveaways', {
+      cookie: adminCookie,
+      body: { title: 'api test giveaway', prizeName: 'Sticker | Please Be Patient', slots: 1, hours: 1 }
+    });
+    ok('admin creates a giveaway', ga.status === 200 && ga.json.data && ga.json.data.id, ga.json);
+    const gaId = ga.json.data && ga.json.data.id;
+
+    const entered = await call('POST', '/api/giveaways/' + encodeURIComponent(gaId) + '/enter', {
+      cookie: playerCookieOnly, body: {}
+    });
+    ok('player enters the giveaway', entered.status === 200 && entered.json.success, entered.json);
+
+    const drawn = await call('POST', '/api/admin/giveaways/' + encodeURIComponent(gaId) + '/draw', {
+      cookie: adminCookie, body: {}
+    });
+    ok('admin draws the giveaway', drawn.status === 200, drawn.json);
+
+    const afterDraw = await call('GET', '/api/items/inventory', { cookie: playerCookieOnly });
+    const prize = (afterDraw.json.items || []).find((i) => i.source === 'giveaway');
+    ok('player received the giveaway prize', !!prize,
+      (afterDraw.json.items || []).map((i) => ({ id: i.id, source: i.source })));
+    const entryId = prize ? String(prize.id) : null;
+
+    const created = await call('POST', '/api/items/withdraw', {
+      cookie: playerCookieOnly, body: { inventoryItemId: entryId }
     });
     ok('withdraw accepted', created.status === 200 && created.json.success && created.json.data.id,
       created.json);
     const wdId = created.json.data && created.json.data.id;
 
-    // Double submit must be refused.
+    // Double submit must be refused (the guard, not a race).
     const dupe = await call('POST', '/api/items/withdraw', {
-      cookie: playerCookieOnly, body: { inventoryItemId: got.entryId }
+      cookie: playerCookieOnly, body: { inventoryItemId: entryId }
     });
     check('second withdraw refused', dupe.status, 400);
 
@@ -166,7 +199,7 @@ async function main() {
       'https://steamcommunity.com/tradeoffer/new/?partner=1&token=t');
 
     const afterReady = await call('GET', '/api/items/inventory', { cookie: playerCookieOnly });
-    const locked = (afterReady.json.items || []).find((i) => String(i.id) === got.entryId);
+    const locked = (afterReady.json.items || []).find((i) => String(i.id) === entryId);
     check('item is trade_ready', locked && locked.status, 'trade_ready');
 
     const done = await call('POST', '/api/admin/withdrawals/' + wdId + '/complete', {
@@ -177,7 +210,7 @@ async function main() {
 
     const afterDone = await call('GET', '/api/items/inventory', { cookie: playerCookieOnly });
     ok('item removed from inventory',
-      !(afterDone.json.items || []).some((i) => String(i.id) === got.entryId),
+      !(afterDone.json.items || []).some((i) => String(i.id) === entryId),
       (afterDone.json.items || []).map((i) => i.id));
 
     // Notifications landed for the player.

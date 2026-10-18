@@ -52,7 +52,7 @@ async function main() {
 
   await store.addInventoryItem(USER, {
     id: entryId, price: parseFloat(item.price), status: 'available',
-    canSell: true, canUpgrade: true, item
+    canSell: true, canUpgrade: true, item, source: 'giveaway'
   });
   check('item starts available',
     (await store.getInventoryEntry(USER, entryId)).status, 'available');
@@ -92,7 +92,7 @@ async function main() {
   const item3 = sampleItem('AWP');
   await store.addInventoryItem(USER, {
     id: 'won_test_3', price: parseFloat(item3.price), status: 'available',
-    canSell: true, canUpgrade: true, item: item3
+    canSell: true, canUpgrade: true, item: item3, source: 'giveaway'
   });
   const wd3 = (await store.createWithdrawal(USER, 'won_test_3')).withdrawal;
   check('pending cannot jump to completed',
@@ -107,7 +107,7 @@ async function main() {
   const item2 = sampleItem('Karambit');
   await store.addInventoryItem(USER, {
     id: 'won_test_2', price: parseFloat(item2.price), status: 'available',
-    canSell: true, canUpgrade: true, item: item2
+    canSell: true, canUpgrade: true, item: item2, source: 'giveaway'
   });
   const wd2 = (await store.createWithdrawal(USER, 'won_test_2')).withdrawal;
   const failedRes = await store.setWithdrawalStatus(wd2.id, 'failed');

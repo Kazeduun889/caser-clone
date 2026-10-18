@@ -496,7 +496,7 @@
 
 .caser-profile-strip {
   display: grid;
-  grid-template-columns: 1.25fr 1.05fr .95fr;
+  grid-template-columns: 1.45fr 1.15fr .9fr;
   gap: 1.2rem;
   /* No horizontal padding: the tiles must line up exactly with the inventory
      grid and the toolbar below them, and the parent already provides the inset. */
@@ -525,6 +525,8 @@
   line-height: 2.3rem;
   color: #ffffff73;
 }
+/* the balance caption sits a touch tighter than the other labels */
+.caser-lbl-sm { font-size: 1.5rem; line-height: 2.1rem; }
 
 /* --- the hexagonal coin the original puts after every money figure --- */
 .caser-coin { width: 2.9rem; height: 2.9rem; flex: none; object-fit: contain; }
@@ -533,20 +535,20 @@
 
 /* Mirrors the site's BUTTON_PRIMARY_SURFACE_CLASSES + content recipe. */
 .caser-btn-primary {
-  display: inline-flex; align-items: center; justify-content: center; gap: .8rem;
-  padding: 1.3rem 2.2rem; border-radius: .2rem; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: .7rem;
+  padding: 1rem 1.6rem; border-radius: .2rem; cursor: pointer;
   background-image: var(--brand-button-primary-bg);
   border: .1rem solid var(--brand-button-primary-border);
   color: var(--brand-button-primary-text);
   box-shadow: var(--brand-button-primary-shadow);
   font-family: var(--font-oswald), Oswald, sans-serif;
-  font-size: 1.9rem; line-height: 2.5rem;
+  font-size: 1.6rem; line-height: 2.2rem;
   text-transform: uppercase; letter-spacing: .04em;
   white-space: nowrap;
   transition: filter .15s;
 }
 .caser-btn-primary:hover { filter: brightness(1.2); }
-.caser-btn-primary .caser-btn-ico { width: 2.2rem; height: 2.2rem; }
+.caser-btn-primary .caser-btn-ico { width: 1.8rem; height: 1.8rem; }
 
 /* Neutral surface. The apply button is deliberately not a primary action. */
 .caser-btn-ghost {
@@ -685,18 +687,14 @@
   margin-top: 1.3rem; padding-top: 1.2rem;
   border-top: .1rem solid #ffffff26;
 }
-/* each stat set off from its neighbours */
-.caser-counters > span + span {
-  padding-left: 1.4rem;
-  border-left: .1rem solid #ffffff26;
-}
+/* no vertical rules between the stats - spacing separates them */
 .caser-counters > span {
   display: inline-flex; align-items: center; gap: .9rem;
   color: #fff;
   font-family: var(--font-oswald), Oswald, sans-serif;
-  font-size: 2.6rem;
+  font-size: 2.4rem;
 }
-.caser-ctr-ico { width: 3rem; height: 3rem; object-fit: contain; opacity: .7; }
+.caser-ctr-ico { width: 2.6rem; height: 2.6rem; object-fit: contain; opacity: .55; }
 
 /* =========================== best drop tile =============================== */
 
@@ -711,26 +709,27 @@
 }
 .caser-best-name {
   font-family: var(--font-oswald), Oswald, sans-serif;
-  font-size: 3rem; line-height: 3.9rem;
+  font-size: 2.3rem; line-height: 3rem;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .caser-best-price {
-  display: flex; align-items: center; gap: .8rem;
+  display: flex; align-items: center; gap: .7rem;
   font-family: var(--font-oswald), Oswald, sans-serif;
-  font-size: 2.6rem; line-height: 3.4rem; color: #fff; margin-top: .5rem;
+  font-size: 2rem; line-height: 2.7rem; color: #fff; margin-top: .4rem;
 }
-/* The frame is tinted with the item's own rarity colour, as on the original. */
+.caser-best-price .caser-coin { width: 2.4rem; height: 2.4rem; }
+/* Square frame tinted with the item's rarity, as on the original. */
 .caser-best-img {
   --drop-color: #B0C3D9;
   flex: none;
-  width: 17rem;
+  width: 15rem; height: 15rem;
   border-radius: .2rem;
   background: #00000073;
-  border-bottom: 1rem solid var(--drop-color);
+  border: .5rem solid var(--drop-color);
   display: flex; align-items: center; justify-content: center;
   overflow: hidden;
 }
-.caser-best-img img { max-width: 100%; max-height: 19rem; object-fit: contain; }
+.caser-best-img img { width: 100%; height: 100%; object-fit: contain; }
 
 /* ========================== withdrawn tile =============================== */
 
@@ -751,9 +750,16 @@
   margin-top: .3rem;
 }
 .caser-wd .caser-coin { width: 4rem; height: 4rem; }
-.caser-wd-sub { font-size: 1.8rem; margin: .3rem 0 1.6rem; }
+.caser-wd-sub { font-size: 1.8rem; margin: .3rem 0 1.4rem; }
 
-.caser-promo-form { display: flex; gap: .8rem; margin-top: auto; }
+/* Promo sits below its own hairline so it reads as a separate block from the
+   figure above it rather than one continuous stack. */
+.caser-promo-block {
+  margin: 0 -2rem -1.6rem;
+  padding: 1.2rem 2rem 1.4rem;
+  border-top: .1rem solid #ffffff26;
+}
+.caser-promo-form { display: flex; gap: .8rem; }
 .caser-promo-form input {
   flex: 1; min-width: 0; padding: 1.3rem 1.6rem; border-radius: .2rem;
   background: #00000073; border: .1rem solid #ffffff26; color: #fff;
@@ -807,7 +813,7 @@
 .caser-promo-row > * { flex: 1; margin-top: 0; }
 
 /* ===========================================================================
-   ÏÐÅÄÌÅÒÛ / ÈÑÒÎÐÈß / ÀÏÃÐÅÉÄÛ row
+   ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ / ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ / ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ row
 
    Injected as the first child of the inventory toolbar, which already uses
    justify-between - so these sit on the left and the sell/sort groups stay
@@ -815,23 +821,33 @@
    classes (bg-black-450, bg-white, text-white) rather than hand-picked hex.
    =========================================================================== */
 
-.caser-tabs { display: flex; align-items: center; gap: .6rem; }
+/* Joined into one control: shared edges, no gaps between them. */
+.caser-tabs {
+  display: flex; align-items: stretch;
+  background-color: #00000073;
+  border: .1rem solid #ffffff26;
+  border-radius: .2rem;
+  overflow: hidden;
+}
 
 .caser-tab {
-  padding: 1.1rem 2rem; border: 0; border-radius: .2rem;
-  background-color: #00000073;
-  color: #fff;
+  padding: 1.1rem 1.8rem; border: 0; border-radius: 0;
+  background: transparent;
+  color: #ffffff73;
   font-family: var(--font-sofia-sans), "Sofia Sans", sans-serif;
   font-size: 1.6rem; font-weight: 700; line-height: 2.2rem;
   text-transform: uppercase; letter-spacing: .04em;
   white-space: nowrap; cursor: pointer;
   transition: background-color .15s, color .15s;
 }
-.caser-tab:hover { background-color: #ffffff26; }
+.caser-tab + .caser-tab { border-left: .1rem solid #ffffff26; }
+.caser-tab:hover { background-color: #ffffff0f; color: #fff; }
 .caser-tab.is-active { background-color: #fff; color: #000; }
-.caser-tab.is-active:hover { background-color: #fff; }
+.caser-tab.is-active:hover { background-color: #fff; color: #000; }
 
 .caser-wip {
+  /* anchored to the page, not a higher positioned ancestor - without this the
+     notice centred against the wrong box and floated up near the header */
   position: absolute; inset: 0; z-index: 2;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: .8rem;
@@ -839,9 +855,90 @@
   color: #fff;
   pointer-events: none;
 }
+[data-testid="inventory-page"] { position: relative; }
 .caser-wip[hidden] { display: none; }
 .caser-wip-title {
   font-family: var(--font-oswald), Oswald, sans-serif;
   font-size: 3rem; letter-spacing: .06em;
 }
 .caser-wip-sub { font-size: 1.8rem; color: #ffffffa6; }
+
+/* ===========================================================================
+   Giveaway banner
+
+   The site's own weekly-drop artwork behind it (bg.webp, users.svg). Colours
+   come from the site's utility classes; only layout is written here.
+   =========================================================================== */
+
+.caser-giveaway {
+  position: relative;
+  width: 100%;
+  margin: 0 0 1.2rem;
+  overflow: hidden;
+  border-radius: .2rem;
+  background-color: #00000073;
+  font-family: var(--font-sofia-sans), "Sofia Sans", sans-serif;
+  color: #fff;
+}
+.caser-giveaway[hidden] { display: none; }
+
+.caser-giveaway-bg {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  opacity: .5;
+  pointer-events: none;
+}
+
+.caser-giveaway-inner {
+  position: relative;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 2rem;
+  padding: 2.4rem 3rem;
+}
+
+.caser-giveaway-prize { display: flex; align-items: center; gap: 2.4rem; min-width: 0; }
+.caser-giveaway-img {
+  width: 14rem; height: 14rem; flex: none;
+  object-fit: contain;
+  filter: drop-shadow(0 1rem 2rem rgba(0,0,0,.5));
+}
+.caser-giveaway-img[hidden] { display: none; }
+.caser-giveaway-kicker {
+  font-size: 1.3rem; font-weight: 700; letter-spacing: .24em;
+  color: var(--brand-nav-active, #83D8FF);
+}
+.caser-giveaway-title {
+  font-family: var(--font-oswald), Oswald, sans-serif;
+  font-size: 3.6rem; line-height: 4.4rem;
+}
+.caser-giveaway-sub {
+  font-family: var(--font-oswald), Oswald, sans-serif;
+  font-size: 2rem; color: #ffffffa6;
+}
+
+.caser-giveaway-side {
+  display: flex; flex-direction: column; align-items: flex-end;
+  gap: 1rem; flex: none;
+}
+.caser-giveaway-timer {
+  font-family: var(--font-oswald), Oswald, sans-serif;
+  font-size: 3.2rem; line-height: 4rem;
+  font-variant-numeric: tabular-nums;
+}
+.caser-giveaway-count {
+  display: inline-flex; align-items: center; gap: .8rem;
+  font-size: 1.8rem; color: #ffffffa6;
+}
+.caser-giveaway-count b {
+  font-family: var(--font-oswald), Oswald, sans-serif;
+  font-size: 2.4rem; color: #fff;
+}
+.caser-giveaway-msg { font-size: 1.6rem; min-height: 2.2rem; }
+.caser-giveaway-msg:empty { display: none; }
+
+@media (max-width: 760px) {
+  .caser-giveaway-inner { flex-direction: column; align-items: flex-start; padding: 1.8rem; }
+  .caser-giveaway-side { align-items: flex-start; width: 100%; }
+  .caser-btn-primary { width: 100%; }
+}

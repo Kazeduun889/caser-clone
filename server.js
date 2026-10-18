@@ -389,15 +389,17 @@ async function resolveUser(req) {
     token ? token.replace(/^token_/, '') : null
   ].filter(Boolean);
 
+  // Accounts are numbered 1, 2, 3 ... A cookie naming an account that already
+  // exists is honoured as-is, so returning visitors keep their balance and
+  // inventory; only an unknown identity is minted a fresh number. That is what
+  // makes the profile show a plain "ID:242408" instead of a random slug.
   for (const id of candidates) {
     const existing = await store.getUser(id);
     if (existing) return existing;
   }
 
   // No known identity yet: mint a stable demo account for this browser.
-  // The number comes from a sequential counter, so the profile shows a plain
-  // "ID:242408" rather than a random slug.
-  const id = candidates[0] || await store.nextUserId();
+  const id = await store.nextUserId();
   const user = await store.ensureUser({
     id,
     nickname: 'CaserPlayer',
@@ -1598,6 +1600,180 @@ app.post('/api/items/withdraw', async (req, res) => {
   res.json({ success: true, data: result.withdrawal });
 });
 
+// --- Giveaways --------------------------------------------------------------
+//
+// Open until the timer expires, no conditions to enter. When the time is up
+// the winners are drawn at random from the entrants and the prize lands in
+// their inventory stamped as a giveaway item - the only kind that can be
+// withdrawn right now.
+
+/** Shape a giveaway for the client, with the countdown and the caller's state. */
+async function giveawayView(g, userId) {
+  const stats = await store.giveawayStats(g.id);
+  const endsAt = Date.parse(g.endsAt);
+  const live = g.status === 'active' && endsAt > Date.now();
+  return {
+    ...g,
+    live,
+    secondsLeft: live ? Math.max(0, Math.floor((endsAt - Date.now()) / 1000)) : 0,
+    entries: stats.entries,
+    winners: stats.winners.map((w) => ({
+      userId: w.userId,
+      itemId: w.itemId,
+      createdAt: w.createdAt
+    })),
+    entered: userId ? stats.winners.some((w) => String(w.userId) === String(userId)) : false
+  };
+}
+
+app.get('/api/giveaways', async (req, res) => {
+  await resolveUser(req);
+  const list = await store.listGiveaways({ limit: clampInt(req.query.limit, 1, 50, 20) });
+  const items = [];
+  for (const g of list) items.push(await giveawayView(g, null));
+  res.json({ success: true, items });
+});
+
+app.get('/api/giveaways/:id', async (req, res) => {
+  const user = await resolveUser(req);
+  const g = await store.getGiveaway(req.params.id);
+  if (!g) return res.status(404).json({ success: false, message: 'Розыгрыш не найден' });
+  res.json({ success: true, data: await giveawayView(g, user.id) });
+});
+
+app.post('/api/giveaways/:id/enter', async (req, res) => {
+  const user = await resolveUser(req);
+  const result = await store.enterGiveaway(req.params.id, user.id);
+  if (result.error) return res.status(400).json({ success: false, message: result.error });
+  res.json({ success: true, data: await giveawayView(result.giveaway, user.id) });
+});
+
+// --- Admin: giveaways -------------------------------------------------------
+
+app.get('/api/admin/giveaways', requireAdmin, async (req, res) => {
+  const list = await store.listGiveaways({ limit: 50 });
+  const items = [];
+  for (const g of list) items.push(await giveawayView(g, null));
+  res.json({ success: true, items });
+});
+
+app.post('/api/admin/giveaways', requireAdmin, async (req, res) => {
+  const body = req.body || {};
+  const hours = clampInt(body.hours, 1, 24 * 30, 3);
+  const endsAt = body.endsAt || new Date(Date.now() + hours * 3600 * 1000).toISOString();
+
+  // Accept either a whole item or just a name to look one up by. A name on
+  // its own has no image or rarity, so resolve it against the catalogue.
+  let prize = body.prize;
+  if (!prize || !prize.marketName) {
+    if (!body.prizeName) return res.status(400).json({ success: false, message: 'Укажите приз' });
+    const found = await store.findItemByName(body.prizeName);
+    if (!found) return res.status(400).json({ success: false, message: 'Приз не найден в каталоге' });
+    prize = found;
+  }
+
+  const result = await store.createGiveaway({
+    title: body.title || 'Розыгрыш',
+    description: body.description || '',
+    prize,
+    slots: body.slots,
+    endsAt
+  });
+  if (result.error) return res.status(400).json({ success: false, message: result.error });
+
+  broadcastGiveaway(result.giveaway);
+  res.json({ success: true, data: result.giveaway });
+});
+
+/**
+ * Wipes every account and restarts the numbering from 1.
+ *
+ * Destructive by design: balances, inventories, drops, stats, withdrawals and
+ * promo redemptions all go with the users. The operator asked for ids to start
+ * over, and there is no way to renumber accounts without dropping them.
+ */
+app.post('/api/admin/reset-ids', requireAdmin, async (req, res) => {
+  if (String((req.body && req.body.confirm) || '').trim().toUpperCase() !== 'СБРОС') {
+    return res.status(400).json({ success: false, message: 'Подтвердите словом СБРОС' });
+  }
+
+  if (store.mode === 'memory') {
+    mem.users.clear();
+    mem.inventory.clear();
+    mem.stats.clear();
+    mem.drops = [];
+    mem.withdrawals = [];
+    mem.promos = [];
+    mem.promoRedemptions = [];
+    mem.counters = { user_seq: 0 };
+    return res.json({ success: true, data: { reset: true } });
+  }
+
+  const tables = [
+    'giveaway_winners', 'giveaway_entries', 'giveaways',
+    'withdrawals', 'inventory_items', 'drops', 'player_stats',
+    'promo_redemptions', 'transactions', 'case_opens', 'users'
+  ];
+  for (const t of tables) {
+    try { await client.execute(`DELETE FROM ${t}`); } catch (e) { /* table may not exist yet */ }
+  }
+  await client.execute("DELETE FROM counters WHERE name = 'user_seq'");
+
+  res.json({ success: true, data: { reset: true } });
+});
+
+app.post('/api/admin/giveaways/:id/draw', requireAdmin, async (req, res) => {
+  // The operator may settle early, so the timer check does not apply here.
+  const result = await store.drawGiveaway(req.params.id, { force: true });
+  if (result.error) return res.status(400).json({ success: false, message: result.error });
+  res.json({ success: true, data: result });
+});
+
+/** Tells every tab a giveaway changed so the banner and countdown stay live. */
+function broadcastGiveaway(g) {
+  if (!g) return;
+  wsBroadcast('giveaways.update', {
+    id: g.id,
+    title: g.title,
+    status: g.status,
+    endsAt: g.endsAt
+  });
+}
+
+/**
+ * Draws anything whose timer has expired.
+ *
+ * This is a fallback, not the primary path: clients poll the giveaway and the
+ * first one through after the deadline draws it, so results appear right on
+ * time even if nobody is looking.
+ */
+let giveawaySweeper = null;
+async function sweepGiveaways() {
+  try {
+    const due = await store.dueGiveaways();
+    for (const g of due) {
+      const result = await store.drawGiveaway(g.id);
+      if (result && result.winners && result.winners.length) {
+        for (const w of result.winners) {
+          pushNewItems(w.userId, [{ id: w.itemId }]);
+          await notify(w.userId, 'giveaway_won', {
+            giveawayId: g.id,
+            title: g.title,
+            itemName: g.prizeName,
+            slot: w.slot
+          });
+        }
+      }
+      broadcastGiveaway(g);
+    }
+  } catch (e) {
+    // The first sweep can land before the schema has been created; that is not
+    // worth taking the process down over, the next tick will find the tables.
+    if (/no such table/i.test(e.message)) return;
+    console.warn('[giveaway] sweep failed:', e.message);
+  }
+}
+
 app.get('/api/withdrawals', async (req, res) => {
   const user = await resolveUser(req);
   const limit = clampInt(req.query.limit, 1, 100, 50);
@@ -2457,12 +2633,18 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`  Каталог кейсов:      http://localhost:${PORT}/ru/cases`);
   console.log(`  Админ-панель:        http://localhost:${PORT}/admin`);
   console.log(`====================================================\n`);
+
+  // Giveaways draw on their timer rather than on anyone visiting, so an expired
+  // one is settled within a minute even when nobody is watching the page.
+  giveawaySweeper = setInterval(() => sweepGiveaways(), 60 * 1000);
+  sweepGiveaways();
 });
 
 // Keep the process out of the event loop for a clean deploy shutdown.
 for (const sig of ['SIGTERM', 'SIGINT']) {
   process.on(sig, () => {
     console.log(`[shutdown] ${sig} received, closing`);
+    if (giveawaySweeper) clearInterval(giveawaySweeper);
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 5000).unref();
   });

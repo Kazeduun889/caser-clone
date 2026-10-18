@@ -528,6 +528,8 @@
       // React owns the page subtree and discards nodes it did not render on
       // every re-render, so the strip has to be re-attached when it goes.
       ensureProfileStrip();
+      ensureInventoryTabs();
+      ensureGiveawayBanner();
     });
     observer.observe(document.body, { childList: true, subtree: true });
   }
@@ -698,14 +700,10 @@
       ico(EXIT, 'caser-btn-ico') + '</button>',
       '    </div>',
       '  </div>',
-      '  <div class="caser-player-mid">',
-      '    <span class="caser-slashes">//</span><b data-f="rating">0</b>',
-      '    <button class="caser-rating" data-act="rating">CASER RATING »</button>',
-      '  </div>',
       // The lower half sits on its own darker plate, split by a hairline.
       '  <div class="caser-plate">',
       '    <div class="caser-player-bal">',
-      '      <div><span class="caser-lbl">История баланса</span>',
+      '      <div><span class="caser-lbl caser-lbl-sm">История баланса</span>',
       '        <span class="caser-bal"><span data-f="balance">0.00</span>' + ico(COIN, 'caser-coin') + '</span>',
       '      </div>',
       '      <button class="caser-btn-primary" data-act="topup">ПОПОЛНИТЬ' + ico(PLUS_GREEN, 'caser-btn-ico') + '</button>',
@@ -737,12 +735,15 @@
       '  <div class="caser-lbl">Выведено</div>',
       '  <div class="caser-wd"><span data-f="withdrawn">0.00</span>' + ico(COIN, 'caser-coin') + '</div>',
       '  <div class="caser-wd-sub text-white-650"><span data-f="wdCount">0</span> предмета</div>',
-      '  <form class="caser-promo-form" autocomplete="off">',
-      '    <input type="text" name="promo" placeholder="Персональный купон" spellcheck="false">',
+      // separated from the figure above by its own hairline
+      '  <div class="caser-promo-block">',
+      '    <form class="caser-promo-form" autocomplete="off">',
+      '      <input type="text" name="promo" placeholder="Персональный купон" spellcheck="false">',
       // deliberately neutral: the apply button is not a primary green action
-      '    <button type="submit" class="caser-btn-ghost">ПРИМЕНИТЬ</button>',
-      '  </form>',
-      '  <div class="caser-promo-msg"></div>',
+      '      <button type="submit" class="caser-btn-ghost">ПРИМЕНИТЬ</button>',
+      '    </form>',
+      '    <div class="caser-promo-msg"></div>',
+      '  </div>',
       '</div>'
     ].join('');
 
@@ -1202,6 +1203,9 @@
       if (!btn) return;
       selectInventoryTab(btn.getAttribute('data-tab'), group, notice, page);
     });
+
+    // Land on ПРЕДМЕТЫ so the sell and sort controls start visible.
+    selectInventoryTab('items', group, notice, page);
   }
 
   function selectInventoryTab(id, group, notice, page) {
@@ -1215,7 +1219,16 @@
     var grid = page.querySelector('[data-testid="inventory-items-list"]') ||
       page.querySelector('[data-testid="upgrade-empty-inventory"]');
 
-    if (tab && tab.ready) {
+    // Selling and sorting only make sense on the items tab.
+    var selling = tab && tab.ready;
+    ['inventory-sell-all-button-desktop', 'inventory-sell-all-button-mobile'].forEach(function (tid) {
+      var btn = document.querySelector('[data-testid="' + tid + '"]');
+      if (btn) btn.hidden = !selling;
+    });
+    var sort = page.querySelector('[data-testid="profile-sort-select"]');
+    if (sort) sort.hidden = !selling;
+
+    if (selling) {
       notice.hidden = true;
       if (grid) grid.hidden = false;
       return;
@@ -1227,23 +1240,151 @@
     notice.hidden = false;
   }
 
-  // Init on DOM ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      injectAuthModal();
-      updateHeaderUI();
-      setupObserver();
-      setupBalanceSync();
-      setupProfileCards();
-      ensureInventoryTabs();
+  /**
+ * The giveaway banner.
+ *
+ * Uses the site's own weekly-drop artwork (bg.webp, users.svg) so it reads as
+ * part of the page rather than an overlay. Full width, as asked. Only the
+ * active giveaway is shown; finished ones are hidden.
+ */
+  var GIVEAWAY_BG = A + '/images/weeklyDrop/bg.webp';
+  var GIVEAWAY_USERS = A + '/icons/weeklyDrop/users.svg';
+
+  function ensureGiveawayBanner() {
+    var existing = document.querySelector('.caser-giveaway');
+    if (existing) return existing;
+
+    var banner = document.createElement('div');
+    banner.className = 'caser-giveaway';
+    banner.setAttribute('data-testid', 'giveaway-banner');
+    banner.innerHTML =
+      '<img class="caser-giveaway-bg" src="' + GIVEAWAY_BG + '" alt="">'
+      + '<div class="caser-giveaway-inner">'
+      +   '<div class="caser-giveaway-prize">'
+      +     '<img class="caser-giveaway-img" alt="">'
+      +     '<div class="caser-giveaway-meta">'
+      +       '<div class="caser-giveaway-kicker">РОЗЫГРЫШ</div>'
+      +       '<div class="caser-giveaway-title" data-f="title">—</div>'
+      +       '<div class="caser-giveaway-sub" data-f="prizeName">—</div>'
+      +     '</div>'
+      +   '</div>'
+      +   '<div class="caser-giveaway-side">'
+      +     '<div class="caser-giveaway-timer" data-f="timer">--:--:--</div>'
+      +     '<div class="caser-giveaway-count">'
+      +       '<img class="caser-btn-ico" src="' + GIVEAWAY_USERS + '" alt="">'
+      +       '<b data-f="entries">0</b><span>участников</span></div>'
+      +     '<button class="caser-btn-primary" data-act="enter">УЧАСТВОВАТЬ</button>'
+      +     '<div class="caser-giveaway-msg" data-f="msg"></div>'
+      +   '</div>'
+      + '</div>';
+
+    // Sit it directly under the header so it spans the page. The header root is
+    // the anchor rather than a class selector: the app root's class contains
+    // min-h-[100svh], and an unescaped bracket is not a valid selector.
+    var header = document.getElementById('header-root');
+    var app = header ? header.parentElement : null;
+    if (app && header) app.insertBefore(banner, header.nextSibling);
+    else if (app) app.insertBefore(banner, app.firstChild);
+    else document.body.insertBefore(banner, document.body.firstChild);
+
+    banner.addEventListener('click', function (e) {
+      if (e.target.closest('[data-act="enter"]')) enterGiveaway(banner);
     });
-  } else {
+
+    loadGiveawayBanner(banner);
+    return banner;
+  }
+
+  function enterGiveaway(banner) {
+    var msg = banner.querySelector('[data-f="msg"]');
+    msg.textContent = 'Отмечаем...';
+    fetch('/api/giveaways/' + banner.dataset.id + '/enter', { method: 'POST' })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (res) {
+        if (!res.ok || !res.j.success) throw new Error((res.j && res.j.message) || 'Не удалось');
+        msg.textContent = 'Вы в игре!';
+        var n = banner.querySelector('[data-f="entries"]');
+        if (n) n.textContent = res.j.data.entries;
+        banner.querySelector('[data-act="enter"]').disabled = true;
+      })
+      .catch(function (err) { msg.textContent = err.message; });
+  }
+
+  function loadGiveawayBanner(banner) {
+    fetch('/api/giveaways?limit=5')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (!j || !j.success) return;
+        var live = (j.items || []).filter(function (g) { return g.live; })[0];
+        if (!live) { banner.hidden = true; return; }
+
+        banner.dataset.id = live.id;
+        banner.querySelector('[data-f="title"]').textContent = live.title;
+        banner.querySelector('[data-f="prizeName"]').textContent = live.prizeName || '';
+        banner.querySelector('[data-f="entries"]').textContent = live.entries;
+        var img = banner.querySelector('.caser-giveaway-img');
+        if (live.prizeImage) { img.src = live.prizeImage; img.hidden = false; }
+        banner.hidden = false;
+        startGiveawayTimer(banner, live.secondsLeft);
+      })
+      .catch(function () { banner.hidden = true; });
+  }
+
+  function startGiveawayTimer(banner, seconds) {
+    if (banner._timer) clearInterval(banner._timer);
+    var left = Math.max(0, Number(seconds) || 0);
+    var el = banner.querySelector('[data-f="timer"]');
+    var tick = function () {
+      var h = Math.floor(left / 3600);
+      var m = Math.floor((left % 3600) / 60);
+      var s = left % 60;
+      el.textContent = [h, m, s].map(function (x) { return String(x).padStart(2, '0'); }).join(':');
+      if (left <= 0) {
+        clearInterval(banner._timer);
+        banner.hidden = true;
+        return;
+      }
+      left--;
+    };
+    tick();
+    banner._timer = setInterval(tick, 1000);
+  }
+
+  // Init after React has hydrated.
+  //
+  // Injecting before hydration makes React report a mismatch (#418): the server
+  // markup has no room for our nodes, so it re-renders the subtree. Waiting for
+  // an idle moment costs nothing - the observer below re-attaches anything React
+  // discards on a later render anyway.
+  function boot() {
+    // ?noboot is a diagnostic escape hatch: it loads the page with none of our
+    // nodes injected, so a React hydration complaint can be attributed either
+    // to this script or to the page itself.
+    if (/[?&]noboot\b/.test(location.search)) return;
     injectAuthModal();
     updateHeaderUI();
     setupObserver();
     setupBalanceSync();
     setupProfileCards();
     ensureInventoryTabs();
+    ensureGiveawayBanner();
+  }
+  function bootWhenIdle() {
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(boot, { timeout: 1500 });
+    } else {
+      setTimeout(boot, 120);
+    }
+  }
+  // The cases page hydrates later than the others (its chunks load more), so
+  // wait for the load event there rather than a fixed tick - that is what keeps
+  // React #418 from firing on /cases while staying instant elsewhere.
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootWhenIdle);
+  } else if (document.readyState === 'complete') {
+    bootWhenIdle();
+  } else {
+    window.addEventListener('load', bootWhenIdle, { once: true });
   }
 
   // Export helper for debugging

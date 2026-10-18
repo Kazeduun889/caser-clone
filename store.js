@@ -185,6 +185,7 @@ async function migrate() {
       can_sell     INTEGER NOT NULL DEFAULT 1,
       can_upgrade  INTEGER NOT NULL DEFAULT 1,
       item_json    TEXT NOT NULL,
+      source       TEXT NOT NULL DEFAULT 'case',
       created_at   TEXT NOT NULL
     )`,
     'CREATE INDEX IF NOT EXISTS idx_inv_user ON inventory_items(user_id, created_at DESC)',
@@ -283,6 +284,37 @@ async function migrate() {
     `CREATE TABLE IF NOT EXISTS counters (
       name  TEXT PRIMARY KEY,
       value INTEGER NOT NULL DEFAULT 0
+    )`,
+
+    // Giveaways. One entry per player per giveaway, and the draw happens once
+    // the timer expires - winners are picked at random from the entrants.
+    `CREATE TABLE IF NOT EXISTS giveaways (
+      id            TEXT PRIMARY KEY,
+      title         TEXT NOT NULL,
+      description   TEXT,
+      prize_json    TEXT NOT NULL,
+      prize_name    TEXT,
+      prize_image   TEXT,
+      prize_rarity  TEXT,
+      slots         INTEGER NOT NULL DEFAULT 1,
+      ends_at       TEXT NOT NULL,
+      status        TEXT NOT NULL DEFAULT 'active',
+      created_at    TEXT NOT NULL,
+      drawn_at      TEXT
+    )`,
+    `CREATE TABLE IF NOT EXISTS giveaway_entries (
+      giveaway_id TEXT NOT NULL,
+      user_id     TEXT NOT NULL,
+      created_at  TEXT NOT NULL,
+      PRIMARY KEY (giveaway_id, user_id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS giveaway_winners (
+      giveaway_id TEXT NOT NULL,
+      user_id     TEXT NOT NULL,
+      slot        INTEGER NOT NULL DEFAULT 1,
+      item_id     TEXT,
+      created_at  TEXT NOT NULL,
+      PRIMARY KEY (giveaway_id, user_id)
     )`
   ];
   await client.batch(statements.map((sql) => ({ sql })), 'write');
@@ -300,6 +332,14 @@ async function migrate() {
   // tier has to be remembered next to the name and image.
   try {
     await client.execute('ALTER TABLE player_stats ADD COLUMN best_drop_rarity TEXT');
+  } catch (e) {
+    if (!/duplicate column/i.test(e.message)) throw e;
+  }
+
+  // Where an item came from. Only 'giveaway' items may be withdrawn right now -
+  // everything won in a case or an upgrade is stuck in the inventory.
+  try {
+    await client.execute("ALTER TABLE inventory_items ADD COLUMN source TEXT NOT NULL DEFAULT 'case'");
   } catch (e) {
     if (!/duplicate column/i.test(e.message)) throw e;
   }
@@ -534,6 +574,7 @@ function rowToEntry(row) {
     status: row.status,
     canSell: !!row.can_sell,
     canUpgrade: !!row.can_upgrade,
+    source: row.source || 'case',
     item,
     createdAt: row.created_at
   };
@@ -585,6 +626,8 @@ async function addInventoryItem(userId, entry) {
     status: entry.status || 'available',
     canSell: entry.canSell !== false,
     canUpgrade: entry.canUpgrade !== false,
+    // case | upgrade | giveaway. Withdrawal checks this.
+    source: entry.source || 'case',
     item: entry.item || {},
     createdAt: entry.createdAt || now()
   };
@@ -598,8 +641,8 @@ async function addInventoryItem(userId, entry) {
 
   await client.execute({
     sql: `INSERT OR REPLACE INTO inventory_items
-          (id, user_id, market_name, image, price, status, can_sell, can_upgrade, item_json, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          (id, user_id, market_name, image, price, status, can_sell, can_upgrade, item_json, source, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       record.id,
       String(userId),
@@ -610,6 +653,7 @@ async function addInventoryItem(userId, entry) {
       record.canSell ? 1 : 0,
       record.canUpgrade ? 1 : 0,
       JSON.stringify(record.item),
+      record.source,
       record.createdAt
     ]
   });
@@ -1294,6 +1338,247 @@ async function listUsers({ limit = 25, offset = 0, search = '' } = {}) {
   }));
 }
 
+/**
+ * Giveaways
+ * ---------------------------------------------------------------------------
+ *
+ * A giveaway is open until its timer expires. Anyone can enter with no
+ * conditions, and when the time is up the winners are drawn at random from
+ * whoever entered - so the operator does not pick them by hand.
+ */
+function rowToGiveaway(row) {
+  if (!row) return null;
+  let prize = {};
+  try { prize = JSON.parse(row.prize_json || '{}'); } catch (e) { prize = {}; }
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description || null,
+    prize,
+    prizeName: row.prize_name || null,
+    prizeImage: row.prize_image || null,
+    prizeRarity: row.prize_rarity || null,
+    slots: Number(row.slots) || 1,
+    endsAt: row.ends_at,
+    status: row.status,
+    createdAt: row.created_at,
+    drawnAt: row.drawn_at || null
+  };
+}
+
+/**
+ * Resolves a prize by its market name against the case catalogue.
+ *
+ * The admin panel only types a name, so the image, price and rarity have to be
+ * looked up - a prize without an image renders as an empty box on the banner.
+ */
+async function findItemByName(marketName) {
+  const wanted = String(marketName || '').trim().toLowerCase();
+  if (!wanted) return null;
+
+  const dir = path.join(__dirname, 'cases_cache');
+  let files = [];
+  try { files = fs.readdirSync(dir); } catch (e) { return null; }
+
+  for (const f of files) {
+    let d;
+    try { d = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')); } catch (e) { continue; }
+    const hit = (d.items || []).find((i) => String(i.marketName || '').toLowerCase() === wanted);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+async function createGiveaway(data) {
+  const id = String(data.id || newId('ga'));
+  const record = {
+    id,
+    title: String(data.title || 'Розыгрыш'),
+    description: data.description ? String(data.description) : null,
+    prize: data.prize || {},
+    prizeName: (data.prize && data.prize.marketName) || null,
+    prizeImage: (data.prize && data.prize.image) || null,
+    prizeRarity: (data.prize && data.prize.rarity != null) ? String(data.prize.rarity) : null,
+    slots: Math.max(1, parseInt(data.slots, 10) || 1),
+    endsAt: String(data.endsAt),
+    status: 'active',
+    createdAt: now()
+  };
+  if (isNaN(Date.parse(record.endsAt))) return { error: 'Некорректное время окончания' };
+
+  if (mode === 'memory') {
+    mem.giveaways = mem.giveaways || [];
+    mem.giveaways.push(Object.assign({}, record, {
+      entries: [], winners: [], prize_json: JSON.stringify(record.prize)
+    }));
+    return { giveaway: record };
+  }
+
+  await client.execute({
+    sql: `INSERT INTO giveaways
+          (id, title, description, prize_json, prize_name, prize_image, prize_rarity, slots, ends_at, status, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [record.id, record.title, val(record.description), JSON.stringify(record.prize),
+      val(record.prizeName), val(record.prizeImage), val(record.prizeRarity),
+      record.slots, record.endsAt, record.status, record.createdAt]
+  });
+  return { giveaway: record };
+}
+
+async function listGiveaways({ onlyActive = false, limit = 50 } = {}) {
+  if (mode === 'memory') {
+    let list = (mem.giveaways || []).map((g) => Object.assign({}, g, { prize_json: undefined }));
+    if (onlyActive) list = list.filter((g) => g.status === 'active' && new Date(g.endsAt) > new Date());
+    return list.slice(-limit).reverse();
+  }
+
+  const sql = onlyActive
+    ? `SELECT * FROM giveaways WHERE status = 'active' AND ends_at > ?
+       ORDER BY created_at DESC LIMIT ?`
+    : `SELECT * FROM giveaways ORDER BY created_at DESC LIMIT ?`;
+  const args = onlyActive ? [now(), limit] : [limit];
+  const res = await client.execute({ sql, args });
+  return res.rows.map(rowToGiveaway);
+}
+
+async function getGiveaway(id) {
+  if (mode === 'memory') {
+    const g = (mem.giveaways || []).filter((x) => x.id === String(id))[0];
+    if (!g) return null;
+    const copy = Object.assign({}, g);
+    delete copy.prize_json;
+    return copy;
+  }
+  const res = await client.execute({ sql: 'SELECT * FROM giveaways WHERE id = ?', args: [String(id)] });
+  return res.rows.length ? rowToGiveaway(res.rows[0]) : null;
+}
+
+async function giveawayStats(id) {
+  if (mode === 'memory') {
+    const g = (mem.giveaways || []).filter((x) => x.id === String(id))[0] || {};
+    return {
+      entries: (g.entries || []).length,
+      winners: (g.winners || []).map((w) => ({ userId: w.user_id, itemId: w.item_id, createdAt: w.created_at }))
+    };
+  }
+  const e = await client.execute({
+    sql: 'SELECT COUNT(*) AS c FROM giveaway_entries WHERE giveaway_id = ?', args: [String(id)]
+  });
+  const w = await client.execute({
+    sql: 'SELECT * FROM giveaway_winners WHERE giveaway_id = ? ORDER BY slot', args: [String(id)]
+  });
+  return {
+    entries: Number(e.rows[0].c) || 0,
+    winners: w.rows.map((r) => ({ userId: r.user_id, itemId: r.item_id, createdAt: r.created_at }))
+  };
+}
+
+/** One entry per account; a repeat press is a no-op, not an error. */
+async function enterGiveaway(id, userId) {
+  const g = await getGiveaway(id);
+  if (!g) return { error: 'Розыгрыш не найден' };
+  if (g.status !== 'active') return { error: 'Розыгрыш уже завершён' };
+  if (new Date(g.endsAt) <= new Date()) return { error: 'Розыгрыш уже завершён' };
+
+  if (mode === 'memory') {
+    const rec = (mem.giveaways || []).filter((x) => x.id === String(id))[0];
+    rec.entries = rec.entries || [];
+    if (!rec.entries.includes(String(userId))) rec.entries.push(String(userId));
+    return { giveaway: g, entered: true };
+  }
+
+  const res = await client.execute({
+    sql: 'INSERT OR IGNORE INTO giveaway_entries (giveaway_id, user_id, created_at) VALUES (?, ?, ?)',
+    args: [String(id), String(userId), now()]
+  });
+  return { giveaway: g, entered: res.rowsAffected > 0 };
+}
+
+/**
+ * Draws the winners once the timer is up and puts the prize in their inventory.
+ *
+ * Returns { winners: [] } when the giveaway is already drawn or nobody entered.
+ * The item is stamped source='giveaway' so it is the only kind that can be
+ * withdrawn.
+ *
+ * `force` lets the operator settle a draw before the timer runs out; without it
+ * only an expired giveaway may be drawn, which is what the sweeper relies on.
+ */
+async function drawGiveaway(id, { force = false } = {}) {
+  const g = await getGiveaway(id);
+  if (!g) return { error: 'Розыгрыш не найден' };
+  if (g.status !== 'active') return { error: 'Розыгрыш уже разыгран', winners: [] };
+  if (!force && new Date(g.endsAt) > new Date()) return { error: 'Розыгрыш ещё не завершён', winners: [] };
+
+  let entrants;
+  if (mode === 'memory') {
+    const rec = (mem.giveaways || []).filter((x) => x.id === String(id))[0];
+    entrants = (rec.entries || []).slice();
+  } else {
+    const res = await client.execute({
+      sql: 'SELECT user_id FROM giveaway_entries WHERE giveaway_id = ?', args: [String(id)]
+    });
+    entrants = res.rows.map((r) => String(r.user_id));
+  }
+
+  if (!entrants.length) {
+    await markGiveawayDrawn(id, []);
+    return { winners: [], entries: 0 };
+  }
+
+  // Fisher-Yates, then take as many as there are slots.
+  const pool = entrants.slice();
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const winners = pool.slice(0, Math.min(g.slots, pool.length));
+
+  const granted = [];
+  for (let i = 0; i < winners.length; i++) {
+    const uid = winners[i];
+    const inv = await addInventoryItem(uid, {
+      price: (g.prize && g.prize.price) || 0,
+      source: 'giveaway',
+      item: g.prize || {}
+    });
+    granted.push({ userId: uid, slot: i + 1, itemId: inv.id });
+  }
+
+  await markGiveawayDrawn(id, granted);
+  return { winners: granted, entries: entrants.length };
+}
+
+async function markGiveawayDrawn(id, winners) {
+  const ts = now();
+  if (mode === 'memory') {
+    const rec = (mem.giveaways || []).filter((x) => x.id === String(id))[0];
+    if (rec) {
+      rec.status = 'finished';
+      rec.drawn_at = ts;
+      rec.winners = (winners || []).map((w) => ({
+        user_id: w.userId, slot: w.slot, item_id: w.itemId, created_at: ts
+      }));
+    }
+    return;
+  }
+
+  const stmts = [{ sql: "UPDATE giveaways SET status = 'finished', drawn_at = ? WHERE id = ?", args: [ts, String(id)] }];
+  for (const w of winners || []) {
+    stmts.push({
+      sql: 'INSERT OR IGNORE INTO giveaway_winners (giveaway_id, user_id, slot, item_id, created_at) VALUES (?, ?, ?, ?, ?)',
+      args: [String(id), String(w.userId), w.slot, val(w.itemId), ts]
+    });
+  }
+  await client.batch(stmts, 'write');
+}
+
+/** Every giveaway whose timer has expired and that still needs drawing. */
+async function dueGiveaways() {
+  const list = await listGiveaways({ onlyActive: true, limit: 200 });
+  return list.filter((g) => new Date(g.endsAt) <= new Date());
+}
+
 // ---------------------------------------------------------------------------
 // Withdrawals
 // ---------------------------------------------------------------------------
@@ -1341,13 +1626,22 @@ function rowToWithdrawal(r) {
 
 /**
  * Locks the item and opens a withdrawal request.
- * Returns { withdrawal } or { error } when the item is not sellable.
+ * Returns { withdrawal } or { error } when the item is not withdrawable.
+ *
+ * Right now only items won in a giveaway may be withdrawn. Anything from a case
+ * or an upgrade stays in the inventory, so the check is on the item's source
+ * rather than on a flag the caller could set.
  */
+const WITHDRAWABLE_SOURCES = new Set(['giveaway']);
+
 async function createWithdrawal(userId, inventoryItemId) {
   const uid = String(userId);
   const entry = await getInventoryEntry(uid, inventoryItemId);
   if (!entry) return { error: 'Предмет не найден' };
   if (entry.status !== 'available') return { error: 'Предмет недоступен' };
+  if (!WITHDRAWABLE_SOURCES.has(entry.source)) {
+    return { error: 'Вывод доступен только для предметов из розыгрыша' };
+  }
 
   const id = newId('wd');
   const ts = now();
@@ -1618,6 +1912,15 @@ module.exports = {
   setInventoryStatus,
   totalInventoryValue,
   nextUserId,
+  findItemByName,
+  // Giveaways
+  createGiveaway,
+  listGiveaways,
+  getGiveaway,
+  giveawayStats,
+  enterGiveaway,
+  drawGiveaway,
+  dueGiveaways,
   recordCaseOpen,
   countCaseOpens,
   // Withdrawals
