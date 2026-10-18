@@ -1361,6 +1361,11 @@
         banner.querySelector('[data-f="entries"]').textContent = live.entries;
         var img = banner.querySelector('.caser-giveaway-img');
         if (live.prizeImage) { img.src = live.prizeImage; img.hidden = false; }
+        // The server reports whether this account already holds an entry, so a
+        // return to the page does not ask for a second press.
+        var btn = banner.querySelector('[data-act="enter"]');
+        btn.disabled = !!live.entered;
+        banner.querySelector('[data-f="msg"]').textContent = live.entered ? 'Вы участвуете' : '';
         banner.hidden = false;
         startGiveawayTimer(banner, live.secondsLeft);
       })

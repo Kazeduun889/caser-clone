@@ -1653,15 +1653,17 @@ async function giveawayView(g, userId) {
       itemId: w.itemId,
       createdAt: w.createdAt
     })),
-    entered: userId ? stats.winners.some((w) => String(w.userId) === String(userId)) : false
+    // Whether this account already holds an entry - the banner reads it to
+    // keep the press from being asked for twice.
+    entered: await store.hasGiveawayEntry(g.id, userId)
   };
 }
 
 app.get('/api/giveaways', async (req, res) => {
-  await resolveUser(req);
+  const user = await resolveUser(req);
   const list = await store.listGiveaways({ limit: clampInt(req.query.limit, 1, 50, 20) });
   const items = [];
-  for (const g of list) items.push(await giveawayView(g, null));
+  for (const g of list) items.push(await giveawayView(g, user.id));
   res.json({ success: true, items });
 });
 
@@ -2391,6 +2393,10 @@ app.get('/api/game/giveaways', async (req, res) => {
   const data = [];
   for (const g of list) {
     const stats = await store.giveawayStats(g.id);
+    // Read back from the entries table, not from a flag held in memory: the
+    // page refetches this on every focus, and an invented `false` here put the
+    // "Участвовать" button back on screen for someone who had already joined.
+    const isParticipant = await store.hasGiveawayEntry(g.id, user.id);
     data.push({
       id: g.id,
       // The client indexes its accent/colour map with this value
@@ -2406,7 +2412,7 @@ app.get('/api/game/giveaways', async (req, res) => {
       rulesText: g.description
         || 'Нажмите «Участвовать», чтобы попасть в розыгрыш. Победитель выбирается случайно среди участников.',
       prize: Object.assign({}, g.prize || {}),
-      me: { isParticipant: false, deposited: '0.00', remaining: null }
+      me: { isParticipant, deposited: '0.00', remaining: null }
     });
   }
   res.json({ data });

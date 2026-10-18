@@ -1554,6 +1554,26 @@ async function giveawayStats(id) {
 }
 
 /**
+ * Whether an account already holds an entry in a draw.
+ *
+ * The client keeps a "Участвовать" button on screen unless the giveaway it
+ * receives says `me.isParticipant`, so this is what stops the page from asking
+ * again after the visitor navigates away and comes back.
+ */
+async function hasGiveawayEntry(id, userId) {
+  if (!userId) return false;
+  if (mode === 'memory') {
+    const rec = (mem.giveaways || []).filter((x) => x.id === String(id))[0];
+    return !!(rec && (rec.entries || []).includes(String(userId)));
+  }
+  const res = await client.execute({
+    sql: 'SELECT 1 FROM giveaway_entries WHERE giveaway_id = ? AND user_id = ? LIMIT 1',
+    args: [String(id), String(userId)]
+  });
+  return res.rows.length > 0;
+}
+
+/**
  * The newest winners across every draw, joined with the winner and the prize.
  *
  * The "Последние победители" feed used to be a hardcoded list of fictional
@@ -2046,6 +2066,7 @@ module.exports = {
   listGiveaways,
   getGiveaway,
   giveawayStats,
+  hasGiveawayEntry,
   enterGiveaway,
   drawGiveaway,
   dueGiveaways,

@@ -24,22 +24,27 @@ const AVATARS = [
 const NAMES = ['clipher', 's1mple_win', 'donk', 'm0NESY', 'sh1ro', 'ZywOo', 'huNter-',
   'electroNic', 'n0rb3r7', 'b1t', 'tolsti', 'sdy'];
 
-const TITLE = 'Розыгрыш наклеек ПОТС';
-const DESCRIPTION = 'Три наклейки Sticker | Please Be Patient. Участие бесплатное, победители выбираются случайно.';
+const TITLE = 'Розыгрыш терминала «Мёртвая рука»';
+const DESCRIPTION = 'Терминал «Мёртвая рука» — итоги подводятся автоматически, когда истекает таймер. Участие бесплатное, победители выбираются случайно.';
 
+// The prize is the case itself, so its artwork comes from the site's own
+// /cases folder rather than the Steam CDN.
 const PRIZE = {
-  id: '27301',
+  id: '109',
   appId: 730,
-  marketName: 'Sticker | Please Be Patient',
-  price: '97.290',
-  image: 'https://community.akamai.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttyVfPaERSR0Wqmu7LAocGJai0ki7VeTHjMmuOHaC619h7cj1_03ofg_wnZ_u-m1L7uKreptvJc-DD3OZxOBi_rk-TXDgzR525WSDzt6hdn3GaQckW5RyTeAOs0LtloK0Y7jj4FDcjo1bjXKpN59SMJA/360fx360f',
+  marketName: 'Терминал «Мёртвая рука»',
+  price: '119.000',
+  image: '/cases/d1b8cf50f45a1c127312be1df2f6bf0a-69f234eb6cb38.webp',
   weapon: null,
-  skin: 'Please Be Patient',
+  skin: 'Терминал «Мёртвая рука»',
   exterior: null,
   stattrack: false,
   type: '13',
-  rarity: '8'
+  rarity: '12'
 };
+
+// The current round runs for twelve hours; the sweeper draws it unaided.
+const LIVE_HOURS = 12;
 
 // Settled rounds, purely so "Последние победители" has real rows to show.
 const PAST_ROUNDS = [
@@ -82,7 +87,7 @@ async function seedGiveaways(store, players) {
       description: DESCRIPTION,
       prize: PRIZE,
       slots: 3,
-      endsAt: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString()
+      endsAt: new Date(Date.now() + LIVE_HOURS * 3600 * 1000).toISOString()
     });
   }
 
