@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const { WebSocketServer, WebSocket } = require('ws');
 const https = require('https');
 const store = require('./store');
+const { seedDemoContent } = require('./seed-demo');
 
 const app = express();
 try {
@@ -47,7 +48,7 @@ app.use(express.json());
 // Boot the storage layer, then start listening. Requests are not served until
 // the database is reachable (or the in-memory fallback is active).
 let storageReady = false;
-store
+const storeReady = store
   .init()
   .catch((err) => console.error('[store] init failed:', err.message))
   .finally(() => {
@@ -841,6 +842,14 @@ BOOT.stage = 'building-catalogue';
 console.log('[boot] building shop catalogue...');
 const SHOP_ITEMS = buildShopCatalogue();
 console.log(`[boot] catalogue ready: ${SHOP_ITEMS.length} distinct skins`);
+
+// A wiped database - Render's Free plan rebuilds the SQLite file on every cold
+// start - would leave the rewards page with an empty board and an empty feed,
+// so the demo content is restored as soon as the store is reachable. Guarded
+// internally: a database that already has the content is left untouched.
+storeReady
+  .then(() => seedDemoContent(store, SHOP_ITEMS))
+  .catch((err) => console.warn('[seed] skipped:', err.message));
 
 const toShopPayload = (s) => {
   const rarity = Number(s.rarity);
