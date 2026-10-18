@@ -496,7 +496,9 @@
 
 .caser-profile-strip {
   display: grid;
-  grid-template-columns: 1.45fr 1.15fr .9fr;
+  /* The best-drop name and the promo field both need room; the extra fractions
+     go to them so nothing truncates. */
+  grid-template-columns: 1.3fr 1.2fr 1.1fr;
   gap: 1.2rem;
   /* No horizontal padding: the tiles must line up exactly with the inventory
      grid and the toolbar below them, and the parent already provides the inset. */
@@ -533,22 +535,24 @@
 
 /* --- buttons ---------------------------------------------------------- */
 
-/* Mirrors the site's BUTTON_PRIMARY_SURFACE_CLASSES + content recipe. */
+/* Mirrors the site's BUTTON_PRIMARY_SURFACE_CLASSES + content recipe. Kept
+   deliberately compact - the plate row is short and a full-height button
+   dwarfed the balance figure next to it. */
 .caser-btn-primary {
-  display: inline-flex; align-items: center; justify-content: center; gap: .7rem;
-  padding: 1rem 1.6rem; border-radius: .2rem; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: .6rem;
+  padding: .6rem 1.2rem; border-radius: .2rem; cursor: pointer;
   background-image: var(--brand-button-primary-bg);
   border: .1rem solid var(--brand-button-primary-border);
   color: var(--brand-button-primary-text);
   box-shadow: var(--brand-button-primary-shadow);
   font-family: var(--font-oswald), Oswald, sans-serif;
-  font-size: 1.6rem; line-height: 2.2rem;
+  font-size: 1.35rem; line-height: 1.9rem;
   text-transform: uppercase; letter-spacing: .04em;
   white-space: nowrap;
   transition: filter .15s;
 }
 .caser-btn-primary:hover { filter: brightness(1.2); }
-.caser-btn-primary .caser-btn-ico { width: 1.8rem; height: 1.8rem; }
+.caser-btn-primary .caser-btn-ico { width: 1.5rem; height: 1.5rem; }
 
 /* Neutral surface. The apply button is deliberately not a primary action. */
 .caser-btn-ghost {
@@ -643,29 +647,8 @@
 .caser-nick-hint { margin-top: .4rem; font-size: 1.6rem; line-height: 2.2rem; color: #ffffff73; }
 .caser-nick-hint.err { color: #ff6b6b; }
 
-/* the `//  4,443` figure, left of its own label */
-.caser-player-mid {
-  display: flex; align-items: center; gap: 1.2rem;
-  margin: 1.6rem 0 0;
-  padding-bottom: 1.4rem;
-}
-.caser-slashes {
-  color: #ffffff4d;
-  font-family: var(--font-oswald), Oswald, sans-serif;
-  font-size: 2.8rem; font-weight: 700; letter-spacing: -.15em;
-}
-.caser-player-mid b {
-  font-family: var(--font-oswald), Oswald, sans-serif;
-  font-size: 3.2rem; line-height: 3.8rem; color: #fff;
-  min-width: 5rem;
-}
-.caser-rating {
-  background: none; border: 0; padding: 0; cursor: pointer;
-  font-size: 1.6rem; font-weight: 700; letter-spacing: .06em;
-  color: var(--brand-nav-active, #83D8FF);
-  white-space: nowrap;
-}
-.caser-rating:hover { text-decoration: underline; }
+/* The `//  4,443` figure and the Casey rating button are gone: the tile shows
+   only the three counters, with spacing instead of rules between them. */
 
 /* Lower plate: darker than the top, split off by a hairline. */
 .caser-plate {
@@ -679,7 +662,7 @@
 .caser-bal {
   display: flex; align-items: center; gap: .8rem;
   font-family: var(--font-oswald), Oswald, sans-serif;
-  font-size: 3.2rem; line-height: 4rem; color: #fff;
+  font-size: 2.9rem; line-height: 3.6rem; color: #fff;
 }
 
 .caser-counters {
@@ -694,7 +677,12 @@
   font-family: var(--font-oswald), Oswald, sans-serif;
   font-size: 2.4rem;
 }
-.caser-ctr-ico { width: 2.6rem; height: 2.6rem; object-fit: contain; opacity: .55; }
+.caser-ctr-ico {
+  width: 2.6rem; height: 2.6rem; object-fit: contain; opacity: .55;
+  /* The mystery glyph ships tinted; greyscale keeps the three counters
+     reading as one grey row. */
+  filter: grayscale(1);
+}
 
 /* =========================== best drop tile =============================== */
 
@@ -709,15 +697,15 @@
 }
 .caser-best-name {
   font-family: var(--font-oswald), Oswald, sans-serif;
-  font-size: 2.3rem; line-height: 3rem;
+  font-size: 1.9rem; line-height: 2.5rem;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .caser-best-price {
   display: flex; align-items: center; gap: .7rem;
   font-family: var(--font-oswald), Oswald, sans-serif;
-  font-size: 2rem; line-height: 2.7rem; color: #fff; margin-top: .4rem;
+  font-size: 1.75rem; line-height: 2.4rem; color: #fff; margin-top: .4rem;
 }
-.caser-best-price .caser-coin { width: 2.4rem; height: 2.4rem; }
+.caser-best-price .caser-coin { width: 2.1rem; height: 2.1rem; }
 /* Square frame tinted with the item's rarity, as on the original. */
 .caser-best-img {
   --drop-color: #B0C3D9;
@@ -752,11 +740,12 @@
 .caser-wd .caser-coin { width: 4rem; height: 4rem; }
 .caser-wd-sub { font-size: 1.8rem; margin: .3rem 0 1.4rem; }
 
-/* Promo sits below its own hairline so it reads as a separate block from the
-   figure above it rather than one continuous stack. */
+/* Promo sits on its own tinted plate, offset from the figure above, so the
+   two blocks read as separate sections of the tile rather than one stack. */
 .caser-promo-block {
-  margin: 0 -2rem -1.6rem;
-  padding: 1.2rem 2rem 1.4rem;
+  margin: 1.2rem -2rem -1.6rem;
+  padding: 1.4rem 2rem 1.4rem;
+  background-color: #00000059;
   border-top: .1rem solid #ffffff26;
 }
 .caser-promo-form { display: flex; gap: .8rem; }
@@ -833,7 +822,9 @@
 .caser-tab {
   padding: 1.1rem 1.8rem; border: 0; border-radius: 0;
   background: transparent;
-  color: #ffffff73;
+  /* the site's text-white-650: readable, but not the plain white that made
+     the row look like one solid block */
+  color: #ccced6;
   font-family: var(--font-sofia-sans), "Sofia Sans", sans-serif;
   font-size: 1.6rem; font-weight: 700; line-height: 2.2rem;
   text-transform: uppercase; letter-spacing: .04em;
@@ -845,18 +836,28 @@
 .caser-tab.is-active { background-color: #fff; color: #000; }
 .caser-tab.is-active:hover { background-color: #fff; color: #000; }
 
+/* The `hidden` attribute has to win: Tailwind's display utilities on the
+   site's own nodes otherwise override it and the items stay visible behind
+   the notice, with the sort and sell controls floating over it. */
+[data-testid="inventory-items-list"][hidden],
+[data-testid="upgrade-empty-inventory"][hidden],
+[data-testid="profile-sort-select"][hidden],
+[data-testid="inventory-sell-all-button-desktop"][hidden],
+[data-testid="inventory-sell-all-button-mobile"][hidden],
+.caser-wip[hidden],
+.caser-giveaway[hidden] { display: none !important; }
+
+/* A centred block in the page flow. Anchoring it absolutely made the notice
+   hover near the header instead of sitting in the middle of the content. */
 .caser-wip {
-  /* anchored to the page, not a higher positioned ancestor - without this the
-     notice centred against the wrong box and floated up near the header */
-  position: absolute; inset: 0; z-index: 2;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: .8rem;
+  min-height: 46rem;
   font-family: var(--font-sofia-sans), "Sofia Sans", sans-serif;
   color: #fff;
   pointer-events: none;
 }
 [data-testid="inventory-page"] { position: relative; }
-.caser-wip[hidden] { display: none; }
 .caser-wip-title {
   font-family: var(--font-oswald), Oswald, sans-serif;
   font-size: 3rem; letter-spacing: .06em;
@@ -880,8 +881,6 @@
   font-family: var(--font-sofia-sans), "Sofia Sans", sans-serif;
   color: #fff;
 }
-.caser-giveaway[hidden] { display: none; }
-
 .caser-giveaway-bg {
   position: absolute; inset: 0;
   width: 100%; height: 100%;

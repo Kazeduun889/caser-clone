@@ -393,7 +393,22 @@ async function resolveUser(req) {
   // exists is honoured as-is, so returning visitors keep their balance and
   // inventory; only an unknown identity is minted a fresh number. That is what
   // makes the profile show a plain "ID:242408" instead of a random slug.
+  //
+  // A slug left over from the days before numbering is renumbered here: the
+  // account moves onto the next free number with its balance and history, and
+  // the cookie is rewritten, so old visitors end up on a numbered account too.
   for (const id of candidates) {
+    if (!/^\d+$/.test(id)) {
+      const migrated = await store.migrateLegacyUser(id);
+      if (!migrated) continue; // never existed: fall through to a fresh number
+      if (req.res && typeof req.res.cookie === 'function') {
+        req.res.cookie('caser_user_id', migrated, { maxAge: 31536000000, path: '/' });
+        req.res.cookie('auth_flag', '1', { maxAge: 31536000000, path: '/' });
+      }
+      const renumbered = await store.getUser(migrated);
+      if (renumbered) return renumbered;
+      continue;
+    }
     const existing = await store.getUser(id);
     if (existing) return existing;
   }
@@ -424,8 +439,15 @@ app.post('/api/auth/session', async (req, res) => {
   const incoming = req.body || {};
   if (!incoming.id) return res.status(400).json({ success: false, message: 'Invalid user data' });
 
+  // Account numbers replaced the old random slugs. A session request that
+  // still carries a slug is renumbered here, so no new legacy accounts are
+  // ever created and resolveUser never has to migrate one of these.
+  const id = /^\d+$/.test(String(incoming.id))
+    ? String(incoming.id)
+    : await store.nextUserId();
+
   const user = await store.ensureUser({
-    id: incoming.id,
+    id,
     nickname: incoming.nickname || 'CaserPlayer',
     image: incoming.image || DEFAULT_AVATARS[0],
     // The client-sent balance is only honoured when the account is brand new
@@ -441,7 +463,7 @@ app.post('/api/auth/session', async (req, res) => {
 app.post('/api/auth/login', async (req, res) => {
   const { username } = req.body || {};
   const user = await store.createUser({
-    id: store.newId('user'),
+    id: await store.nextUserId(),
     nickname: username || 'Player',
     image: DEFAULT_AVATARS[0],
     balance: START_BALANCE,
@@ -456,7 +478,7 @@ app.post('/api/auth/login', async (req, res) => {
 app.post('/api/auth/register', async (req, res) => {
   const { username, image, balance } = req.body || {};
   const user = await store.createUser({
-    id: store.newId('user'),
+    id: await store.nextUserId(),
     nickname: username || 'ProGamer',
     image: image || DEFAULT_AVATARS[0],
     balance: parseFloat(balance) || START_BALANCE,
@@ -1847,7 +1869,9 @@ async function requireAdmin(req, res, next) {
   // this must be awaited - comparing a Promise against the admin id would
   // always fail and lock the operator out of their own panel.
   const user = await resolveUser(req);
-  if (!isAdminId(user.id)) {
+  // The operator's own account may have been renumbered from a legacy slug
+  // that is what ADMIN_IDS actually lists, so the alias is consulted too.
+  if (!isAdminId(user.id) && !(await store.legacyAdminMatch(user.id, ADMIN_IDS))) {
     return res.status(403).json({ success: false, message: 'Admin only' });
   }
   req.adminUser = user;

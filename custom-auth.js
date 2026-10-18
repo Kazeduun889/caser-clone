@@ -529,6 +529,7 @@
       // every re-render, so the strip has to be re-attached when it goes.
       ensureProfileStrip();
       ensureInventoryTabs();
+      ensureSellAllPlacement();
       ensureGiveawayBanner();
     });
     observer.observe(document.body, { childList: true, subtree: true });
@@ -663,7 +664,7 @@
 
   /** Creates the strip once, and puts it back if React removed it. */
   function ensureProfileStrip() {
-    if (!/\/(profile|ru\/profile|ru\/inventory)/.test(location.pathname)) return;
+    if (!/\/(profile|inventory|ru\/profile|ru\/inventory)/.test(location.pathname)) return;
     if (document.querySelector('.caser-profile-strip')) return;
 
     var strip = document.createElement('div');
@@ -1041,8 +1042,8 @@
     q('nick').textContent = u.nickname || 'Игрок';
     q('uid').textContent = u.id;
     q('balance').textContent = fmtMoney(u.balance);
-    // The original shows the rating as a whole number with separators.
-    q('rating').textContent = fmtCount(s.rating);
+    // Casey's rating tile is gone for good - the line used to reference a
+    // removed element and crashed here, which froze every stat below it.
     q('cases').textContent = fmtCount(s.casesOpened);
     q('upgrades').textContent = fmtCount(s.upgradesMade);
     q('won').textContent = fmtCount(s.upgradesWon);
@@ -1170,8 +1171,36 @@
     { id: 'upgrades', label: 'АПГРЕЙДЫ', ready: false }
   ];
 
+  /**
+   * Puts "Продать все" beside the sort select in the toolbar, where the
+   * filtering controls live, instead of wherever the grid left it. The site
+   * renders a desktop or a mobile variant of the button depending on the
+   * viewport, so whichever one is on screen is the one that moves. The button
+   * only appears on the ПРЕДМЕТЫ tab - selectInventoryTab hides it elsewhere.
+   * Re-running is a no-op, which matters because React moves nodes around.
+   */
+  function placeSellAllNextToSort(page) {
+    var sort = page.querySelector('[data-testid="profile-sort-select"]');
+    if (!sort || !sort.parentNode) return;
+    var candidates = [
+      document.querySelector('[data-testid="inventory-sell-all-button-desktop"]'),
+      document.querySelector('[data-testid="inventory-sell-all-button-mobile"]')
+    ].filter(Boolean);
+    if (!candidates.length) return;
+    var sell = candidates.filter(function (b) { return b.offsetWidth || b.offsetHeight; })[0] || candidates[0];
+    if (sell.previousElementSibling === sort) return; // already in place
+    sort.parentNode.insertBefore(sell, sort);
+  }
+
+  /** Re-checks the placement on pages that have the toolbar. */
+  function ensureSellAllPlacement() {
+    if (!/\/(profile|inventory|ru\/profile|ru\/inventory)/.test(location.pathname)) return;
+    var page = document.querySelector('[data-testid="inventory-page"]');
+    if (page) placeSellAllNextToSort(page);
+  }
+
   function ensureInventoryTabs() {
-    if (!/\/(profile|ru\/profile|ru\/inventory)/.test(location.pathname)) return;
+    if (!/\/(profile|inventory|ru\/profile|ru\/inventory)/.test(location.pathname)) return;
     if (document.querySelector('.caser-tabs')) return;
 
     var page = document.querySelector('[data-testid="inventory-page"]');
@@ -1188,6 +1217,8 @@
     }).join('');
 
     toolbar.insertBefore(group, toolbar.firstChild);
+
+    placeSellAllNextToSort(page);
 
     var notice = document.createElement('div');
     notice.className = 'caser-wip';
@@ -1367,6 +1398,7 @@
     setupBalanceSync();
     setupProfileCards();
     ensureInventoryTabs();
+    ensureSellAllPlacement();
     ensureGiveawayBanner();
   }
   function bootWhenIdle() {

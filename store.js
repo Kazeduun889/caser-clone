@@ -315,6 +315,15 @@ async function migrate() {
       item_id     TEXT,
       created_at  TEXT NOT NULL,
       PRIMARY KEY (giveaway_id, user_id)
+    )`,
+
+    // Old random account slugs (player_xxx...) map onto the numbered account
+    // that replaced them, so a returning visitor with an old cookie - and an
+    // ADMIN_IDS entry written before numbering - still finds the same account.
+    `CREATE TABLE IF NOT EXISTS id_aliases (
+      old_id     TEXT PRIMARY KEY,
+      new_id     TEXT NOT NULL,
+      created_at TEXT NOT NULL
     )`
   ];
   await client.batch(statements.map((sql) => ({ sql })), 'write');
@@ -401,6 +410,77 @@ async function nextUserId() {
 
   // Should not happen; a unique id is better than a failed registration.
   return newId('player');
+}
+
+/**
+ * Renumbers an account that still carries a pre-numbering slug (player_xxx...).
+ *
+ * The slug keeps its balance, inventory, statistics and history - everything is
+ * moved onto the next account number in one batch - and the slug is remembered
+ * as an alias, so the old cookie lands on the same account on every later
+ * visit. Returns null when the slug never belonged to anyone, which tells the
+ * caller to simply mint a fresh number.
+ */
+async function migrateLegacyUser(oldId) {
+  const oid = String(oldId);
+  if (mode === 'memory') return oid;
+
+  const aliased = await client.execute({
+    sql: 'SELECT new_id FROM id_aliases WHERE old_id = ?',
+    args: [oid]
+  });
+  if (aliased.rows.length) return String(aliased.rows[0].new_id);
+
+  const found = await client.execute({ sql: 'SELECT * FROM users WHERE id = ?', args: [oid] });
+  if (!found.rows.length) return null;
+
+  const newIdNum = String(await nextUserId());
+
+  // Copy the user row across with its real column list - guessing column names
+  // would break the moment the schema gains one - then repoint every table
+  // that references a user, then drop the slug and record the alias. One batch
+  // = one transaction, so a failure cannot leave a half-migrated account.
+  const statements = [];
+  const userCols = (await client.execute('PRAGMA table_info("users")')).rows.map((c) => c.name);
+  const row = found.rows[0];
+  statements.push({
+    sql: 'INSERT INTO users (' + userCols.map((c) => '"' + c + '"').join(', ') + ') VALUES ('
+      + userCols.map(() => '?').join(', ') + ')',
+    args: userCols.map((c) => (c === 'id' ? newIdNum : row[c]))
+  });
+
+  const tables = await client.execute(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT IN ('users', 'id_aliases')");
+  for (const t of tables.rows) {
+    const info = await client.execute('PRAGMA table_info("' + t.name + '")');
+    if (info.rows.some((c) => c.name === 'user_id')) {
+      statements.push({
+        sql: 'UPDATE "' + t.name + '" SET user_id = ? WHERE user_id = ?',
+        args: [newIdNum, oid]
+      });
+    }
+  }
+
+  statements.push({ sql: 'DELETE FROM users WHERE id = ?', args: [oid] });
+  statements.push({
+    sql: 'INSERT OR REPLACE INTO id_aliases (old_id, new_id, created_at) VALUES (?, ?, ?)',
+    args: [oid, newIdNum, now()]
+  });
+  await client.batch(statements, 'write');
+  return newIdNum;
+}
+
+/**
+ * True when the account's number came from a slug listed in `ids`. Keeps the
+ * operator's own ADMIN_IDS entry working after their account was renumbered.
+ */
+async function legacyAdminMatch(userId, ids) {
+  if (mode === 'memory' || !ids || !ids.size) return false;
+  const res = await client.execute({
+    sql: 'SELECT old_id FROM id_aliases WHERE new_id = ?',
+    args: [String(userId)]
+  });
+  return res.rows.some((r) => ids.has(String(r.old_id)));
 }
 
 // ---------------------------------------------------------------------------
@@ -1912,6 +1992,8 @@ module.exports = {
   setInventoryStatus,
   totalInventoryValue,
   nextUserId,
+  migrateLegacyUser,
+  legacyAdminMatch,
   findItemByName,
   // Giveaways
   createGiveaway,
