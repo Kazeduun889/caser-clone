@@ -79,7 +79,7 @@ async function createPlayers(store) {
   return players;
 }
 
-async function seedGiveaways(store, players) {
+async function seedGiveaways(store, getPlayers) {
   const live = await store.listGiveaways({ onlyActive: true, limit: 1 });
   if (!live.length) {
     await store.createGiveaway({
@@ -92,7 +92,13 @@ async function seedGiveaways(store, players) {
   }
 
   const winners = await store.listRecentGiveawayWinners(1);
-  if (winners.length || !players.length) return;
+  if (winners.length) return;
+
+  // Only now are the demo accounts needed, and only now are they minted: a
+  // database that already has its winners would otherwise be handed a second
+  // set of players with the same nicknames.
+  const players = await getPlayers();
+  if (!players.length) return;
 
   // The rounds are created open and drawn on the spot. enterGiveaway refuses a
   // giveaway whose clock has run out, so the entries have to be placed first;
@@ -160,7 +166,7 @@ async function seedDemoContent(store, items) {
   let players = null;
   const getPlayers = async () => (players = players || await createPlayers(store));
 
-  if (!live.length || !winners.length) await seedGiveaways(store, await getPlayers());
+  if (!live.length || !winners.length) await seedGiveaways(store, getPlayers);
   if (!named.length) await seedDrops(store, await getPlayers(), items);
 
   console.log('[seed] demo content restored for a fresh database');
