@@ -2376,75 +2376,78 @@ app.get('/api/game/giveaways', async (req, res) => {
   const user = await resolveUser(req);
   const now = Date.now();
   const iso = (ms) => new Date(ms).toISOString();
-  res.json({
-    data: GAME_GIVEAWAY_ROWS.map((row) => {
-      const joined = GAME_GIVEAWAY_JOINED.has(user.id + ':' + row.id);
-      return {
-        id: row.id,
-        cadence: row.cadence,
-        title: row.title,
-        minDeposit: row.minDeposit,
-        startsAt: iso(now - 5 * 60e3),
-        endsAt: iso(now + Math.round(GAME_GIVEAWAY_PERIOD_MS[row.cadence] * 0.6)),
-        serverTime: iso(now),
-        participantCount: GAME_GIVEAWAY_BASE[row.id] + GAME_GIVEAWAY_JOINS[row.id],
-        rulesText: 'Пополните баланс на сумму от ' + row.minDeposit
-          + ' ₽ в течение периода розыгрыша, чтобы участвовать в борьбе за приз.',
-        prize: { ...row.skin },
-        me: joined
-          ? { isParticipant: true, deposited: row.minDeposit.toFixed(2), remaining: '0.00' }
-          : { isParticipant: false, deposited: '0.00', remaining: null }
-      };
-    })
-  });
+  // Real giveaways only - the operator's own draws, not the old hourly/daily/
+  // weekly fiction. Finished ones drop out of the list.
+  const list = await store.listGiveaways({ onlyActive: true, limit: 20 });
+  const data = [];
+  for (const g of list) {
+    const stats = await store.giveawayStats(g.id);
+    data.push({
+      id: g.id,
+      // The client indexes its accent/colour map with this value
+      // (C[e.cadence]); anything outside hourly|daily|weekly resolves to
+      // undefined and the whole page throws while rendering the card.
+      cadence: 'weekly',
+      title: g.title,
+      minDeposit: 0,
+      startsAt: iso(Date.parse(g.createdAt) || now),
+      endsAt: iso(Date.parse(g.endsAt)),
+      serverTime: iso(now),
+      participantCount: stats.entries,
+      rulesText: g.description
+        || 'Нажмите «Участвовать», чтобы попасть в розыгрыш. Победитель выбирается случайно среди участников.',
+      prize: Object.assign({}, g.prize || {}),
+      me: { isParticipant: false, deposited: '0.00', remaining: null }
+    });
+  }
+  res.json({ data });
 });
 
 app.post('/api/game/giveaways/:id/join', async (req, res) => {
   const user = await resolveUser(req);
-  const row = GAME_GIVEAWAY_ROWS.find((r) => r.id === String(req.params.id));
-  if (!row) return res.status(404).json({ success: false, status: 404, message: 'Not found' });
-  const key = user.id + ':' + row.id;
-  if (!GAME_GIVEAWAY_JOINED.has(key)) {
-    GAME_GIVEAWAY_JOINED.add(key);
-    GAME_GIVEAWAY_JOINS[row.id] += 1;
+  const id = String(req.params.id);
+  const row = GAME_GIVEAWAY_ROWS.find((r) => r.id === id);
+  if (row) {
+    const key = user.id + ':' + row.id;
+    if (!GAME_GIVEAWAY_JOINED.has(key)) {
+      GAME_GIVEAWAY_JOINED.add(key);
+      GAME_GIVEAWAY_JOINS[row.id] += 1;
+    }
+    return res.json({
+      joined: true,
+      participantCount: GAME_GIVEAWAY_BASE[row.id] + GAME_GIVEAWAY_JOINS[row.id]
+    });
   }
-  res.json({
-    joined: true,
-    participantCount: GAME_GIVEAWAY_BASE[row.id] + GAME_GIVEAWAY_JOINS[row.id]
-  });
+  const result = await store.enterGiveaway(id, user.id);
+  if (result.error) return res.status(400).json({ success: false, message: result.error });
+  const stats = await store.giveawayStats(id);
+  res.json({ joined: true, participantCount: stats.entries });
 });
 
-app.get(['/api/game/giveaways/winners', '/game/giveaways/winners'], (req, res) => {
-  const now = Date.now();
-  const nicknames = [
-    'achilles7777', 'kotleta_tv', 'Дядя Витя', 'dropaholic', 'MurZik', 'NEFOS',
-    'tarkov_enjoyer', 'Гоша Рубчинский', 'skincase_ru', 'butterfly_overpay', 'Vto4ka', 'prosto_povezlo'
-  ];
-  const cadences = ['hourly', 'daily', 'hourly', 'weekly'];
+app.get(['/api/game/giveaways/winners', '/game/giveaways/winners'], async (req, res) => {
+  // Real draw results - an empty feed while nothing has been drawn yet is the
+  // honest state, not a list of invented players.
+  const winners = await store.listRecentGiveawayWinners(20);
   res.json({
-    items: nicknames.map((nickname, i) => {
-      const skin = SAMPLE_SKINS[i % SAMPLE_SKINS.length];
-      return {
-        id: String(770000 + i),
-        cadence: cadences[i % cadences.length],
-        wonAt: new Date(now - (i + 1) * 13 * 60e3).toISOString(),
-        prizeValue: Number(skin.price).toFixed(2),
-        currency: 'RUB',
-        user: {
-          id: String(520000 + i * 17),
-          nickname,
-          image: DEFAULT_AVATARS[i % DEFAULT_AVATARS.length]
-        },
-        item: {
-          id: skin.id,
-          appId: skin.appId ?? 730,
-          marketName: skin.marketName,
-          price: Number(skin.price).toFixed(2),
-          image: skin.image,
-          rarity: skin.rarity ?? null
-        }
-      };
-    }),
+    items: winners.map((w) => ({
+      id: String(w.giveawayId) + '_' + w.slot,
+      cadence: null,
+      wonAt: w.createdAt,
+      prizeValue: Number((w.prize && w.prize.price) || 0).toFixed(2),
+      currency: 'RUB',
+      user: {
+        id: String(w.userId),
+        nickname: w.nickname || 'Игрок',
+        image: w.userImage || null
+      },
+      item: {
+        id: (w.prize && w.prize.id) || null,
+        appId: (w.prize && w.prize.appId) || 730,
+        marketName: (w.prize && w.prize.marketName) || null,
+        image: (w.prize && w.prize.image) || null,
+        rarity: (w.prize && w.prize.rarity) || null
+      }
+    })),
     hasMore: false
   });
 });
@@ -2470,7 +2473,11 @@ app.get('/api/game/weekly-drops/current', (req, res) => {
   const expires = new Date(next.getTime() + 7 * 24 * 3600 * 1000);
   const slotSkins = [SAMPLE_SKINS[0], SAMPLE_SKINS[2], SAMPLE_SKINS[1], SAMPLE_SKINS[3]];
   res.json({
-      state: 'locked_need_deposit',
+      // The bundle auto-opens the "Еженедельный набор" popup as soon as this
+      // state is `ready` or `locked_need_deposit` (see the `eu` set in the
+      // overlay chunk). The operator wants the whole weekly drop gone, so the
+      // endpoint reports the neutral state and the popup never appears.
+      state: 'none',
       progress: { current_week_deposits: 1240, unlock_target: 3000 },
       next_drop_at: next.toISOString(),
       drop: {
@@ -2502,35 +2509,32 @@ app.post('/api/game/weekly-drops/:id/claim', (req, res) => {
   res.status(422).json({ success: false, status: 422, message: 'Награды разблокируются пополнением баланса' });
 });
 
-app.get('/api/game/weekly-drops/top-feed', (req, res) => {
-  const now = Date.now();
-  // The wrapper already adds { data: <body> }, so one nested data key here is
-  // what the bundle ends up reading as body.data.items.
+app.get('/api/game/weekly-drops/top-feed', async (req, res) => {
+  // Real recent drops with the item's own rarity, so the feed is genuine play
+  // rather than a fixed list of invented winners.
+  const drops = await store.listRecentDrops(16);
   res.json({
-      data: {
-        items: Array.from({ length: 16 }, (_, i) => {
-          const skin = SAMPLE_SKINS[i % SAMPLE_SKINS.length];
-          return {
-            id: String(993000 + i),
-            price: Number(skin.price).toFixed(2),
-            currency: 'RUB',
-            claimedAt: new Date(now - (i + 1) * 9 * 60e3).toISOString(),
-            user: {
-              id: String(540000 + i * 23),
-              nickname: ['achilles7777', 'MurZik', 'Дядя Витя', 'dropaholic', 'NEFOS', 'Vto4ka', 'skincase_ru'][i % 7],
-              image: DEFAULT_AVATARS[i % DEFAULT_AVATARS.length]
-            },
-            item: {
-              id: skin.id,
-              appId: skin.appId ?? 730,
-              marketName: skin.marketName,
-              image: skin.image,
-              rarity: skin.rarity ?? null,
-              stattrak: null
-            }
-          };
-        })
-      }
+    data: {
+      items: drops.map((d) => ({
+        id: d.id,
+        price: Number((d.item && d.item.price) || 0).toFixed(2),
+        currency: 'RUB',
+        claimedAt: d.createdAt,
+        user: {
+          id: String(d.user && d.user.id),
+          nickname: (d.user && d.user.nickname) || 'Игрок',
+          image: (d.user && d.user.image) || null
+        },
+        item: {
+          id: (d.item && d.item.id) || null,
+          appId: (d.item && d.item.appId) || 730,
+          marketName: (d.item && d.item.marketName) || null,
+          image: (d.item && d.item.image) || null,
+          rarity: (d.item && d.item.rarity) || null,
+          stattrak: null
+        }
+      }))
+    }
   });
 });
 
@@ -2674,6 +2678,10 @@ function serveStatic(reqPath, res) {
 function sendInjectedHtml(filePath, res, slug) {
   try {
     let content = fs.readFileSync(filePath, 'utf8');
+    // The operator's own contacts replace the original site's footer addresses.
+    content = content.split('support@caser.one').join('vscybon@gmail.com');
+    content = content.split('mailto:marketing@caser.one').join('#');
+    content = content.split('marketing@caser.one').join('нет');
     if (slug) {
       content = content.split('egg').join(slug);
       content = content.split('Egg').join(slug.charAt(0).toUpperCase() + slug.slice(1));
@@ -2726,6 +2734,10 @@ function sendInjectedHtml(filePath, res, slug) {
 <script src="/custom-auth.js" defer></script>
 </body>`);
 
+    // Never let a stale HTML shell survive a deploy: it references chunk
+    // hashes that no longer exist, and the browser then waits forever for
+    // scripts that will never arrive.
+    res.setHeader('Cache-Control', 'no-store');
     res.type('html').send(content);
   } catch (err) {
     res.status(500).send('Error loading page: ' + err.message);

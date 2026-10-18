@@ -1553,6 +1553,52 @@ async function giveawayStats(id) {
   };
 }
 
+/**
+ * The newest winners across every draw, joined with the winner and the prize.
+ *
+ * The "Последние победители" feed used to be a hardcoded list of fictional
+ * players; this reads the real draw results instead.
+ */
+async function listRecentGiveawayWinners(limit = 30) {
+  const n = Math.min(100, Math.max(1, parseInt(limit, 10) || 30));
+  if (mode === 'memory') {
+    const out = [];
+    for (const g of mem.giveaways || []) {
+      for (const w of g.winners || []) {
+        out.push({
+          giveawayId: g.id,
+          userId: w.user_id,
+          slot: w.slot,
+          createdAt: w.created_at,
+          nickname: null,
+          userImage: null,
+          prize: g.prize || {}
+        });
+      }
+    }
+    return out.slice(0, n);
+  }
+  const res = await client.execute({
+    sql: `SELECT w.giveaway_id, w.user_id, w.slot, w.created_at,
+                 u.nickname, u.image AS user_image, g.prize_json
+          FROM giveaway_winners w
+          LEFT JOIN users u ON u.id = w.user_id
+          LEFT JOIN giveaways g ON g.id = w.giveaway_id
+          ORDER BY w.created_at DESC, w.rowid DESC
+          LIMIT ?`,
+    args: [n]
+  });
+  return res.rows.map((r) => ({
+    giveawayId: r.giveaway_id,
+    userId: r.user_id,
+    slot: r.slot,
+    createdAt: r.created_at,
+    nickname: r.nickname,
+    userImage: r.user_image,
+    prize: (() => { try { return JSON.parse(r.prize_json || '{}'); } catch (e) { return {}; } })()
+  }));
+}
+
 /** One entry per account; a repeat press is a no-op, not an error. */
 async function enterGiveaway(id, userId) {
   const g = await getGiveaway(id);
@@ -2003,6 +2049,7 @@ module.exports = {
   enterGiveaway,
   drawGiveaway,
   dueGiveaways,
+  listRecentGiveawayWinners,
   recordCaseOpen,
   countCaseOpens,
   // Withdrawals

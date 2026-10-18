@@ -531,6 +531,7 @@
       ensureInventoryTabs();
       ensureSellAllPlacement();
       ensureGiveawayBanner();
+      ensureFooterContacts();
     });
     observer.observe(document.body, { childList: true, subtree: true });
   }
@@ -1188,7 +1189,12 @@
     ].filter(Boolean);
     if (!candidates.length) return;
     var sell = candidates.filter(function (b) { return b.offsetWidth || b.offsetHeight; })[0] || candidates[0];
-    if (sell.previousElementSibling === sort) return; // already in place
+    // insertBefore(sell, sort) leaves the button immediately BEFORE the sort
+    // select, so the "already in place" check has to look at the NEXT sibling.
+    // Testing previousElementSibling was never true, so every pass moved the
+    // button again, and each move re-fired the MutationObserver - an endless
+    // insert loop that locked the main thread on the inventory page.
+    if (sell.nextElementSibling === sort) return; // already in place
     sort.parentNode.insertBefore(sell, sort);
   }
 
@@ -1381,6 +1387,67 @@
     banner._timer = setInterval(tick, 1000);
   }
 
+  /**
+   * The rewards page.
+   *
+   * Three things the operator asked for: the weekly-drop panel is not ready
+   * yet, the info cards under the top drop duplicate it, and the injected
+   * giveaway banner was painted behind the site's sticky promo sidebar, which
+   * left a large blank band above the tabs.
+   */
+  function setupRewardsPage() {
+    if (!/\/rewards/.test(location.pathname)) return;
+    document.body.setAttribute('data-caser-page', 'rewards');
+
+    // The banner has to outrank the site's sticky promo sidebar (z-3), or the
+    // sidebar paints over it and the giveaway looks empty.
+    var banner = document.querySelector('.caser-giveaway');
+    if (banner) banner.style.zIndex = '5';
+
+    // "Еженедельный набор" - the whole panel, mobile and desktop.
+    var weekly = document.querySelector('[data-testid="weekly-drop-content"]');
+    if (weekly && weekly.parentElement) weekly.parentElement.style.display = 'none';
+
+    // The three info cards under the top drop ("СРЕДА В ...", "Что я получу",
+    // "Условия получения").
+    var info = Array.prototype.slice.call(document.querySelectorAll('h3')).filter(function (h) {
+      return /^(СРЕДА В|Что я получу|Условия получения)/i.test(h.textContent.trim());
+    });
+    if (info.length) {
+      var grid = info[0];
+      for (var i = 0; i < 4 && grid; i++) {
+        if (grid.className && grid.className.toString().indexOf('grid-cols-3') >= 0) break;
+        grid = grid.parentElement;
+      }
+      if (grid) grid.style.display = 'none';
+    }
+  }
+
+  /**
+   * Footer contacts.
+   *
+   * The server already rewrites these two addresses in the HTML it sends, but
+   * the page is a static export: the RSC payload carries the original footer
+   * and React re-creates it on hydration, putting caser.one's own addresses
+   * back on screen. Rewriting them here is what actually sticks.
+   */
+  var FOOTER_SUPPORT = 'vscybon@gmail.com';
+  var FOOTER_PARTNERSHIP = 'нет';
+
+  function ensureFooterContacts() {
+    var support = document.querySelector('[data-testid="footer-support-email-link"]');
+    if (support) {
+      if (support.textContent !== FOOTER_SUPPORT) support.textContent = FOOTER_SUPPORT;
+      var href = 'mailto:' + FOOTER_SUPPORT;
+      if (support.getAttribute('href') !== href) support.setAttribute('href', href);
+    }
+    var partner = document.querySelector('[data-testid="footer-partnership-email-link"]');
+    if (partner) {
+      if (partner.textContent !== FOOTER_PARTNERSHIP) partner.textContent = FOOTER_PARTNERSHIP;
+      if (partner.hasAttribute('href')) partner.removeAttribute('href');
+    }
+  }
+
   // Init after React has hydrated.
   //
   // Injecting before hydration makes React report a mismatch (#418): the server
@@ -1400,6 +1467,8 @@
     ensureInventoryTabs();
     ensureSellAllPlacement();
     ensureGiveawayBanner();
+    setupRewardsPage();
+    ensureFooterContacts();
   }
   function bootWhenIdle() {
     if (typeof window.requestIdleCallback === 'function') {
