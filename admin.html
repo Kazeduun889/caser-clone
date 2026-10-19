@@ -95,6 +95,39 @@
   code { background: var(--panel-2); padding: 1px 6px; border-radius: 4px; font-size: 12px; }
   label.lbl { display: block; font-size: 11px; color: var(--muted); margin: 0 0 6px; text-transform: uppercase; letter-spacing: .04em; }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; }
+
+  /* --- giveaway prize picker ----------------------------------------------
+     Picking a prize by typing its exact name meant the image, the price and
+     the rarity had to be guessed, and a typo produced a banner with nothing on
+     it. The catalogue already knows all three, so the operator searches for the
+     item and gets them filled in. */
+  .ga-results {
+    margin-top: 6px; max-height: 300px; overflow-y: auto;
+    border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2);
+  }
+  .ga-results:empty { display: none; }
+  .ga-row {
+    display: flex; align-items: stretch; gap: 10px; width: 100%;
+    padding: 0; border: 0; border-bottom: 1px solid var(--line);
+    background: transparent; color: var(--text); cursor: pointer; text-align: left;
+    border-radius: 0;
+  }
+  .ga-row:last-child { border-bottom: 0; }
+  .ga-row:hover { border-color: transparent; background: rgba(255,255,255,.05); }
+  .ga-row .swatch { width: 4px; flex: none; }
+  .ga-row img { width: 48px; height: 32px; object-fit: contain; margin: 6px 0; flex: none; }
+  .ga-row .nm { flex: 1; align-self: center; font-size: 12px; line-height: 1.35; }
+  .ga-row .pr { align-self: center; font-size: 12px; color: var(--accent); white-space: nowrap; padding-right: 10px; }
+  .ga-picked {
+    display: flex; align-items: center; gap: 10px; min-height: 58px;
+    padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px;
+    background: var(--bg); font-size: 12px; color: var(--muted);
+  }
+  .ga-picked .swatch { width: 4px; align-self: stretch; border-radius: 2px; }
+  .ga-picked img { width: 56px; height: 38px; object-fit: contain; flex: none; }
+  .ga-picked .nm { flex: 1; color: var(--text); }
+  .ga-picked .pr { color: var(--accent); font-size: 14px; white-space: nowrap; }
+  .ga-picked.is-empty { justify-content: center; }
   @media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } }
   .pill.off { background: rgba(139,148,158,.15); color: var(--muted); }
 </style>
@@ -132,6 +165,15 @@
       </button>
       <p class="hint" style="margin-top:8px">
         Стирает всех игроков, балансы, инвентари и историю. Сайт останавливается только на время запроса.
+      </p>
+      <button id="purgeTest" style="margin-top:14px">
+        Удалить тестовые аккаунты
+      </button>
+      <p class="hint" style="margin-top:8px">
+        Чистит только служебные ники (CaserPlayer, probe, scam) вместе с их дропами
+        и участием в розыгрышах — из «ТОП дропа», списка победителей и счётчика
+        игроков. Сначала покажет, сколько найдёт, и спросит подтверждение.
+        Переименованные аккаунты не трогает.
       </p>
     </div>
 
@@ -178,19 +220,24 @@
       </p>
       <div class="grid2">
         <div>
-          <label class="lbl" for="gaPrize">Приз (название предмета)</label>
-          <input type="text" id="gaPrize" placeholder="Sticker | Please Be Patient" autocomplete="off" spellcheck="false">
+          <label for="gaSearch">Приз — найдите предмет в каталоге</label>
+          <input type="text" id="gaSearch" placeholder="AK-47 | Ice Coaled" autocomplete="off" spellcheck="false">
+          <div class="ga-results" id="gaResults"></div>
         </div>
         <div>
-          <label class="lbl" for="gaSlots">Сколько победителей</label>
-          <input type="number" id="gaSlots" value="3" min="1" max="10" step="1">
+          <label>Выбранный приз</label>
+          <div class="ga-picked is-empty" id="gaPicked">ничего не выбрано</div>
         </div>
         <div>
-          <label class="lbl" for="gaHours">Через сколько часов итоги</label>
+          <label for="gaSlots">Сколько победителей</label>
+          <input type="number" id="gaSlots" value="1" min="1" max="10" step="1">
+        </div>
+        <div>
+          <label for="gaHours">Через сколько часов итоги</label>
           <input type="number" id="gaHours" value="3" min="1" max="720" step="1">
         </div>
         <div>
-          <label class="lbl" for="gaTitle">Заголовок баннера</label>
+          <label for="gaTitle">Заголовок баннера</label>
           <input type="text" id="gaTitle" placeholder="Розыгрыш наклеек ПОТС">
         </div>
       </div>
@@ -650,20 +697,131 @@
   });
 
   // ---------- giveaways ----------
+
+  // The site's own rarity palette, so the picker tints the swatch exactly the
+  // way the banner and the top-drop rail will.
+  var GA_RARITY = {
+    1: '#B0C3D9', 2: '#4B69FF', 3: '#8847FF', 4: '#EB4B4B', 5: '#D32CE6',
+    6: '#D32CE6', 7: '#EB4B4B', 8: '#4B69FF', 9: '#8847FF', 10: '#EB4B4B',
+    11: '#FFAE39', 12: '#D32CE6', 13: '#B0C3D9', 14: '#5E98D9', 15: '#4B69FF',
+    16: '#8847FF'
+  };
+  var GA_RARITY_NAME = {
+    common: '#B0C3D9', uncommon: '#5E98D9', rare: '#4B69FF', mythical: '#8847FF',
+    legendary: '#D32CE6', ancient: '#EB4B4B', immortal: '#FFAE39'
+  };
+  function gaColor(item) {
+    if (!item) return '';
+    var name = String(item.marketName || '');
+    if (name.indexOf('★') >= 0) return '#FFAE39';
+    if (name.indexOf('Sticker') === 0) return '#8847FF';
+    var r = item.rarity;
+    if (r === null || r === undefined || r === '') return '';
+    if (/^\d+$/.test(String(r))) return GA_RARITY[Number(r)] || '';
+    return GA_RARITY_NAME[String(r).toLowerCase()] || '';
+  }
+
+  var gaPrize = null;
+  var gaHits = [];
+
+  function renderGaPicked() {
+    var box = $('gaPicked');
+    if (!gaPrize) {
+      box.className = 'ga-picked is-empty';
+      box.textContent = 'ничего не выбрано';
+      return;
+    }
+    var color = gaColor(gaPrize);
+    box.className = 'ga-picked';
+    box.innerHTML = (color ? '<span class="swatch" style="background:' + color + '"></span>' : '')
+      + (gaPrize.image ? '<img src="' + esc(gaPrize.image) + '" alt="">' : '')
+      + '<span class="nm">' + esc(gaPrize.marketName) + '</span>'
+      + '<span class="pr">' + Number(gaPrize.price || 0).toFixed(2) + ' ₽</span>';
+  }
+
+  function pickGaPrize(item) {
+    gaPrize = item;
+    renderGaPicked();
+    $('gaResults').innerHTML = '';
+  }
+
+  function renderGaResults(items, typed) {
+    gaHits = items;
+    var box = $('gaResults');
+    var html = '';
+    items.forEach(function (it) {
+      var color = gaColor(it);
+      html += '<button type="button" class="ga-row" data-i="' + esc(it.id) + '">'
+        + (color ? '<span class="swatch" style="background:' + color + '"></span>' : '')
+        + (it.image ? '<img src="' + esc(it.image) + '" alt="">' : '')
+        + '<span class="nm">' + esc(it.marketName) + '</span>'
+        + '<span class="pr">' + Number(it.price || 0).toFixed(2) + ' ₽</span>'
+        + '</button>';
+    });
+    // Cases are not in the skin catalogue, so a name that matches nothing is
+    // still offered as a prize rather than silently ignored.
+    if (!items.length && typed) {
+      html += '<button type="button" class="ga-row" data-raw="' + esc(typed) + '">'
+        + '<span class="nm">Использовать «' + esc(typed) + '» как есть (кейс или предмет вне каталога)</span>'
+        + '</button>';
+    }
+    box.innerHTML = html;
+  }
+
+  var gaSearchTimer = null;
+  $('gaSearch').oninput = function () {
+    var q = this.value.trim();
+    clearTimeout(gaSearchTimer);
+    if (q.length < 2) { $('gaResults').innerHTML = ''; return; }
+    gaSearchTimer = setTimeout(function () {
+      api('GET', '/api/items/shop?limit=24&sortBy=marketName&marketName=' + encodeURIComponent(q))
+        .then(function (d) { renderGaResults(d.items || [], q); })
+        .catch(function () { $('gaResults').innerHTML = ''; });
+    }, 220);
+  };
+
+  $('gaResults').onclick = function (e) {
+    var row = e.target.closest('.ga-row');
+    if (!row) return;
+    var raw = row.getAttribute('data-raw');
+    if (raw) return pickGaPrize({ marketName: raw, image: null, price: 0, rarity: null, appId: 730 });
+    // The whole catalogue entry travels, so the banner keeps the rarity, the
+    // app id and the exterior rather than a name the server has to guess from.
+    var id = row.getAttribute('data-i');
+    for (var i = 0; i < gaHits.length; i++) {
+      if (String(gaHits[i].id) === id) return pickGaPrize(gaHits[i]);
+    }
+  };
+
   $('gaCreate').onclick = function () {
-    var prize = $('gaPrize').value.trim();
-    if (!prize) { $('gaErr').textContent = 'Укажите приз'; return; }
+    if (!gaPrize) { $('gaErr').textContent = 'Выберите приз из каталога'; return; }
     $('gaErr').textContent = '';
     $('gaCreate').disabled = true;
     api('POST', '/api/admin/giveaways', {
       title: $('gaTitle').value.trim() || 'Розыгрыш',
-      prizeName: prize,
+      prize: gaPrize,
       slots: Number($('gaSlots').value) || 1,
       hours: Number($('gaHours').value) || 3
     })
-      .then(loadGiveaways)
+      .then(function () { gaPrize = null; renderGaPicked(); $('gaSearch').value = ''; return loadGiveaways(); })
       .catch(function (err) { $('gaErr').textContent = err.message; })
       .finally(function () { $('gaCreate').disabled = false; });
+  };
+
+  // ---------- purge probe accounts ----------
+  $('purgeTest').onclick = function () {
+    if (!confirm('Удалить тестовые аккаунты (CaserPlayer / probe / scam) вместе с их дропами и участием в розыгрышах?')) return;
+    api('POST', '/api/admin/purge-test-users', { dryRun: true })
+      .then(function (d) {
+        var n = (d.data && d.data.ids || []).length;
+        if (!n) { alert('Тестовых аккаунтов не найдено'); return; }
+        if (!confirm('Найдено ' + n + '. Удалить их без возможности отмены?')) return;
+        return api('POST', '/api/admin/purge-test-users', {}).then(function (r) {
+          alert('Удалено аккаунтов: ' + (r.data && r.data.deleted));
+          return refreshAll();
+        });
+      })
+      .catch(function (err) { alert(err.message); });
   };
 
   // ---------- reset ids ----------

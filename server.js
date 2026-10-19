@@ -773,14 +773,45 @@ app.post('/game/cases/:slug/open', handleOpenCase);
 // GAME & CONTENT REST API Endpoints
 // ----------------------------------------------------
 
-app.get('/api/statistics', (req, res) => {
-  const online = 3850 + Math.floor(Math.sin(Date.now() / 20000) * 35) + Math.floor(Math.random() * 10);
-  res.json({
-    online: online,
-    users_count: 412589,
-    cases_opened: 1542380,
-    upgrader_count: 894120
-  });
+// Site-wide counters.
+//
+// They are read on every /api/statistics hit and on every websocket tick, so
+// summing the tables each time would be wasteful on a free instance: the
+// numbers are refreshed once every few seconds and reused in between.
+let siteCounters = { users: 0, casesOpened: 0, upgradesMade: 0 };
+let siteCountersAt = 0;
+const SITE_COUNTERS_TTL_MS = 4000;
+
+async function currentSiteCounters() {
+  if (Date.now() - siteCountersAt > SITE_COUNTERS_TTL_MS) {
+    try {
+      siteCounters = await store.siteStats();
+      siteCountersAt = Date.now();
+    } catch (err) {
+      // Keep serving the previous numbers rather than blanking the footer.
+    }
+  }
+  return siteCounters;
+}
+
+/** Drops the cached counters so the next read reflects a purge immediately. */
+function invalidateSiteCounters() { siteCountersAt = 0; }
+
+/** The payload the footer and the online badge both consume. */
+async function countersPayload() {
+  const totals = await currentSiteCounters();
+  return {
+    // Real: one per open socket. The old 3.8k was a sine wave, so the badge
+    // showed thousands of "players" on a site nobody had signed up for.
+    online: wss.clients.size,
+    users_count: totals.users,
+    cases_opened: totals.casesOpened,
+    upgrader_count: totals.upgradesMade
+  };
+}
+
+app.get('/api/statistics', async (req, res) => {
+  res.json(await countersPayload());
 });
 
 /**
@@ -849,9 +880,20 @@ console.log(`[boot] catalogue ready: ${SHOP_ITEMS.length} distinct skins`);
 // start - would leave the rewards page with an empty board and an empty feed,
 // so the demo content is restored as soon as the store is reachable. Guarded
 // internally: a database that already has the content is left untouched.
-storeReady
-  .then(() => seedDemoContent(store, SHOP_ITEMS))
-  .catch((err) => console.warn('[seed] skipped:', err.message));
+// The demo roster - twelve pro nicknames, 48 drops and three settled rounds - is
+// only ever wanted on an empty development database. On the deployed site it
+// fills the top drop, the winner list and the player counter with people who
+// never played, so it is off there: SEED_DEMO=1 puts it back.
+const DEMO_SEEDING = process.env.SEED_DEMO === '1'
+  || !(process.env.RENDER || process.env.RAILWAY_ENVIRONMENT || process.env.FLY_APP_NAME);
+
+if (DEMO_SEEDING) {
+  storeReady
+    .then(() => seedDemoContent(store, SHOP_ITEMS))
+    .catch((err) => console.warn('[seed] skipped:', err.message));
+} else {
+  console.log('[seed] demo content disabled on this host (set SEED_DEMO=1 to restore it)');
+}
 
 const toShopPayload = (s) => {
   const rarity = Number(s.rarity);
@@ -1721,6 +1763,38 @@ app.post('/api/admin/giveaways', requireAdmin, async (req, res) => {
 });
 
 /**
+ * Removes the throwaway accounts that API probing creates.
+ *
+ * Every request carrying a bare `caser_user_id` cookie provisions a player, so
+ * a few hundred accounts named CaserPlayer/probe/scam accumulated and filled the
+ * top drop, the winner list and the "Всего игроков" counter with people who
+ * never played. Their drops, entries and stats go with them.
+ *
+ * Only stock nicknames are touched, and `{ dryRun: true }` reports what would
+ * go without deleting anything: an account that has been renamed is a real
+ * player even if it never opened a case.
+ */
+app.post('/api/admin/purge-test-users', requireAdmin, async (req, res) => {
+  const body = req.body || {};
+  try {
+    const result = await store.purgeTestUsers({
+      dryRun: !!body.dryRun,
+      nicknames: Array.isArray(body.nicknames) ? body.nicknames : undefined,
+      // Never the operator's own account.
+      protect: [...ADMIN_IDS]
+    });
+    // The footer reads cached totals, so they have to be recomputed.
+    invalidateSiteCounters();
+    res.json({ success: true, data: result });
+  } catch (err) {
+    // An unhandled rejection here would leave the request hanging and take the
+    // whole process down with it.
+    console.error('[purge-test-users]', err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
  * Wipes every account and restarts the numbering from 1.
  *
  * Destructive by design: balances, inventories, drops, stats, withdrawals and
@@ -1873,6 +1947,23 @@ function isAdminId(userId) {
   return !!userId && ADMIN_IDS.has(String(userId));
 }
 
+/**
+ * The id the request actually presented, before any renumbering.
+ *
+ * resolveUser migrates a legacy slug onto the next account number, so by the
+ * time it returns, the operator's own id is no longer the one ADMIN_IDS lists -
+ * it only matches through the alias table. If that row is ever missing (a fresh
+ * database, a purge that removed the account), the operator is locked out of
+ * their own panel. The presented credential is checked as well, which is the
+ * same trust level the cookie itself already carries.
+ */
+function presentedUserId(req) {
+  let cookies = {};
+  try { cookies = parseCookies({ headers: req.headers || {} }); } catch (e) { /* no cookies */ }
+  const bearer = String(req.get('authorization') || '').replace(/^Bearer\s+/i, '');
+  return cookies['caser_user_id'] || (bearer || null);
+}
+
 async function requireAdmin(req, res, next) {
   // A matching token wins - the admin page has no session cookie.
   const token = tokenFromRequest(req);
@@ -1882,9 +1973,9 @@ async function requireAdmin(req, res, next) {
   // this must be awaited - comparing a Promise against the admin id would
   // always fail and lock the operator out of their own panel.
   const user = await resolveUser(req);
-  // The operator's own account may have been renumbered from a legacy slug
-  // that is what ADMIN_IDS actually lists, so the alias is consulted too.
-  if (!isAdminId(user.id) && !(await store.legacyAdminMatch(user.id, ADMIN_IDS))) {
+  if (!isAdminId(user.id)
+    && !isAdminId(presentedUserId(req))
+    && !(await store.legacyAdminMatch(user.id, ADMIN_IDS))) {
     return res.status(403).json({ success: false, message: 'Admin only' });
   }
   req.adminUser = user;
@@ -2839,16 +2930,10 @@ wss.on('connection', (ws, wsReq) => {
     ws.userId = null;
   }
 
-  // Send initial counters
-  ws.send(JSON.stringify({
-    event: 'statistics.counters',
-    data: {
-      online: 3867 + Math.floor(Math.random() * 15),
-      users_count: 412589,
-      cases_opened: 1542380,
-      upgrader_count: 894120
-    }
-  }));
+  // Real counters, same shape as before so the bundle's parser is unchanged.
+  countersPayload()
+    .then((data) => ws.send(JSON.stringify({ event: 'statistics.counters', data })))
+    .catch(() => {});
 
   // Handle incoming messages
   ws.on('message', (msg) => {
@@ -2864,19 +2949,11 @@ wss.on('connection', (ws, wsReq) => {
   // so there is no timer generating fake entries any more. This interval only
   // keeps the site-wide counters moving.
   const dropInterval = setInterval(() => {
-    if (ws.readyState === WebSocket.OPEN) {
-      const currentOnline = 3850 + Math.floor(Math.sin(Date.now() / 20000) * 35) + Math.floor(Math.random() * 8);
-      ws.send(JSON.stringify({
-        event: 'statistics.counters',
-        data: {
-          online: currentOnline,
-          users_count: 412589 + Math.floor(Math.random() * 2),
-          cases_opened: 1542380 + Math.floor(Math.random() * 5),
-          upgrader_count: 894120 + Math.floor(Math.random() * 3)
-        }
-      }));
-    }
-  }, 3000);
+    if (ws.readyState !== WebSocket.OPEN) return;
+    countersPayload()
+      .then((data) => ws.send(JSON.stringify({ event: 'statistics.counters', data })))
+      .catch(() => {});
+  }, 5000);
 
   ws.on('close', () => {
     clearInterval(dropInterval);

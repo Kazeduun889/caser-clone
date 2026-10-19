@@ -1204,19 +1204,6 @@
     ].filter(Boolean);
     if (!candidates.length) return;
     var sell = candidates.filter(function (b) { return b.offsetWidth || b.offsetHeight; })[0] || candidates[0];
-
-    // The toolbar lays its children out with justify-between, so once the tabs
-    // join them the button and the select end up stranded in the middle of the
-    // row. They travel together in one right-hand group instead, with the
-    // button directly left of the select as asked.
-    if (sort.parentNode !== sell.parentNode) {
-      var wrap = document.createElement('div');
-      wrap.className = 'caser-items-tools';
-      sort.parentNode.insertBefore(wrap, sort);
-      wrap.appendChild(sell);
-      wrap.appendChild(sort);
-      return;
-    }
     // insertBefore(sell, sort) leaves the button immediately BEFORE the sort
     // select, so the "already in place" check has to look at the NEXT sibling.
     // Testing previousElementSibling was never true, so every pass moved the
@@ -1330,6 +1317,7 @@
       var stale = document.querySelector('.caser-giveaway');
       if (stale) {
         if (stale._timer) clearInterval(stale._timer);
+        if (stale._watch) clearInterval(stale._watch);
         stale.remove();
       }
       return null;
@@ -1443,6 +1431,25 @@
     };
     tick();
     banner._timer = setInterval(tick, 1000);
+
+    // A round can also be settled early by the operator, so the countdown
+    // never reaches zero on its own and the banner would keep advertising a
+    // prize that is already gone. Re-check on a slower beat and step aside.
+    if (banner._watch) clearInterval(banner._watch);
+    banner._watch = setInterval(function () {
+      fetch('/api/giveaways?limit=5')
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) {
+          if (!j || !j.success) return;
+          var live = (j.items || []).filter(function (g) { return g.live; })[0];
+          if (!live || live.id !== banner.dataset.id) {
+            if (banner._timer) clearInterval(banner._timer);
+            if (banner._watch) clearInterval(banner._watch);
+            banner.hidden = true;
+          }
+        })
+        .catch(function () { /* keep the banner up on a network hiccup */ });
+    }, 30000);
   }
 
   /**
@@ -1481,6 +1488,32 @@
         grid = grid.parentElement;
       }
       if (grid) grid.style.display = 'none';
+    }
+
+    // A finished round leaves the giveaways slot completely empty - the bundle
+    // renders no heading and no list at all - and the page then showed a blank
+    // column the height of three cards. Say what is going on instead.
+    var page = document.querySelector('.animate-page-in');
+    var shell = page && page.firstElementChild;
+    // child 0 is the Награды/Розыгрыши tab row, child 1 is whatever that tab
+    // is currently showing.
+    var slot = shell && shell.children[1];
+    var note = document.querySelector('[data-testid="giveaways-empty"]');
+    if (slot) {
+      // The card testids are giveaway-card-<cadence>, so the list's own child
+      // count is what tells cards apart from nothing.
+      var listEl = slot.querySelector('[data-testid="giveaway-list"]');
+      var hasCards = !!listEl && listEl.children.length > 0;
+      if (!hasCards && !note) {
+        note = document.createElement('div');
+        note.className = 'caser-giveaways-empty';
+        note.setAttribute('data-testid', 'giveaways-empty');
+        note.innerHTML = '<span class="caser-giveaways-empty-title">Сейчас активных розыгрышей нет</span>'
+          + '<span class="caser-giveaways-empty-sub">Следующий откроется совсем скоро — следите за обновлениями.</span>';
+        slot.appendChild(note);
+      } else if (hasCards && note) {
+        note.remove();
+      }
     }
   }
 

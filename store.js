@@ -1419,6 +1419,117 @@ async function listUsers({ limit = 25, offset = 0, search = '' } = {}) {
 }
 
 /**
+ * Site-wide counters, summed from what the server actually holds.
+ *
+ * The bundle reads these for the footer's "Всего игроков", "Открыто кейсов"
+ * and "Сделано апгрейдов". They used to be hardcoded numbers (412589 / 1542380
+ * / 894120) that only ever went up, which made a brand new site look like it
+ * had been running for years.
+ */
+async function siteStats() {
+  if (mode === 'memory') {
+    const stats = [...mem.stats.values()];
+    return {
+      users: mem.users.size,
+      casesOpened: stats.reduce((n, s) => n + (s.cases_opened || 0), 0),
+      upgradesMade: stats.reduce((n, s) => n + (s.upgrades_made || 0), 0)
+    };
+  }
+  const [users, totals] = await Promise.all([
+    client.execute({ sql: 'SELECT COUNT(*) AS c FROM users', args: [] }),
+    client.execute({
+      sql: 'SELECT COALESCE(SUM(cases_opened),0) AS cases, COALESCE(SUM(upgrades_made),0) AS upgrades FROM player_stats',
+      args: []
+    })
+  ]);
+  return {
+    users: Number(users.rows[0] && users.rows[0].c) || 0,
+    casesOpened: Number(totals.rows[0] && totals.rows[0].cases) || 0,
+    upgradesMade: Number(totals.rows[0] && totals.rows[0].upgrades) || 0
+  };
+}
+
+/** Every table that points at a user and therefore has to go with it. */
+const USER_OWNED_TABLES = [
+  'inventory_items', 'transactions', 'case_opens', 'withdrawals',
+  'notifications', 'promo_redemptions', 'drops', 'player_stats',
+  'giveaway_entries', 'giveaway_winners'
+];
+
+/**
+ * Removes the throwaway accounts that API probing creates.
+ *
+ * Hitting any endpoint with a bare `caser_user_id` cookie provisions a player,
+ * so a few hundred accounts named CaserPlayer/probe/scam piled up and filled the
+ * top drop, the winner list and the player counter with people who never
+ * opened anything.
+ *
+ * Only stock nicknames are touched, and `dryRun` reports what would go without
+ * deleting anything: an account that has been renamed is a real player even if
+ * it never played.
+ */
+// Both the anonymous visitors that API probing creates and the roster
+// seed-demo.js invents. The second group is what fills the top drop and the
+// winner list on the deployed site.
+const TEST_NICKNAMES = [
+  'caserplayer', 'probe', 'scam', 'test', 'tester',
+  'clipher', 's1mple_win', 'donk', 'm0nesy', 'sh1ro', 'zywoo',
+  'hunter-', 'electronic', 'n0rb3r7', 'b1t', 'tolsti', 'sdy'
+];
+
+async function purgeTestUsers({ dryRun = false, nicknames, protect = [] } = {}) {
+  const wanted = (nicknames || TEST_NICKNAMES).map((n) => String(n).toLowerCase());
+  const keep = new Set(protect.map((id) => String(id)));
+
+  let ids;
+  if (mode === 'memory') {
+    ids = [...mem.users.values()]
+      .filter((u) => wanted.includes(String(u.nickname || '').toLowerCase()))
+      .filter((u) => String(u.role || 'user') !== 'admin' && String(u.role || 'user') !== 'owner')
+      .map((u) => String(u.id))
+      .filter((id) => !keep.has(id));
+    if (dryRun || !ids.length) return { deleted: 0, ids, dryRun };
+    const set = new Set(ids);
+    mem.drops = (mem.drops || []).filter((d) => !set.has(String(d.user_id)));
+    for (const id of ids) { mem.users.delete(id); mem.stats.delete(id); }
+    return { deleted: ids.length, ids, dryRun };
+  }
+
+  // Two kinds of account survive no matter what their nickname says. An
+  // id_aliases row means this id replaced a real legacy slug, i.e. a browser
+  // that had a session here before the renumbering - the operator's own account
+  // among them. A role of admin/owner is the same argument from the other side.
+  const like = wanted.map(() => 'LOWER(nickname) = ?').join(' OR ');
+  const found = await client.execute({
+    sql: `SELECT id FROM users
+          WHERE (${like})
+            AND COALESCE(role, 'user') NOT IN ('admin', 'owner')
+            AND id NOT IN (SELECT new_id FROM id_aliases)`,
+    args: wanted
+  });
+  ids = found.rows.map((r) => String(r.id)).filter((id) => !keep.has(id));
+  if (dryRun || !ids.length) return { deleted: 0, ids, dryRun };
+
+  // SQLite caps how many variables one statement may bind, and a purge is
+  // routinely thousands of accounts, so the ids are deleted in chunks.
+  const CHUNK = 400;
+  for (let start = 0; start < ids.length; start += CHUNK) {
+    const part = ids.slice(start, start + CHUNK);
+    const holes = part.map(() => '?').join(',');
+    const stmts = USER_OWNED_TABLES.map((table) => ({
+      sql: `DELETE FROM ${table} WHERE user_id IN (${holes})`,
+      args: part
+    }));
+    // id_aliases maps a retired id onto the one that replaced it, so it is the
+    // new_id that has to go - the row is keyed by old_id.
+    stmts.push({ sql: `DELETE FROM id_aliases WHERE new_id IN (${holes})`, args: part });
+    stmts.push({ sql: `DELETE FROM users WHERE id IN (${holes})`, args: part });
+    await client.batch(stmts, 'write');
+  }
+  return { deleted: ids.length, ids, dryRun };
+}
+
+/**
  * Giveaways
  * ---------------------------------------------------------------------------
  *
@@ -2035,6 +2146,8 @@ module.exports = {
   addBalance,
   recordTransaction,
   listUsers,
+  siteStats,
+  purgeTestUsers,
   setCreator,
   // Promo codes
   createPromoCode,
