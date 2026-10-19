@@ -483,6 +483,32 @@ async function legacyAdminMatch(userId, ids) {
   return res.rows.some((r) => ids.has(String(r.old_id)));
 }
 
+/**
+ * Remembers that a retired id now points at a numbered account.
+ *
+ * The client keeps its own id in localStorage and sends it back on every
+ * request. When it is a slug the account was minted from, the alias is what
+ * lets the next visit find that account again. Without it a browser that cannot
+ * keep the cookie - private mode, a strict privacy setting - would mint a fresh
+ * account on every single reload and the player would watch their balance and
+ * inventory disappear.
+ */
+async function aliasLegacyId(oldId, newId) {
+  const from = String(oldId);
+  const to = String(newId);
+  if (!from || !to || from === to) return false;
+  if (mode === 'memory') return false;
+  try {
+    await client.execute({
+      sql: 'INSERT OR IGNORE INTO id_aliases (old_id, new_id, created_at) VALUES (?, ?, ?)',
+      args: [from, to, new Date().toISOString()]
+    });
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Users
 // ---------------------------------------------------------------------------
@@ -1491,6 +1517,9 @@ async function purgeTestUsers({ dryRun = false, nicknames, protect = [] } = {}) 
     ids = [...mem.users.values()]
       .filter((u) => wanted.includes(String(u.nickname || '').toLowerCase()))
       .filter((u) => String(u.role || 'user') !== 'admin' && String(u.role || 'user') !== 'owner')
+      // A spent balance or any inventory means a real player, whatever the
+      // nickname says.
+      .filter((u) => Number(u.balance || 0) === START_BALANCE)
       .map((u) => String(u.id))
       .filter((id) => !keep.has(id));
     if (dryRun || !ids.length) return { deleted: 0, ids, dryRun };
@@ -1500,17 +1529,25 @@ async function purgeTestUsers({ dryRun = false, nicknames, protect = [] } = {}) 
     return { deleted: ids.length, ids, dryRun };
   }
 
-  // Two kinds of account survive no matter what their nickname says. An
-  // id_aliases row means this id replaced a real legacy slug, i.e. a browser
-  // that had a session here before the renumbering - the operator's own account
-  // among them. A role of admin/owner is the same argument from the other side.
+  // Three kinds of account survive no matter what their nickname says.
+  //   * an id_aliases row means this id replaced a real legacy slug, i.e. a
+  //     browser that had a session here before the renumbering - the operator's
+  //     own account among them;
+  //   * a role of admin/owner is the same argument from the other side;
+  //   * anything that has been played - a spent balance, an item, a withdrawal -
+  //     is a real player, and deleting it is how a friend's account got wiped
+  //     by accident. Matching on a nickname alone is not enough.
   const like = wanted.map(() => 'LOWER(nickname) = ?').join(' OR ');
   const found = await client.execute({
-    sql: `SELECT id FROM users
+    sql: `SELECT u.id FROM users u
           WHERE (${like})
-            AND COALESCE(role, 'user') NOT IN ('admin', 'owner')
-            AND id NOT IN (SELECT new_id FROM id_aliases)`,
-    args: wanted
+            AND COALESCE(u.role, 'user') NOT IN ('admin', 'owner')
+            AND u.id NOT IN (SELECT new_id FROM id_aliases)
+            AND u.balance = ?
+            AND NOT EXISTS (SELECT 1 FROM inventory_items i WHERE i.user_id = u.id)
+            AND NOT EXISTS (SELECT 1 FROM transactions t WHERE t.user_id = u.id)
+            AND NOT EXISTS (SELECT 1 FROM withdrawals w WHERE w.user_id = u.id)`,
+    args: [...wanted, START_BALANCE]
   });
   ids = found.rows.map((r) => String(r.id)).filter((id) => !keep.has(id));
   if (dryRun || !ids.length) return { deleted: 0, ids, dryRun };
@@ -2153,6 +2190,7 @@ module.exports = {
   listUsers,
   siteStats,
   purgeTestUsers,
+  aliasLegacyId,
   setCreator,
   // Promo codes
   createPromoCode,

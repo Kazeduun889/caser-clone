@@ -523,6 +523,15 @@
   overflow: hidden;
   padding: 1.9rem 2rem 0;
   min-width: 0;
+  /* The site's surfaces are translucent black (bg-black-250). Over a light page
+     they wash out to grey, and the darker plates inside then read as black
+     bands lying across the blocks - the "black background over the tiles" the
+     operator complained about. A solid surface keeps the strip reading as one
+     dark block whatever the page behind it does. Unlayered author CSS also
+     wins over the utility class in Tailwind's @layer utilities, so this is
+     what actually paints. */
+  background: #161616;
+  border: .1rem solid #ffffff14;
 }
 
 .caser-lbl {
@@ -655,11 +664,12 @@
 /* The `//  4,443` figure and the Casey rating button are gone: the tile shows
    only the three counters, with spacing instead of rules between them. */
 
-/* Lower plate: darker than the top, split off by a hairline. */
+/* Lower plate: a shade darker than the tile, split off by a hairline. Both are
+   solid, so the plate never reads as a black smear on a light tile. */
 .caser-plate {
-  margin: 0 -2rem;
+  margin: 0;
   padding: 1.4rem 2rem 1.4rem;
-  background-color: #00000066;
+  background-color: #101010;
   border-top: .1rem solid #ffffff26;
 }
 .caser-player-bal { display: flex; align-items: center; justify-content: space-between; gap: 1.4rem; }
@@ -749,9 +759,9 @@
 /* Promo sits on its own tinted plate, offset from the figure above, so the
    two blocks read as separate sections of the tile rather than one stack. */
 .caser-promo-block {
-  margin: 1.2rem -2rem -1.6rem;
+  margin: 1.2rem 0 0;
   padding: 1.4rem 2rem 1.4rem;
-  background-color: #00000059;
+  background-color: #101010;
   border-top: .1rem solid #ffffff26;
 }
 .caser-promo-form { display: flex; gap: .8rem; }

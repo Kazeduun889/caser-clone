@@ -59,6 +59,66 @@
 
   reconcileSession();
 
+  /**
+   * Sends the player's own id on every API request.
+   *
+   * The server resolves the account from the caser_user_id cookie. A browser
+   * that refuses to keep cookies - private mode, a strict privacy setting - is
+   * then minted a brand new account on every reload, and the player watches
+   * their balance and inventory reset. The id is already in localStorage, so it
+   * travels as a Bearer token, which resolveUser accepts as a second candidate.
+   */
+  (function attachIdentityHeader() {
+    var token = null;
+    function read() {
+      try { token = localStorage.getItem('auth_token'); } catch (e) { token = null; }
+      return token;
+    }
+    read();
+
+    var origFetch = window.fetch;
+    if (origFetch) {
+      window.fetch = function (input, init) {
+        var url = typeof input === 'string' ? input : (input && input.url) || '';
+        if (!/^\/api\//.test(url)) return origFetch.apply(this, arguments);
+        init = init || {};
+        var t = token || read();
+        if (!t) return origFetch.call(this, input, init);
+        if (init.headers && typeof init.headers.append === 'function') {
+          init.headers.append('Authorization', 'Bearer ' + t);
+        } else if (init.headers && typeof init.headers === 'object') {
+          init.headers.Authorization = 'Bearer ' + t;
+        } else {
+          init.headers = { Authorization: 'Bearer ' + t };
+        }
+        return origFetch.call(this, input, init);
+      };
+    }
+
+    var XHR = window.XMLHttpRequest;
+    if (XHR) {
+      var open = XHR.prototype.open;
+      var setHeader = XHR.prototype.setRequestHeader;
+      var send = XHR.prototype.send;
+      XHR.prototype.open = function (method, url) {
+        this.__caserApi = /^\/api\//.test(String(url));
+        this.__caserAuth = false;
+        return open.apply(this, arguments);
+      };
+      XHR.prototype.setRequestHeader = function (name, value) {
+        if (this.__caserApi && /^authorization$/i.test(name)) this.__caserAuth = true;
+        return setHeader.apply(this, arguments);
+      };
+      XHR.prototype.send = function () {
+        if (this.__caserApi && !this.__caserAuth) {
+          var t = token || read();
+          if (t) { try { setHeader.call(this, 'Authorization', 'Bearer ' + t); } catch (e) {} }
+        }
+        return send.apply(this, arguments);
+      };
+    }
+  })();
+
   // Auto-initialize demo/player session so cases and features are immediately accessible
   try {
     if (!localStorage.getItem('auth_token') || !localStorage.getItem('caser_user')) {
@@ -764,23 +824,19 @@
       '</div>'
     ].join('');
 
-    // Put it directly above the page's own content. The site renders into plain
-    // divs (there is no <header> element), so anchor on the inventory toolbar
-    // or the live-drop rail and fall back to the app container.
-    var anchor = null;
-    var sellAll = Array.prototype.find.call(document.querySelectorAll('button'), function (b) {
-      return /продать все/i.test(b.textContent || '');
-    });
-    if (sellAll) anchor = sellAll;
-    if (!anchor) {
-      var live = document.querySelector('[data-testid="live-drop-list"]');
-      if (live) anchor = live;
-    }
-    var host = anchor && anchor.closest('div.relative, div.flex') ? anchor.closest('div.relative') : null;
-    if (host && host.parentNode) host.parentNode.insertBefore(strip, host);
+    // Put it at the top of the main column, directly above the inventory page.
+    //
+    // The old anchor was the "Продать все" button, falling back to
+    // [data-testid="live-drop-list"] when the toolbar had not rendered yet.
+    // That fallback is the narrow left rail, so on a narrow window the whole
+    // strip was inserted into the sidebar and rendered squeezed at 28rem -
+    // which is what clicking a player in the drop feed showed.
+    var page = document.querySelector('[data-testid="inventory-page"]');
+    var host = page && page.parentElement;
+    if (host && host.parentNode) host.insertBefore(strip, page);
     else {
-      var page = document.querySelector('div.animate-page-in') || document.querySelector('#header-root') || document.body;
-      page.insertBefore(strip, page.firstChild);
+      var root = document.querySelector('div.animate-page-in') || document.body;
+      root.insertBefore(strip, root.firstChild);
     }
 
     strip.addEventListener('click', function (e) {
@@ -1493,26 +1549,36 @@
     // A finished round leaves the giveaways slot completely empty - the bundle
     // renders no heading and no list at all - and the page then showed a blank
     // column the height of three cards. Say what is going on instead.
-    var page = document.querySelector('.animate-page-in');
-    var shell = page && page.firstElementChild;
-    // child 0 is the Награды/Розыгрыши tab row, child 1 is whatever that tab
-    // is currently showing.
-    var slot = shell && shell.children[1];
+    //
+    // Only the Розыгрыши tab gets it. The note used to be dropped into whatever
+    // tab was showing, so on Награды it landed above the top drop rail - the
+    // layout the operator screenshotted as "fine for a second, then ugly".
+    // The inactive tab carries opacity-50, the active one does not.
+    var gaTab = document.querySelector('[data-testid="weekly-drop-tab-giveaways"]');
+    var gaActive = !!gaTab && !/opacity-50/.test(String(gaTab.className));
     var note = document.querySelector('[data-testid="giveaways-empty"]');
-    if (slot) {
-      // The card testids are giveaway-card-<cadence>, so the list's own child
-      // count is what tells cards apart from nothing.
-      var listEl = slot.querySelector('[data-testid="giveaway-list"]');
-      var hasCards = !!listEl && listEl.children.length > 0;
-      if (!hasCards && !note) {
-        note = document.createElement('div');
-        note.className = 'caser-giveaways-empty';
-        note.setAttribute('data-testid', 'giveaways-empty');
-        note.innerHTML = '<span class="caser-giveaways-empty-title">Сейчас активных розыгрышей нет</span>'
-          + '<span class="caser-giveaways-empty-sub">Следующий откроется совсем скоро — следите за обновлениями.</span>';
-        slot.appendChild(note);
-      } else if (hasCards && note) {
-        note.remove();
+    if (note && !gaActive) note.remove();
+
+    if (gaActive) {
+      var page = document.querySelector('.animate-page-in');
+      var shell = page && page.firstElementChild;
+      // child 0 is the Награды/Розыгрыши tab row, child 1 is that tab's content.
+      var slot = shell && shell.children[1];
+      if (slot) {
+        // The card testids are giveaway-card-<cadence>, so the list's own child
+        // count is what tells cards apart from nothing.
+        var listEl = slot.querySelector('[data-testid="giveaway-list"]');
+        var hasCards = !!listEl && listEl.children.length > 0;
+        if (!hasCards && !note) {
+          note = document.createElement('div');
+          note.className = 'caser-giveaways-empty';
+          note.setAttribute('data-testid', 'giveaways-empty');
+          note.innerHTML = '<span class="caser-giveaways-empty-title">Сейчас активных розыгрышей нет</span>'
+            + '<span class="caser-giveaways-empty-sub">Следующий откроется совсем скоро — следите за обновлениями.</span>';
+          slot.appendChild(note);
+        } else if (hasCards && note) {
+          note.remove();
+        }
       }
     }
   }

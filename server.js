@@ -400,34 +400,47 @@ async function resolveUser(req) {
   // A slug left over from the days before numbering is renumbered here: the
   // account moves onto the next free number with its balance and history, and
   // the cookie is rewritten, so old visitors end up on a numbered account too.
+  //
+  // The client also sends its own id as a Bearer token, so a browser that
+  // cannot keep cookies still resolves to the same account.
+  let slug = null;
+  let user = null;
   for (const id of candidates) {
     if (!/^\d+$/.test(id)) {
+      if (!slug) slug = id;
       const migrated = await store.migrateLegacyUser(id);
       if (!migrated) continue; // never existed: fall through to a fresh number
-      if (req.res && typeof req.res.cookie === 'function') {
-        req.res.cookie('caser_user_id', migrated, { maxAge: 31536000000, path: '/' });
-        req.res.cookie('auth_flag', '1', { maxAge: 31536000000, path: '/' });
-      }
       const renumbered = await store.getUser(migrated);
-      if (renumbered) return renumbered;
+      if (renumbered) { user = renumbered; break; }
       continue;
     }
     const existing = await store.getUser(id);
-    if (existing) return existing;
+    if (existing) { user = existing; break; }
   }
 
   // No known identity yet: mint a stable demo account for this browser.
-  const id = await store.nextUserId();
-  const user = await store.ensureUser({
-    id,
-    nickname: 'CaserPlayer',
-    image: DEFAULT_AVATARS[0],
-    balance: START_BALANCE,
-    tradeUrl: 'https://steamcommunity.com/tradeoffer/new/?partner=12345678',
-    role: 'user'
-  });
+  if (!user) {
+    const id = await store.nextUserId();
+    user = await store.ensureUser({
+      id,
+      nickname: 'CaserPlayer',
+      image: DEFAULT_AVATARS[0],
+      balance: START_BALANCE,
+      tradeUrl: 'https://steamcommunity.com/tradeoffer/new/?partner=12345678',
+      role: 'user'
+    });
+    // The client keeps its own id in localStorage and sends it back with every
+    // request. If it was a slug this account was minted from, remember the
+    // pair: a browser that cannot hold the cookie still presents that slug, and
+    // the alias is what lands it on this account instead of minting a new one
+    // on every reload.
+    if (slug) await store.aliasLegacyId(slug, id);
+  }
 
-  if (req.res && typeof req.res.cookie === 'function') {
+  // Keep the cookie in step with the account we resolved. A browser that
+  // dropped it (private mode, a strict privacy setting) otherwise has to rely
+  // on the header on every single request.
+  if (req.res && typeof req.res.cookie === 'function' && cookies['caser_user_id'] !== user.id) {
     req.res.cookie('caser_user_id', user.id, { maxAge: 31536000000, path: '/' });
     req.res.cookie('auth_flag', '1', { maxAge: 31536000000, path: '/' });
   }
