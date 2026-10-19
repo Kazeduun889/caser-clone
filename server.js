@@ -368,13 +368,15 @@ let liveDropsList = [];
 /** Warms the in-process cache so a freshly booted server can answer at once. */
 store.listRecentDrops(30).then((drops) => { liveDropsList = drops; }).catch(() => {});
 
-// Serve Custom Auth CSS & JS directly
-app.get('/custom-auth.css', (req, res) => {
-  res.sendFile(path.join(SITE_DIR, 'custom-auth.css'));
-});
-
-app.get('/custom-auth.js', (req, res) => {
-  res.sendFile(path.join(SITE_DIR, 'custom-auth.js'));
+// The enhancement script and stylesheet are ours, not part of the original
+// bundle. They must not be pinned with `immutable`: browsers that already have
+// a copy would keep running it for a year, which is how a page can stay broken
+// long after the deploy that fixed it. Sent from memory because res.sendFile
+// overwrites Cache-Control with its own `public, max-age=0`.
+app.get(['/custom-auth.js', '/custom-auth.css'], (req, res) => {
+  const file = path.join(SITE_DIR, req.path.slice(1));
+  res.setHeader('Cache-Control', 'no-store');
+  res.type(path.extname(file)).send(fs.readFileSync(file, 'utf8'));
 });
 
 // Resolves (and if needed provisions) the user for this request.

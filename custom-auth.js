@@ -531,6 +531,7 @@
       ensureInventoryTabs();
       ensureSellAllPlacement();
       ensureGiveawayBanner();
+      setupRewardsPage();
       ensureFooterContacts();
     });
     observer.observe(document.body, { childList: true, subtree: true });
@@ -659,13 +660,27 @@
    * white-150), the 0.2rem radius, Oswald for numerals, and --brand-accent /
    * --brand-nav-active straight from the site stylesheets.
    */
+  // Route helpers.
+  //
+  // /profile and /inventory are served from the same markup, so the two have to
+  // be told apart: the profile gets the stats strip and the tabs, while the
+  // inventory stays the plain item grid it is on the original site.
+  function isProfileRoute() { return /\/profile/.test(location.pathname); }
+  function isInventoryRoute() { return /\/inventory/.test(location.pathname); }
+
   function setupProfileCards() {
     ensureProfileStrip();
   }
 
   /** Creates the strip once, and puts it back if React removed it. */
   function ensureProfileStrip() {
-    if (!/\/(profile|inventory|ru\/profile|ru\/inventory)/.test(location.pathname)) return;
+    if (!isProfileRoute()) {
+      // SPA navigation keeps the old document around: the strip has to be
+      // taken off the inventory, or the inventory inherits the profile look.
+      var stale = document.querySelector('.caser-profile-strip');
+      if (stale) stale.remove();
+      return;
+    }
     if (document.querySelector('.caser-profile-strip')) return;
 
     var strip = document.createElement('div');
@@ -1189,6 +1204,19 @@
     ].filter(Boolean);
     if (!candidates.length) return;
     var sell = candidates.filter(function (b) { return b.offsetWidth || b.offsetHeight; })[0] || candidates[0];
+
+    // The toolbar lays its children out with justify-between, so once the tabs
+    // join them the button and the select end up stranded in the middle of the
+    // row. They travel together in one right-hand group instead, with the
+    // button directly left of the select as asked.
+    if (sort.parentNode !== sell.parentNode) {
+      var wrap = document.createElement('div');
+      wrap.className = 'caser-items-tools';
+      sort.parentNode.insertBefore(wrap, sort);
+      wrap.appendChild(sell);
+      wrap.appendChild(sort);
+      return;
+    }
     // insertBefore(sell, sort) leaves the button immediately BEFORE the sort
     // select, so the "already in place" check has to look at the NEXT sibling.
     // Testing previousElementSibling was never true, so every pass moved the
@@ -1200,13 +1228,21 @@
 
   /** Re-checks the placement on pages that have the toolbar. */
   function ensureSellAllPlacement() {
-    if (!/\/(profile|inventory|ru\/profile|ru\/inventory)/.test(location.pathname)) return;
+    if (!isProfileRoute() && !isInventoryRoute()) return;
     var page = document.querySelector('[data-testid="inventory-page"]');
     if (page) placeSellAllNextToSort(page);
   }
 
   function ensureInventoryTabs() {
-    if (!/\/(profile|inventory|ru\/profile|ru\/inventory)/.test(location.pathname)) return;
+    // Only the profile gets the ПРЕДМЕТЫ/ИСТОРИЯ/АПГРЕЙДЫ tabs - on the
+    // inventory they would cover the item grid the original page shows.
+    if (!isProfileRoute()) {
+      var staleGroup = document.querySelector('.caser-tabs');
+      if (staleGroup) staleGroup.remove();
+      var staleNotice = document.querySelector('[data-testid="inventory-wip"]');
+      if (staleNotice) staleNotice.remove();
+      return;
+    }
     if (document.querySelector('.caser-tabs')) return;
 
     var page = document.querySelector('[data-testid="inventory-page"]');
@@ -1288,6 +1324,16 @@
   var GIVEAWAY_USERS = A + '/icons/weeklyDrop/users.svg';
 
   function ensureGiveawayBanner() {
+    // The banner belongs to the giveaways screen only. On every other page it
+    // sat under the fixed header and pushed the content down.
+    if (!/\/rewards/.test(location.pathname)) {
+      var stale = document.querySelector('.caser-giveaway');
+      if (stale) {
+        if (stale._timer) clearInterval(stale._timer);
+        stale.remove();
+      }
+      return null;
+    }
     var existing = document.querySelector('.caser-giveaway');
     if (existing) return existing;
 
@@ -1318,11 +1364,18 @@
     // Sit it directly under the header so it spans the page. The header root is
     // the anchor rather than a class selector: the app root's class contains
     // min-h-[100svh], and an unescaped bracket is not a valid selector.
-    var header = document.getElementById('header-root');
+    var header = document.querySelector('[data-testid="header-root"]');
     var app = header ? header.parentElement : null;
     if (app && header) app.insertBefore(banner, header.nextSibling);
     else if (app) app.insertBefore(banner, app.firstChild);
     else document.body.insertBefore(banner, document.body.firstChild);
+
+    // getElementById('header-root') finds nothing - it is a data-testid - so the
+    // banner used to be prepended to the app root and slide up behind the fixed
+    // header. Insert after the header and give it the header's height as an
+    // offset, because a position:fixed header takes no space in the flow.
+    var headerH = header ? Math.round(header.getBoundingClientRect().height) : 50;
+    banner.style.marginTop = headerH + 'px';
 
     banner.addEventListener('click', function (e) {
       if (e.target.closest('[data-act="enter"]')) enterGiveaway(banner);
@@ -1401,7 +1454,10 @@
    * left a large blank band above the tabs.
    */
   function setupRewardsPage() {
-    if (!/\/rewards/.test(location.pathname)) return;
+    if (!/\/rewards/.test(location.pathname)) {
+      document.body.removeAttribute('data-caser-page');
+      return;
+    }
     document.body.setAttribute('data-caser-page', 'rewards');
 
     // The banner has to outrank the site's sticky promo sidebar (z-3), or the

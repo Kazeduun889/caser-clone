@@ -216,7 +216,9 @@
 }
 
 .caser-btn-primary {
-  width: 100%;
+  /* No `width: 100%` here: it was written for the auth sheet and leaked into
+     the profile's top-up button, which then spanned the whole row and sat on
+     top of the balance figure. Buttons size to their label by default. */
   padding: 14px 20px;
   background: linear-gradient(180deg, #13432C 0%, #13432C 100%);
   border: 1px solid #44C987;
@@ -235,6 +237,9 @@
   justify-content: center;
   gap: 10px;
 }
+
+/* The auth sheet's buttons do span the form. */
+.caser-auth-modal .caser-btn-primary { width: 100%; }
 
 .caser-btn-primary:hover {
   background: linear-gradient(180deg, #1D5A3A 0%, #1D5A3A 100%);
@@ -722,12 +727,13 @@
 /* ========================== withdrawn tile =============================== */
 
 .caser-card-wd { display: flex; flex-direction: column; padding-bottom: 1.6rem; }
-/* the Steam mark, as on the reference */
+/* the Steam mark, as on the reference - kept faint so it reads as a watermark
+   rather than a smudge sitting behind the coupon field */
 .caser-watermark {
-  position: absolute; right: -2.5rem; top: 52%;
+  position: absolute; right: -3rem; top: 34%;
   transform: translateY(-50%);
-  width: 26rem; height: 26rem;
-  opacity: .08;
+  width: 20rem; height: 20rem;
+  opacity: .04;
   pointer-events: none;
 }
 
@@ -816,8 +822,13 @@
   background-color: #00000073;
   border: .1rem solid #ffffff26;
   border-radius: .2rem;
-  overflow: hidden;
+  /* min-width:0 lets the row shrink next to the sell/sort group instead of
+     pushing them off-screen; the tabs scroll rather than being cut off. */
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.caser-tabs::-webkit-scrollbar { display: none; }
 
 .caser-tab {
   padding: 1.1rem 1.8rem; border: 0; border-radius: 0;
@@ -940,7 +951,9 @@
 @media (max-width: 760px) {
   .caser-giveaway-inner { flex-direction: column; align-items: flex-start; padding: 1.8rem; }
   .caser-giveaway-side { align-items: flex-start; width: 100%; }
-  .caser-btn-primary { width: 100%; }
+  /* Scoped to the banner: applied globally this stretched the profile's top-up
+     button to the full row width and it overlapped the balance figure. */
+  .caser-giveaway .caser-btn-primary { width: 100%; }
 }
 
 /* The rewards page stacks two blocks of reserved top padding for a hero that
@@ -950,6 +963,65 @@
 body[data-caser-page="rewards"] div[class*="gap-[12rem]"][class*="min-h-[100svh]"] {
   padding-top: 0 !important;
 }
+
+/* ===========================================================================
+   Inventory toolbar
+
+   "Продать все" and the sort select travel together on the right of the
+   toolbar, so the button sits directly left of the filter instead of being
+   stranded in the middle by justify-between.
+   =========================================================================== */
+.caser-items-tools {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  flex: none;
+}
+
+/* --- profile top-up button -------------------------------------------------
+   The site paints its buttons 4.4rem tall with 2rem of horizontal padding.
+   The top-up button was shrunk to a sliver next to the balance figure, which
+   read as a label rather than a button. */
+.caser-player-bal .caser-btn-primary {
+  padding: 1.1rem 2rem;
+  font-size: 1.6rem;
+  line-height: 2.2rem;
+  gap: .8rem;
+}
+.caser-player-bal .caser-btn-primary .caser-btn-ico { width: 1.8rem; height: 1.8rem; }
+
+/* --- "Выведено" tile ------------------------------------------------------
+   The figure and the coupon field used to bleed to the card edges on negative
+   margins, which clipped the rounded corners and left the tile looking broken.
+   The coupon now sits inset on its own plate, and the figure is sized so the
+   coin sits beside it instead of dwarfing it. */
+.caser-card-wd { padding-bottom: 2rem; }
+
+.caser-wd {
+  display: flex; align-items: center; gap: .9rem;
+  font-family: var(--font-oswald), Oswald, sans-serif;
+  font-size: 4.4rem; line-height: 5.2rem; color: #fff;
+  margin-top: .2rem;
+}
+.caser-wd .caser-coin { width: 3rem; height: 3rem; }
+.caser-wd-sub { font-size: 1.7rem; margin: .2rem 0 0; color: #ffffffa6; }
+
+.caser-promo-block {
+  margin: 1.6rem 0 0;
+  padding: 1.4rem 1.5rem;
+  background-color: #00000059;
+  border: .1rem solid #ffffff1f;
+  border-radius: .2rem;
+}
+.caser-promo-form { display: flex; gap: .8rem; }
+.caser-promo-form input {
+  flex: 1; min-width: 0; padding: 1.1rem 1.4rem; border-radius: .2rem;
+  background: #00000073; border: .1rem solid #ffffff26; color: #fff;
+  font-family: var(--font-sofia-sans), "Sofia Sans", sans-serif;
+  font-size: 1.5rem; line-height: 2.2rem;
+  text-transform: none;
+}
+.caser-promo-form .caser-btn-ghost { padding: 1.1rem 1.6rem; font-size: 1.5rem; line-height: 2.1rem; }
 body[data-caser-page="rewards"] div[class*="max-w-[152rem]"][class*="pt-[6rem]"] {
   padding-top: 0 !important;
 }
