@@ -152,23 +152,31 @@ async function main() {
       (afterDraw.json.items || []).map((i) => ({ id: i.id, source: i.source })));
     const entryId = prize ? String(prize.id) : null;
 
-    const created = await call('POST', '/api/items/withdraw', {
+    // The bundle posts to /api/withdrawals, not /api/items/withdraw. Getting
+    // this path wrong made every attempt in the UI fail with "Failed to create
+    // withdrawal request", so the live path is the one under test here.
+    const created = await call('POST', '/api/withdrawals', {
       cookie: playerCookieOnly, body: { inventoryItemId: entryId }
     });
     ok('withdraw accepted', created.status === 200 && created.json.success && created.json.data.id,
       created.json);
     const wdId = created.json.data && created.json.data.id;
 
-    // Double submit must be refused (the guard, not a race).
+    // The legacy path still answers, and still refuses a second submit.
     const dupe = await call('POST', '/api/items/withdraw', {
       cookie: playerCookieOnly, body: { inventoryItemId: entryId }
     });
     check('second withdraw refused', dupe.status, 400);
 
-    const missing = await call('POST', '/api/items/withdraw', {
+    const missing = await call('POST', '/api/withdrawals', {
       cookie: playerCookieOnly, body: { inventoryItemId: 'nope' }
     });
     check('unknown item refused', missing.status, 400);
+
+    const noBody = await call('POST', '/api/withdrawals', {
+      cookie: playerCookieOnly, body: {}
+    });
+    check('missing item id refused', noBody.status, 400);
 
     // Player can list their own.
     const mine = await call('GET', '/api/withdrawals', { cookie: playerCookieOnly });

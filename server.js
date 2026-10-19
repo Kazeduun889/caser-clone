@@ -455,7 +455,7 @@ app.post('/api/auth/session', async (req, res) => {
     image: incoming.image || DEFAULT_AVATARS[0],
     // The client-sent balance is only honoured when the account is brand new
     balance: incoming.balance ?? START_BALANCE,
-    tradeUrl: incoming.tradeUrl || null,
+    tradeUrl: incoming.tradeUrl || incoming.steamTradeLink || null,
     role: incoming.role || 'user'
   });
   res.cookie('caser_user_id', user.id, { maxAge: 31536000000, path: '/' });
@@ -565,6 +565,8 @@ const handleUsersMe = async (req, res) => {
     isCreator: !!user.isCreator,
     createdAt: user.createdAt || null,
     tradeUrl: user.tradeUrl || 'https://steamcommunity.com/tradeoffer/new/?partner=12345678',
+    // Same value under the name the bundle actually reads.
+    steamTradeLink: user.steamTradeLink || user.tradeUrl || 'https://steamcommunity.com/tradeoffer/new/?partner=12345678',
     role: user.role || 'user'
   });
 };
@@ -1653,9 +1655,18 @@ async function notify(userId, type, content) {
   wsSendToUser(userId, 'notifications.new', { type, content, createdAt: new Date().toISOString() });
 }
 
-app.post('/api/items/withdraw', async (req, res) => {
+/**
+ * Creates a withdrawal request.
+ *
+ * The bundle POSTs to /api/withdrawals - not /api/items/withdraw - so the
+ * request never reached the server and every attempt ended with "Failed to
+ * create withdrawal request". Both paths answer, and both spellings of the
+ * item id are accepted.
+ */
+async function createWithdrawalHandler(req, res) {
   const user = await resolveUser(req);
-  const { inventoryItemId } = req.body || {};
+  const body = req.body || {};
+  const inventoryItemId = body.inventoryItemId || body.itemId || body.inventoryItemID;
   if (!inventoryItemId) return res.status(400).json({ success: false, message: 'Не указан предмет' });
 
   const result = await store.createWithdrawal(user.id, inventoryItemId);
@@ -1673,7 +1684,10 @@ app.post('/api/items/withdraw', async (req, res) => {
   pushInventoryBalance(user.id);
 
   res.json({ success: true, data: result.withdrawal });
-});
+}
+
+app.post('/api/withdrawals', createWithdrawalHandler);
+app.post('/api/items/withdraw', createWithdrawalHandler);
 
 // --- Giveaways --------------------------------------------------------------
 //
@@ -2298,6 +2312,7 @@ const PUBLIC_PROFILE_FIELDS = (user) => ({
   image: user.image,
   balance: safeMoney(user.balance),
   tradeUrl: user.tradeUrl || null,
+  steamTradeLink: user.steamTradeLink || user.tradeUrl || null,
   role: user.role,
   isCreator: !!user.isCreator,
   createdAt: user.createdAt || null
@@ -2342,30 +2357,41 @@ const NICKNAME_RE = /^[A-Za-z0-9_][A-Za-z0-9_\-. ]{1,23}$/;
 
 app.patch('/api/users/me/profile', async (req, res) => {
   const user = await resolveUser(req);
-  const nickname = String((req.body && req.body.nickname) || '').trim();
+  const body = req.body || {};
+  const nickname = String(body.nickname || '').trim();
+  const rawTrade = body.steamTradeLink !== undefined ? body.steamTradeLink : body.tradeUrl;
+  const tradeUrl = rawTrade === undefined ? undefined : (String(rawTrade).trim() || null);
 
-  if (!nickname) return res.status(400).json({ success: false, message: 'Введите никнейм' });
-  if (nickname.length < 2) return res.status(400).json({ success: false, message: 'Минимум 2 символа' });
-  if (nickname.length > 24) return res.status(400).json({ success: false, message: 'Максимум 24 символа' });
-  if (!NICKNAME_RE.test(nickname)) {
-    return res.status(400).json({
-      success: false,
-      message: 'Только латиница, цифры, пробел, дефис и подчёркивание'
-    });
-  }
-  if (nickname === user.nickname) {
-    return res.json({ success: true, data: PUBLIC_PROFILE_FIELDS(user) });
+  // The settings sheet saves the trade link on its own, so a request that
+  // carries only that must not be rejected for having no nickname.
+  if (nickname) {
+    if (nickname.length < 2) return res.status(400).json({ success: false, message: 'Минимум 2 символа' });
+    if (nickname.length > 24) return res.status(400).json({ success: false, message: 'Максимум 24 символа' });
+    if (!NICKNAME_RE.test(nickname)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Только латиница, цифры, пробел, дефис и подчёркивание'
+      });
+    }
+  } else if (tradeUrl === undefined) {
+    return res.status(400).json({ success: false, message: 'Введите никнейм' });
   }
 
-  await store.ensureUser({ id: user.id, nickname });
+  const patch = { id: user.id };
+  if (nickname && nickname !== user.nickname) patch.nickname = nickname;
+  if (tradeUrl !== undefined) patch.tradeUrl = tradeUrl;
+
+  await store.ensureUser(patch);
   const updated = await store.getUser(user.id);
 
-  // Push it to every tab the player has open, so the header follows without
-  // a reload, and broadcast so their name in the live feed corrects too.
-  wsSendToUser(user.id, 'users.update_profile', {
-    id: user.id,
-    nickname: updated.nickname
-  });
+  if (patch.nickname) {
+    // Push it to every tab the player has open, so the header follows without
+    // a reload, and broadcast so their name in the live feed corrects too.
+    wsSendToUser(user.id, 'users.update_profile', {
+      id: user.id,
+      nickname: updated.nickname
+    });
+  }
 
   res.json({ success: true, data: PUBLIC_PROFILE_FIELDS(updated) });
 });
@@ -2809,6 +2835,9 @@ function sendInjectedHtml(filePath, res, slug) {
         image: "https://avatars.steamstatic.com/6ee7f3e3312c196dbdb6bdd754a4e021abc16885_full.jpg",
         balance: ${START_BALANCE},
         tradeUrl: "https://steamcommunity.com/tradeoffer/new/?partner=12345678",
+        // The bundle reads steamTradeLink; without it the withdraw button only
+        // ever opens the "enter your trade link" sheet.
+        steamTradeLink: "https://steamcommunity.com/tradeoffer/new/?partner=12345678",
         role: "user"
       };
       localStorage.setItem("cookieConsent", "accepted");

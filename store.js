@@ -488,12 +488,17 @@ async function legacyAdminMatch(userId, ids) {
 // ---------------------------------------------------------------------------
 function rowToUser(row) {
   if (!row) return null;
+  const tradeUrl = row.trade_url || null;
   return {
     id: row.id,
     nickname: row.nickname,
     image: row.image,
     balance: Number(row.balance),
-    tradeUrl: row.trade_url,
+    tradeUrl,
+    // The bundle's user object names this field steamTradeLink, not tradeUrl.
+    // Without it the client never sees a trade link, and every attempt to
+    // withdraw an item opens the "enter your Steam trade link" sheet instead.
+    steamTradeLink: tradeUrl,
     role: row.role,
     createdAt: row.created_at,
     // The green tick. Only the operator can set this.
