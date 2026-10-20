@@ -638,6 +638,7 @@
       ensureInventoryTabs();
       ensureSellAllPlacement();
       ensureGiveawayBanner();
+      ensureChickenBanner();
       setupRewardsPage();
       ensureFooterContacts();
     });
@@ -1676,41 +1677,9 @@
       if (grid) grid.style.display = 'none';
     }
 
-    // A finished round leaves the giveaways slot completely empty - the bundle
-    // renders no heading and no list at all - and the page then showed a blank
-    // column the height of three cards. Say what is going on instead.
-    //
-    // Only the Розыгрыши tab gets it. The note used to be dropped into whatever
-    // tab was showing, so on Награды it landed above the top drop rail - the
-    // layout the operator screenshotted as "fine for a second, then ugly".
-    // The inactive tab carries opacity-50, the active one does not.
-    var gaTab = document.querySelector('[data-testid="weekly-drop-tab-giveaways"]');
-    var gaActive = !!gaTab && !/opacity-50/.test(String(gaTab.className));
-    var note = document.querySelector('[data-testid="giveaways-empty"]');
-    if (note && !gaActive) note.remove();
-
-    if (gaActive) {
-      var page = document.querySelector('.animate-page-in');
-      var shell = page && page.firstElementChild;
-      // child 0 is the Награды/Розыгрыши tab row, child 1 is that tab's content.
-      var slot = shell && shell.children[1];
-      if (slot) {
-        // The card testids are giveaway-card-<cadence>, so the list's own child
-        // count is what tells cards apart from nothing.
-        var listEl = slot.querySelector('[data-testid="giveaway-list"]');
-        var hasCards = !!listEl && listEl.children.length > 0;
-        if (!hasCards && !note) {
-          note = document.createElement('div');
-          note.className = 'caser-giveaways-empty';
-          note.setAttribute('data-testid', 'giveaways-empty');
-          note.innerHTML = '<span class="caser-giveaways-empty-title">Сейчас активных розыгрышей нет</span>'
-            + '<span class="caser-giveaways-empty-sub">Следующий откроется совсем скоро — следите за обновлениями.</span>';
-          slot.appendChild(note);
-        } else if (hasCards && note) {
-          note.remove();
-        }
-      }
-    }
+    // The "no giveaways" band is deliberately not injected any more: the tab
+    // already renders its own rules block, and the band read as an extra strip
+    // pasted over the page.
   }
 
   /**
@@ -1744,6 +1713,22 @@
   // markup has no room for our nodes, so it re-renders the subtree. Waiting for
   // an idle moment costs nothing - the observer below re-attaches anything React
   // discards on a later render anyway.
+  /**
+   * Operation Chicken Farm link.
+   *
+   * The bundle points this promo banner at chicken.localhost - the test host of
+   * the real event - and opens it in a new tab. Point it at our own page and
+   * keep the click in the same tab, like every other nav link.
+   */
+  function ensureChickenBanner() {
+    var link = document.querySelector('[data-testid="live-drop-chicken-farm-banner"]');
+    if (!link) return;
+    var href = '/ru/chicken-farm';
+    if (link.getAttribute('href') !== href) link.setAttribute('href', href);
+    if (link.getAttribute('target') !== '_self') link.setAttribute('target', '_self');
+    if (link.hasAttribute('rel')) link.removeAttribute('rel');
+  }
+
   function boot() {
     // ?noboot is a diagnostic escape hatch: it loads the page with none of our
     // nodes injected, so a React hydration complaint can be attributed either
@@ -1757,6 +1742,7 @@
     ensureInventoryTabs();
     ensureSellAllPlacement();
     ensureGiveawayBanner();
+    ensureChickenBanner();
     setupRewardsPage();
     ensureFooterContacts();
   }

@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const { WebSocketServer, WebSocket } = require('ws');
 const https = require('https');
 const store = require('./store');
+const farm = require('./chicken-farm-rewards');
 const { seedDemoContent } = require('./seed-demo');
 
 const app = express();
@@ -980,6 +981,9 @@ const handleOpenCase = async (req, res) => {
 
     await store.recordCaseOpen(user.id, slug, totalCost, wonItems.map((w) => w.marketName));
 
+    // Operation Chicken Farm: every rouble spent is one point of XP.
+    await store.addFarmXp(user.id, Math.round(totalCost));
+
     // Tell the client about the new drops so the sell buttons light up and
     // the header balance refreshes without a reload
     pushNewItems(user.id, createdEntries);
@@ -1048,6 +1052,94 @@ async function countersPayload() {
 
 app.get('/api/statistics', async (req, res) => {
   res.json(await countersPayload());
+});
+
+// ----------------------------------------------------
+// Operation Chicken Farm
+//
+// A 50-level battle pass. Playing (opening cases, making upgrades) earns 1 XP
+// per unit of money spent; every level holds one reward that can be claimed
+// once. The reward table itself lives in chicken-farm-rewards.js.
+// ----------------------------------------------------
+const farmLevelPayload = (progress) => {
+  const state = farm.levelFromXp(progress.xp);
+  return {
+    xp: state.total,
+    level: state.level,
+    into: state.into,
+    need: state.need,
+    levels: farm.LEVELS,
+    claimed: progress.claimed,
+    rewards: farm.REWARDS
+  };
+};
+
+app.get('/api/farm', async (req, res) => {
+  const user = await resolveUser(req);
+  if (!user) return res.status(401).json({ message: 'Авторизуйтесь, чтобы открыть ферму' });
+  const progress = await store.getFarmProgress(user.id);
+  res.json({ ...farmLevelPayload(progress), balance: safeMoney(user.balance) });
+});
+
+app.post('/api/farm/claim', rateLimit({ windowMs: 60000, max: 60 }), async (req, res) => {
+  const user = await resolveUser(req);
+  if (!user) return res.status(401).json({ message: 'Авторизуйтесь, чтобы забрать награду' });
+
+  const level = parseInt(req.body && req.body.level, 10);
+  const reward = farm.getReward(level);
+  if (!reward) return res.status(400).json({ message: 'Такой награды нет' });
+
+  const progress = await store.getFarmProgress(user.id);
+  const current = farm.levelFromXp(progress.xp);
+  if (current.level < reward.level) {
+    return res.status(400).json({ message: 'Уровень ещё не открыт' });
+  }
+
+  // claimFarmLevel() is the race guard: only one of two parallel clicks wins.
+  const claim = await store.claimFarmLevel(user.id, reward.level);
+  if (!claim.ok) {
+    return res.status(409).json({
+      message: claim.reason === 'already' ? 'Награда уже получена' : 'Не получилось забрать награду',
+      ...farmLevelPayload(progress)
+    });
+  }
+
+  let balance = safeMoney(user.balance);
+  let entry = null;
+
+  if (reward.type === 'balance') {
+    balance = (await store.addBalance(user.id, reward.amount, 'farm_reward', { level: reward.level })) ?? balance;
+    pushBalance({ ...user, balance });
+  } else {
+    const item = reward.item;
+    const flat = {
+      ...item,
+      id: String(item.id || ''),
+      appId: item.appId ?? 730,
+      name: item.marketName,
+      price: String(item.price)
+    };
+    entry = await store.addInventoryItem(user.id, {
+      id: store.newId('won'),
+      price: Number(item.price) || 0,
+      status: 'available',
+      canSell: true,
+      canUpgrade: true,
+      // Deliberately not 'giveaway': only giveaway prizes can be withdrawn.
+      source: 'farm',
+      item: flat
+    });
+    pushNewItems(user.id, [entry]);
+  }
+
+  const after = await store.getFarmProgress(user.id);
+  res.json({
+    success: true,
+    reward,
+    item: entry ? entry.item : null,
+    balance,
+    ...farmLevelPayload(after)
+  });
 });
 
 /**
@@ -1844,6 +1936,10 @@ const handleUpgradeBet = async (req, res) => {
   // Counts the attempt either way, then publishes a real drop on a win.
   await store.recordUpgradeAttempt(user.id, isWin, isMysteryBet ? 1 : winChance);
   if (wonEntry) await publishDrop(user.id, wonEntry.item, wonEntry.price, 'upgrade');
+
+  // Operation Chicken Farm: the stake is worth the same XP as a case of the
+  // same price, whether the roll was won or lost.
+  await store.addFarmXp(user.id, Math.round(stake));
 
   const stakeFromItems = Number(
     betEntries.reduce((sum, i) => sum + (parseFloat(i.price) || 0), 0).toFixed(2)
@@ -3060,6 +3156,9 @@ function sendInjectedHtml(filePath, res, slug) {
     content = content.split('support@caser.one').join('vscybon@gmail.com');
     content = content.split('mailto:marketing@caser.one').join('#');
     content = content.split('marketing@caser.one').join('нет');
+    // The bundle links the Chicken Farm promo at chicken.localhost (the test
+    // host of the real event). Point it at our own page instead.
+    content = content.split('https://chicken.localhost').join('/ru/chicken-farm');
     if (slug) {
       content = content.split('egg').join(slug);
       content = content.split('Egg').join(slug.charAt(0).toUpperCase() + slug.slice(1));
@@ -3172,6 +3271,12 @@ app.use((req, res, next) => {
   }
   if (cleanPath === '/ru/rewards' || cleanPath === '/rewards') {
     return sendInjectedHtml(path.join(SITE_DIR, 'ru/rewards/index.html'), res);
+  }
+
+  // Operation Chicken Farm is a standalone event page, exactly like the real
+  // chicken.caser.one. It brings its own chrome, so it is served as-is.
+  if (cleanPath === '/ru/chicken-farm' || cleanPath === '/chicken-farm' || cleanPath === '/farm') {
+    return res.sendFile(path.join(SITE_DIR, 'chicken-farm/index.html'));
   }
 
   const pageCandidate = path.join(SITE_DIR, cleanPath.replace(/^\//, ''), 'index.html');

@@ -39,7 +39,9 @@ const mem = {
   promos: [],
   promoRedemptions: [],
   drops: [],
-  stats: new Map()
+  stats: new Map(),
+  // userId -> { xp, claimed: [level] } for Operation Chicken Farm.
+  farm: new Map()
 };
 
 // Mirrors MAX_MONEY in server.js. Kept here so the store never writes a
@@ -334,6 +336,16 @@ async function migrate() {
     `CREATE TABLE IF NOT EXISTS app_settings (
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL
+    )`,
+
+    // Operation Chicken Farm: XP earned by playing, plus the levels whose
+    // reward has already been taken. `claimed` is a JSON array of level
+    // numbers, which keeps the whole track in one row.
+    `CREATE TABLE IF NOT EXISTS farm_progress (
+      user_id    TEXT PRIMARY KEY,
+      xp         INTEGER NOT NULL DEFAULT 0,
+      claimed    TEXT NOT NULL DEFAULT '[]',
+      updated_at TEXT NOT NULL
     )`
   ];
   await client.batch(statements.map((sql) => ({ sql })), 'write');
@@ -2234,6 +2246,95 @@ async function stats() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Operation Chicken Farm
+// ---------------------------------------------------------------------------
+const FARM_EMPTY = (userId) => ({ userId: String(userId), xp: 0, claimed: [] });
+
+async function getFarmProgress(userId) {
+  const uid = String(userId);
+  if (mode === 'memory') {
+    const row = mem.farm.get(uid);
+    return row ? { userId: uid, xp: row.xp, claimed: row.claimed.slice() } : FARM_EMPTY(uid);
+  }
+
+  const res = await client.execute({
+    sql: 'SELECT xp, claimed FROM farm_progress WHERE user_id = ?',
+    args: [uid]
+  });
+  if (!res.rows.length) return FARM_EMPTY(uid);
+
+  let claimed = [];
+  try {
+    const parsed = JSON.parse(res.rows[0].claimed || '[]');
+    if (Array.isArray(parsed)) claimed = parsed.map(Number).filter((n) => Number.isFinite(n));
+  } catch (e) { /* a broken cell just means nothing is claimed */ }
+
+  return { userId: uid, xp: Number(res.rows[0].xp) || 0, claimed };
+}
+
+/** Adds XP and returns the fresh progress. Negative or zero amounts are a no-op. */
+async function addFarmXp(userId, amount) {
+  const uid = String(userId);
+  const add = Math.max(0, Math.round(Number(amount) || 0));
+  if (!add) return getFarmProgress(uid);
+
+  if (mode === 'memory') {
+    const row = mem.farm.get(uid) || { xp: 0, claimed: [] };
+    row.xp += add;
+    mem.farm.set(uid, row);
+    return { userId: uid, xp: row.xp, claimed: row.claimed.slice() };
+  }
+
+  await client.execute({
+    sql: `INSERT INTO farm_progress (user_id, xp, claimed, updated_at)
+          VALUES (?, ?, '[]', ?)
+          ON CONFLICT(user_id) DO UPDATE SET
+            xp = farm_progress.xp + excluded.xp,
+            updated_at = excluded.updated_at`,
+    args: [uid, add, now()]
+  });
+  return getFarmProgress(uid);
+}
+
+/**
+ * Marks one level as claimed.
+ *
+ * The conditional UPDATE is what makes two fast clicks on the same card pay
+ * once: the second one finds `claimed` already changed and updates no rows.
+ * `ok: false` with reason 'already' is a normal answer, not an error.
+ */
+async function claimFarmLevel(userId, level) {
+  const uid = String(userId);
+  const lvl = Number(level);
+  if (!Number.isFinite(lvl)) return { ok: false, reason: 'invalid' };
+
+  const current = await getFarmProgress(uid);
+  if (current.claimed.includes(lvl)) return { ok: false, reason: 'already' };
+
+  const nextClaimed = current.claimed.concat([lvl]).sort((a, b) => a - b);
+
+  if (mode === 'memory') {
+    mem.farm.set(uid, { xp: current.xp, claimed: nextClaimed });
+    return { ok: true, progress: { userId: uid, xp: current.xp, claimed: nextClaimed } };
+  }
+
+  // The row may not exist yet (level 1 is free), so make sure there is one.
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO farm_progress (user_id, xp, claimed, updated_at)
+          VALUES (?, 0, '[]', ?)`,
+    args: [uid, now()]
+  });
+
+  const res = await client.execute({
+    sql: 'UPDATE farm_progress SET claimed = ?, updated_at = ? WHERE user_id = ? AND claimed = ?',
+    args: [JSON.stringify(nextClaimed), now(), uid, JSON.stringify(current.claimed)]
+  });
+  if (!Number(res.rowsAffected)) return { ok: false, reason: 'already' };
+
+  return { ok: true, progress: { userId: uid, xp: current.xp, claimed: nextClaimed } };
+}
+
 module.exports = {
   START_BALANCE,
   DATA_DIR,
@@ -2299,6 +2400,10 @@ module.exports = {
   setWithdrawalStatus,
   WITHDRAWAL_STATUS,
   WITHDRAWAL_TRANSITIONS,
+  // Operation Chicken Farm
+  getFarmProgress,
+  addFarmXp,
+  claimFarmLevel,
   // Notifications
   createNotification,
   listNotifications,

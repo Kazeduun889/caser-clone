@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Operation Chicken Farm — КЕЙСЕР</title>
+<meta name="description" content="Операция Chicken Farm: 50 уровней, награда за каждый. Открывай кейсы и делай апгрейды — получай XP и забирай скины.">
+<meta name="theme-color" content="#0d0d0f">
+<link rel="icon" href="/cdn/fa/icons/header/logo_text_ru.webp">
+<style>
+  :root {
+    --bg: #0b0b0d;
+    --panel: #141417;
+    --panel-2: #19191d;
+    --line: #2a2a31;
+    --text: #f3f3f5;
+    --muted: #9a9aa4;
+    --accent: #ff7a1a;
+    --accent-2: #ffb03a;
+    --green: #48d17a;
+    --radius: 10px;
+    --head: 62px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background:
+      radial-gradient(1200px 600px at 78% -8%, rgba(255, 122, 26, .14), transparent 62%),
+      radial-gradient(900px 500px at 8% 0%, rgba(255, 176, 58, .06), transparent 60%),
+      var(--bg);
+    color: var(--text);
+    font-family: "Sofia Sans", "Segoe UI", Roboto, Arial, sans-serif;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; text-decoration: none; }
+  button { font: inherit; color: inherit; }
+
+  .cf-wrap { max-width: 1360px; margin: 0 auto; padding: 0 20px; }
+
+  /* ---------- header ---------- */
+  .cf-header {
+    position: sticky; top: 0; z-index: 40;
+    height: var(--head);
+    background: rgba(9, 9, 11, .86);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255, 255, 255, .07);
+  }
+  .cf-header .cf-wrap { height: 100%; display: flex; align-items: center; gap: 22px; }
+  .cf-logo img { height: 26px; display: block; }
+  .cf-nav { display: flex; align-items: center; gap: 4px; margin-left: 8px; }
+  .cf-nav a {
+    padding: 8px 12px; border-radius: 6px; font-size: 14px; color: #c9c9d1;
+    text-transform: uppercase; letter-spacing: .04em; font-weight: 600;
+  }
+  .cf-nav a:hover { color: #fff; background: rgba(255, 255, 255, .06); }
+  .cf-nav a.is-active { color: #fff; box-shadow: inset 0 -2px 0 var(--accent); }
+  .cf-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .cf-bal {
+    display: flex; align-items: center; gap: 7px;
+    padding: 7px 12px; border-radius: 6px;
+    background: #000; border: 1px solid rgba(255, 255, 255, .1);
+    font-weight: 700; font-size: 14px; letter-spacing: .02em;
+  }
+  .cf-bal img { width: 16px; height: 16px; }
+  .cf-avatar {
+    width: 34px; height: 34px; border-radius: 50%; object-fit: cover;
+    border: 1px solid rgba(255, 255, 255, .16); background: #1d1d22;
+  }
+  .cf-login {
+    padding: 9px 14px; border-radius: 6px; font-size: 13px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .04em;
+    background: linear-gradient(180deg, #ff8d33, #f26200);
+    color: #150a00; box-shadow: 0 6px 18px rgba(255, 122, 26, .25);
+  }
+
+  /* ---------- hero ---------- */
+  .cf-hero {
+    position: relative;
+    margin-top: 22px;
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: 16px;
+    overflow: hidden;
+    background:
+      radial-gradient(90% 140% at 88% 30%, rgba(255, 122, 26, .22), transparent 55%),
+      linear-gradient(120deg, #17171b 0%, #101013 55%, #191410 100%);
+    min-height: 300px;
+  }
+  .cf-hero::after {
+    content: ""; position: absolute; inset: 0;
+    background-image: radial-gradient(rgba(255,255,255,.05) 1px, transparent 1px);
+    background-size: 22px 22px; opacity: .5; pointer-events: none;
+  }
+  .cf-hero-inner {
+    position: relative; z-index: 2;
+    display: flex; align-items: center; gap: 28px;
+    padding: 30px 34px;
+  }
+  .cf-hero-copy { flex: 1 1 auto; min-width: 0; }
+  .cf-kicker {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12px; font-weight: 800; letter-spacing: .22em;
+    text-transform: uppercase; color: var(--accent-2);
+  }
+  .cf-kicker::before { content: ""; width: 26px; height: 2px; background: var(--accent); }
+  .cf-title {
+    margin: 8px 0 6px;
+    font-family: "Arial Narrow", "Oswald", Impact, sans-serif;
+    font-size: clamp(38px, 6vw, 64px);
+    line-height: .95; letter-spacing: .02em; text-transform: uppercase;
+    background: linear-gradient(180deg, #fff 20%, #ffcf9a 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .cf-sub { margin: 0; color: #b9b9c2; font-size: 15px; line-height: 1.5; max-width: 56ch; }
+  .cf-hero-art {
+    flex: 0 0 300px; align-self: stretch; position: relative;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .cf-hero-art img {
+    max-width: 290px; width: 100%; height: auto;
+    filter: drop-shadow(0 18px 34px rgba(0, 0, 0, .55));
+    transform: translateY(6px);
+  }
+
+  /* progress */
+  .cf-progress-box {
+    margin-top: 18px;
+    background: rgba(0, 0, 0, .38);
+    border: 1px solid rgba(255, 255, 255, .09);
+    border-radius: 10px;
+    padding: 13px 15px;
+    max-width: 620px;
+  }
+  .cf-progress-top {
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+    font-size: 13px; color: var(--muted);
+  }
+  .cf-level-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 34px; height: 24px; padding: 0 8px; border-radius: 5px;
+    background: linear-gradient(180deg, #ff9a3c, #ef5c00);
+    color: #1a0d00; font-weight: 800; font-size: 13px;
+  }
+  .cf-progress-top b { color: #fff; font-size: 14px; }
+  .cf-bar {
+    margin-top: 9px; height: 8px; border-radius: 99px; overflow: hidden;
+    background: rgba(255, 255, 255, .1);
+  }
+  .cf-bar > i {
+    display: block; height: 100%; width: 0%;
+    background: linear-gradient(90deg, #ff6a00, #ffc24b);
+    box-shadow: 0 0 14px rgba(255, 122, 26, .55);
+    transition: width .35s ease;
+  }
+  .cf-progress-foot {
+    display: flex; justify-content: space-between; gap: 10px;
+    margin-top: 7px; font-size: 12px; color: #8f8f99;
+  }
+
+  /* ---------- section ---------- */
+  .cf-section { margin: 34px 0 10px; }
+  .cf-section-head {
+    display: flex; align-items: end; justify-content: space-between; gap: 16px;
+    margin-bottom: 14px;
+  }
+  .cf-h2 {
+    margin: 0;
+    font-family: "Arial Narrow", "Oswald", Impact, sans-serif;
+    font-size: 26px; letter-spacing: .03em; text-transform: uppercase;
+  }
+  .cf-h2 span { color: var(--accent); }
+  .cf-hint { color: var(--muted); font-size: 13px; }
+  .cf-scroll-btns { display: flex; gap: 8px; }
+  .cf-scroll-btns button {
+    width: 38px; height: 38px; border-radius: 8px; cursor: pointer;
+    background: #17171b; border: 1px solid var(--line); color: #d8d8de;
+    font-size: 16px; line-height: 1;
+  }
+  .cf-scroll-btns button:hover { border-color: #4a4a55; color: #fff; }
+
+  /* ---------- track ---------- */
+  .cf-track {
+    display: flex; gap: 10px; overflow-x: auto; overflow-y: hidden;
+    padding: 4px 2px 18px; scroll-behavior: smooth;
+    scrollbar-width: thin; scrollbar-color: #3a3a44 transparent;
+  }
+  .cf-track::-webkit-scrollbar { height: 8px; }
+  .cf-track::-webkit-scrollbar-thumb { background: #3a3a44; border-radius: 99px; }
+  .cf-col { flex: 0 0 152px; scroll-snap-align: start; }
+  .cf-card {
+    position: relative; height: 208px; border-radius: var(--radius);
+    border: 1px solid var(--line);
+    background: linear-gradient(180deg, #1a1a1f 0%, #121215 100%);
+    overflow: hidden; display: flex; flex-direction: column;
+    transition: border-color .18s, transform .18s, box-shadow .18s;
+  }
+  .cf-card::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+    background: var(--c, #b0c3d9); opacity: .85;
+  }
+  .cf-art {
+    position: relative; height: 104px; display: flex; align-items: center; justify-content: center;
+    padding: 10px 8px 0; overflow: hidden;
+  }
+  .cf-art-glow {
+    position: absolute; inset: -20% -10% 0;
+    background: radial-gradient(55% 60% at 50% 55%, var(--c, #b0c3d9), transparent 70%);
+    opacity: .3; pointer-events: none;
+  }
+  .cf-art img {
+    position: relative; z-index: 2; max-width: 100%; max-height: 92px; object-fit: contain;
+    filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .5));
+  }
+  .cf-art .cf-lock { position: relative; z-index: 2; width: 34px; height: 34px; opacity: .5; }
+  .cf-body { padding: 8px 10px 0; flex: 1 1 auto; min-height: 0; }
+  .cf-name {
+    font-size: 11.5px; line-height: 1.3; font-weight: 600; color: #e8e8ee;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden; min-height: 30px;
+  }
+  .cf-type { margin-top: 3px; font-size: 10.5px; color: #85858f; text-transform: uppercase; letter-spacing: .06em; }
+  .cf-claim {
+    margin: 8px 8px 9px; height: 30px; border: 0; border-radius: 6px; cursor: pointer;
+    font-size: 11.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
+    background: #23232a; color: #8d8d97;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .cf-claim.is-ready {
+    background: linear-gradient(180deg, #ff9a3c, #ef5c00); color: #180b00;
+    box-shadow: 0 6px 16px rgba(255, 122, 26, .3);
+  }
+  .cf-claim.is-ready:hover { filter: brightness(1.07); }
+  .cf-card.is-ready { border-color: rgba(255, 138, 40, .75); box-shadow: 0 0 0 1px rgba(255, 138, 40, .25), 0 12px 28px rgba(0, 0, 0, .45); }
+  .cf-card.is-locked { opacity: .72; }
+  .cf-card.is-locked:hover { transform: translateY(-2px); opacity: .9; }
+  .cf-card.is-claimed { opacity: .55; }
+  .cf-card.is-claimed .cf-claim { color: var(--green); background: rgba(72, 209, 122, .09); }
+  .cf-node {
+    margin: 7px auto 0; width: 26px; height: 26px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 800; color: #8d8d97;
+    background: #17171b; border: 1px solid var(--line);
+  }
+  .cf-node.is-done { color: #170b00; background: linear-gradient(180deg, #ffb03a, #ef6a00); border-color: transparent; }
+  .cf-node.is-current { color: #fff; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255, 122, 26, .16); }
+
+  /* ---------- info row ---------- */
+  .cf-info {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+    margin: 26px 0 40px;
+  }
+  .cf-info div {
+    border: 1px solid var(--line); border-radius: 10px; background: #131316;
+    padding: 15px 16px;
+  }
+  .cf-info b { display: block; font-size: 14px; margin-bottom: 4px; }
+  .cf-info p { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--muted); }
+
+  /* ---------- toast ---------- */
+  .cf-toast {
+    position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 20px);
+    z-index: 90; max-width: min(92vw, 460px);
+    padding: 12px 18px; border-radius: 9px;
+    background: #1c1c21; border: 1px solid #34343d;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, .5);
+    font-size: 13.5px; text-align: center;
+    opacity: 0; pointer-events: none; transition: .22s ease;
+  }
+  .cf-toast.is-on { opacity: 1; transform: translate(-50%, 0); }
+  .cf-toast.is-ok { border-color: rgba(72, 209, 122, .5); }
+  .cf-toast.is-err { border-color: rgba(235, 75, 75, .55); }
+
+  .cf-skeleton { color: var(--muted); font-size: 14px; padding: 30px 0; text-align: center; }
+
+  @media (max-width: 860px) {
+    .cf-hero-inner { flex-direction: column-reverse; align-items: flex-start; padding: 22px; gap: 10px; }
+    .cf-hero-art { flex: none; width: 100%; height: 170px; }
+    .cf-hero-art img { max-width: 220px; }
+    .cf-info { grid-template-columns: 1fr; }
+    .cf-nav { display: none; }
+    .cf-bal span { display: none; }
+  }
+  @media (max-width: 520px) {
+    .cf-col { flex-basis: 136px; }
+    .cf-card { height: 196px; }
+    .cf-hero { min-height: 0; }
+    .cf-header .cf-wrap { gap: 10px; }
+    .cf-logo img { height: 21px; }
+  }
+</style>
+</head>
+<body>
+<header class="cf-header">
+  <div class="cf-wrap">
+    <a class="cf-logo" href="/ru" aria-label="КЕЙСЕР"><img src="/cdn/fa/icons/header/logo_text_ru.webp" alt="КЕЙСЕР"></a>
+    <nav class="cf-nav">
+      <a href="#track" class="is-active">Батлпасс</a>
+      <a href="/ru/cases">Кейсы</a>
+      <a href="/ru/inventory">Инвентарь</a>
+    </nav>
+    <div class="cf-right">
+      <div class="cf-bal" title="Баланс">
+        <img src="/cdn/fa/images/chicken-farm/coins.webp" alt="">
+        <b id="balance">—</b>
+      </div>
+      <img class="cf-avatar" id="avatar" alt="" style="display:none">
+      <a class="cf-login" href="/ru" id="login">Войти</a>
+    </div>
+  </div>
+</header>
+
+<main class="cf-wrap" id="app">
+  <section class="cf-hero">
+    <div class="cf-hero-inner">
+      <div class="cf-hero-copy">
+        <div class="cf-kicker">Операция</div>
+        <h1 class="cf-title">Chicken Farm</h1>
+        <p class="cf-sub">Открывай кейсы и делай апгрейды — каждый потраченный рубль приносит 1 XP.
+          На пути 50 уровней, и на каждом лежит награда: скин или деньги на баланс.</p>
+        <div class="cf-progress-box">
+          <div class="cf-progress-top">
+            <span class="cf-level-badge" id="level">1</span>
+            <span>уровень из 50</span>
+            <b id="xp-text" style="margin-left:auto">0 / 60 XP</b>
+          </div>
+          <div class="cf-bar"><i id="bar"></i></div>
+          <div class="cf-progress-foot">
+            <span id="xp-total">Всего 0 XP</span>
+            <span id="xp-next">До следующего уровня 60 XP</span>
+          </div>
+        </div>
+      </div>
+      <div class="cf-hero-art">
+        <img src="/cdn/fa/images/liveDrop/chicken-farm/chickens.webp" alt="Chicken Farm">
+      </div>
+    </div>
+  </section>
+
+  <section class="cf-section" id="track-section">
+    <div class="cf-section-head">
+      <div>
+        <h2 class="cf-h2">Награды <span>батлпасса</span></h2>
+        <div class="cf-hint">Забери всё, что уже открыто. Награда выдаётся один раз.</div>
+      </div>
+      <div class="cf-scroll-btns">
+        <button type="button" id="scroll-left" aria-label="Назад">←</button>
+        <button type="button" id="scroll-right" aria-label="Вперёд">→</button>
+      </div>
+    </div>
+    <div class="cf-track" id="track">
+      <div class="cf-skeleton">Загрузка батлпасса…</div>
+    </div>
+  </section>
+
+  <section class="cf-info">
+    <div><b>1 ₽ = 1 XP</b><p>Открытие кейса или апгрейд на 500 ₽ даёт 500 XP. Ничего покупать отдельно не нужно.</p></div>
+    <div><b>50 уровней</b><p>От дешёвых скинов на старте до заметного предмета на 50-м уровне. Все награды — из нашего каталога.</p></div>
+    <div><b>Без срока</b><p>Прогресс сохраняется на аккаунте. Можно вернуться через неделю и продолжить с того же уровня.</p></div>
+  </section>
+</main>
+
+<div class="cf-toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var state = {
+    data: null,
+    busy: false,
+    started: false
+  };
+
+  var $ = function (id) { return document.getElementById(id); };
+  var trackEl = $('track');
+
+  function money(n) {
+    var value = Number(n) || 0;
+    return value.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  var toastTimer = null;
+  function toast(message, kind) {
+    var el = $('toast');
+    el.textContent = message;
+    el.className = 'cf-toast is-on' + (kind === 'ok' ? ' is-ok' : kind === 'err' ? ' is-err' : '');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.className = 'cf-toast'; }, 3400);
+  }
+
+  function api(url, options) {
+    var opts = options || {};
+    opts.credentials = 'include';
+    return fetch(url, opts).then(function (res) {
+      return res.json().catch(function () { return null; }).then(function (body) {
+        return { ok: res.ok, status: res.status, body: body };
+      });
+    });
+  }
+
+  /**
+   * The main site hands every visitor an account. The farm is a standalone
+   * page, so if the browser has no cookie yet it asks for one the same way the
+   * bundle does and then retries.
+   */
+  function ensureSession() {
+    return api('/api/users/me').then(function (first) {
+      if (first.ok) return first.body;
+      var id = 'player_' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+      return api('/api/auth/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id, nickname: 'CaserPlayer' })
+      }).then(function () {
+        return api('/api/users/me');
+      }).then(function (second) {
+        return second.ok ? second.body : null;
+      });
+    }).catch(function () { return null; });
+  }
+
+  function setUser(user) {
+    if (!user) return;
+    $('balance').textContent = money(user.balance);
+    if (user.image) {
+      var avatar = $('avatar');
+      avatar.src = user.image;
+      avatar.style.display = 'block';
+      avatar.title = user.nickname || '';
+    }
+    $('login').style.display = 'none';
+  }
+
+  function setBalance(value) {
+    if (value == null) return;
+    $('balance').textContent = money(value);
+  }
+
+  function renderProgress() {
+    var d = state.data;
+    var pct = d.need > 0 ? Math.min(100, (d.into / d.need) * 100) : 100;
+    $('level').textContent = d.level;
+    $('bar').style.width = pct.toFixed(2) + '%';
+    $('xp-text').textContent = d.need > 0
+      ? d.into + ' / ' + d.need + ' XP'
+      : 'максимальный уровень';
+    $('xp-total').textContent = 'Всего ' + Math.round(d.xp) + ' XP';
+    $('xp-next').textContent = d.need > 0
+      ? 'До следующего уровня ' + Math.max(0, d.need - d.into) + ' XP'
+      : 'Все награды открыты';
+  }
+
+  function cardHtml(reward) {
+    var claimed = state.data.claimed.indexOf(reward.level) !== -1;
+    var ready = !claimed && state.data.level >= reward.level;
+    var cls = claimed ? 'is-claimed' : (ready ? 'is-ready' : 'is-locked');
+    var color = reward.color || '#b0c3d9';
+
+    var art;
+    if (reward.type === 'item') {
+      art = '<img src="' + esc(reward.item.image) + '" alt="" loading="lazy">';
+    } else {
+      art = '<img src="/cdn/fa/images/chicken-farm/coins.webp" alt="" loading="lazy">';
+    }
+
+    var button;
+    if (claimed) button = '<button type="button" class="cf-claim" disabled>Получено</button>';
+    else if (ready) button = '<button type="button" class="cf-claim is-ready" data-claim="' + reward.level + '">Забрать</button>';
+    else button = '<button type="button" class="cf-claim" disabled>Уровень ' + reward.level + '</button>';
+
+    var nodeCls = claimed ? 'is-done' : (state.data.level === reward.level ? 'is-current' : '');
+
+    return ''
+      + '<div class="cf-col" data-level="' + reward.level + '">'
+      +   '<div class="cf-card ' + cls + '" style="--c:' + esc(color) + '">'
+      +     '<div class="cf-art"><div class="cf-art-glow"></div>' + art + '</div>'
+      +     '<div class="cf-body">'
+      +       '<div class="cf-name">' + esc(reward.value) + '</div>'
+      +       '<div class="cf-type">' + (reward.type === 'item' ? 'Предмет' : 'На баланс') + '</div>'
+      +     '</div>'
+      +     button
+      +   '</div>'
+      +   '<div class="cf-node ' + nodeCls + '">' + reward.level + '</div>'
+      + '</div>';
+  }
+
+  function render() {
+    if (!state.data) return;
+    renderProgress();
+    trackEl.innerHTML = (state.data.rewards || []).map(cardHtml).join('');
+
+    if (!state.started) {
+      state.started = true;
+      // Bring the player's current level into view, like the real pass does.
+      var current = trackEl.querySelector('.cf-col[data-level="' + state.data.level + '"]');
+      if (current) {
+        trackEl.scrollLeft = Math.max(0, current.offsetLeft - trackEl.clientWidth / 2 + current.clientWidth / 2);
+      }
+    }
+  }
+
+  function claim(level, button) {
+    if (state.busy || !state.data) return;
+    state.busy = true;
+    button.disabled = true;
+    button.textContent = '…';
+
+    api('/api/farm/claim', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ level: level })
+    }).then(function (r) {
+      state.busy = false;
+      if (!r.ok) {
+        toast((r.body && r.body.message) || 'Не получилось забрать награду', 'err');
+        render();
+        return;
+      }
+      var reward = r.body.reward;
+      state.data = r.body;
+      if (r.body.balance != null) setBalance(r.body.balance);
+      render();
+      toast(reward.type === 'item'
+        ? 'Получено: ' + reward.item.marketName
+        : 'На баланс зачислено +' + reward.amount + ' ₽', 'ok');
+    }).catch(function () {
+      state.busy = false;
+      toast('Сеть недоступна, попробуйте ещё раз', 'err');
+      render();
+    });
+  }
+
+  trackEl.addEventListener('click', function (event) {
+    var btn = event.target.closest('[data-claim]');
+    if (btn) claim(parseInt(btn.getAttribute('data-claim'), 10), btn);
+  });
+
+  $('scroll-left').addEventListener('click', function () {
+    trackEl.scrollLeft -= Math.max(300, trackEl.clientWidth * 0.7);
+  });
+  $('scroll-right').addEventListener('click', function () {
+    trackEl.scrollLeft += Math.max(300, trackEl.clientWidth * 0.7);
+  });
+
+  function load() {
+    return ensureSession().then(function (user) {
+      if (!user) {
+        $('login').style.display = '';
+        toast('Не удалось создать сессию — откройте главную и попробуйте снова', 'err');
+        return null;
+      }
+      setUser(user);
+      return api('/api/farm').then(function (r) {
+        if (!r.ok) {
+          toast((r.body && r.body.message) || 'Не удалось загрузить ферму', 'err');
+          return null;
+        }
+        state.data = r.body;
+        render();
+        return r.body;
+      });
+    });
+  }
+
+  load();
+
+  // XP arrives from case opens and upgrades in other tabs; keep the bar fresh
+  // without a reload.
+  setInterval(function () {
+    if (document.hidden || !state.data) return;
+    api('/api/farm').then(function (r) {
+      if (!r.ok || !r.body) return;
+      var before = state.data.xp;
+      state.data = r.body;
+      if (r.body.xp !== before) render();
+      if (r.body.balance != null) setBalance(r.body.balance);
+    }).catch(function () {});
+  }, 15000);
+
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden || !state.data) return;
+    api('/api/farm').then(function (r) {
+      if (r.ok && r.body) { state.data = r.body; render(); }
+    }).catch(function () {});
+  });
+})();
+</script>
+</body>
+</html>
