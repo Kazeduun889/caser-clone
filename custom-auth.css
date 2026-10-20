@@ -510,7 +510,9 @@
   padding: 0;
   width: 100%;
   max-width: 100%;
-  margin: 1.4rem 0 0;
+  /* Bottom margin too: without it the tabs sat flush against the strip, which
+     read as one block instead of a header above the inventory. */
+  margin: 1.6rem 0 3.6rem;
   box-sizing: border-box;
   font-family: var(--font-sofia-sans), "Sofia Sans", sans-serif;
   color: #fff;
@@ -523,14 +525,15 @@
   overflow: hidden;
   padding: 1.9rem 2rem 0;
   min-width: 0;
-  /* The site's surfaces are translucent black (bg-black-250). Over a light page
-     they wash out to grey, and the darker plates inside then read as black
-     bands lying across the blocks - the "black background over the tiles" the
-     operator complained about. A solid surface keeps the strip reading as one
-     dark block whatever the page behind it does. Unlayered author CSS also
-     wins over the utility class in Tailwind's @layer utilities, so this is
-     what actually paints. */
-  background: #161616;
+  /* The site's own surface treatment, matched exactly: the toolbar below the
+     tiles is rgba(0,0,0,.45) over the page background. An opaque #161616 tile
+     looked like three black slabs glued onto the page ("профиль стал чёрным
+     весь"), so the tiles go back to translucent glass and the page shows
+     through them. Unlayered author CSS beats the utility class in Tailwind's
+     @layer utilities, so this is what actually paints. */
+  background: rgba(10, 10, 12, .55);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   border: .1rem solid #ffffff14;
 }
 
@@ -664,12 +667,13 @@
 /* The `//  4,443` figure and the Casey rating button are gone: the tile shows
    only the three counters, with spacing instead of rules between them. */
 
-/* Lower plate: a shade darker than the tile, split off by a hairline. Both are
-   solid, so the plate never reads as a black smear on a light tile. */
+/* Lower plate: a hair lighter than the tile, split off by a hairline. It used to
+   be solid #101010, which read as a black band lying on the glass tile; a light
+   overlay keeps the two surfaces in the same family. */
 .caser-plate {
   margin: 0;
   padding: 1.4rem 2rem 1.4rem;
-  background-color: #101010;
+  background-color: rgba(255, 255, 255, .045);
   border-top: .1rem solid #ffffff26;
 }
 .caser-player-bal { display: flex; align-items: center; justify-content: space-between; gap: 1.4rem; }
@@ -761,7 +765,7 @@
 .caser-promo-block {
   margin: 1.2rem 0 0;
   padding: 1.4rem 2rem 1.4rem;
-  background-color: #101010;
+  background-color: rgba(255, 255, 255, .045);
   border-top: .1rem solid #ffffff26;
 }
 .caser-promo-form { display: flex; gap: .8rem; }
@@ -969,9 +973,16 @@
 /* The rewards page stacks two blocks of reserved top padding for a hero that
    is no longer rendered: the app column's pt-[8.8rem] (lg:pt-[17rem]) and the
    inner page wrapper's pt-[6rem]. Together they left a tall blank band above
-   "Розыгрыши", so both are dropped. */
+   "Розыгрыши".
+
+   Zero was too far: the header is fixed and 5rem tall, and when the live-drop
+   banner above the column is not rendered the column starts at the very top of
+   the document, so the top drop rail slid up behind the header and could not
+   be scrolled back. The header offset is kept instead. */
 body[data-caser-page="rewards"] div[class*="gap-[12rem]"][class*="min-h-[100svh]"] {
-  padding-top: 0 !important;
+  /* The exact header height is measured in JS and set as --caser-header-h;
+     5rem is the fallback for the first paint. */
+  padding-top: var(--caser-header-h, 5rem) !important;
 }
 
 /* ===========================================================================

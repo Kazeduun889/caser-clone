@@ -45,6 +45,71 @@ if (!fs.existsSync(CACHE_DIR)) {
 
 app.use(express.json());
 
+// Behind Render's proxy, req.ip is otherwise always 127.0.0.1 and every rate
+// limit would be a single bucket for the whole internet.
+app.set('trust proxy', 1);
+
+/**
+ * A small in-memory rate limiter - the site's first line of defence.
+ *
+ * Every endpoint that hands out value (an account, a promo credit, a case open)
+ * is a bare POST whose only credential is a cookie anyone can write. Nothing
+ * stopped a script from minting accounts and draining promo codes as fast as
+ * the database allows, so each sensitive route gets a budget per visitor.
+ *
+ * One Map in one process is enough for a single instance; a multi-instance
+ * deploy would have to move this into Redis, which is a later decision.
+ */
+const RATE_BUCKETS = new Map();
+
+// On Render, visitors arrive through the platform proxy, so a loopback socket
+// is never a real player: it is the box talking to itself (health checks, the
+// test suites). Counting those would rate-limit the operator's own tooling out
+// of the site. The socket address is used rather than req.ip because a header
+// can be forged and a socket cannot. RATE_LIMIT_STRICT=1 lifts the exemption so
+// the limiter itself can be exercised from a local machine.
+const RATE_LIMIT_STRICT = process.env.RATE_LIMIT_STRICT === '1';
+
+function isLoopback(req) {
+  const addr = (req.socket && req.socket.remoteAddress) || '';
+  return addr === '::1' || addr === '127.0.0.1' || addr.startsWith('127.') || addr.startsWith('::ffff:127.');
+}
+
+function rateLimit({ windowMs = 60000, max = 30, keyFn } = {}) {
+  return (req, res, next) => {
+    if (!RATE_LIMIT_STRICT && isLoopback(req)) return next();
+    const who = keyFn ? keyFn(req) : req.ip;
+    const key = `${who}|${req.path}`;
+    const now = Date.now();
+    let rec = RATE_BUCKETS.get(key);
+    if (!rec || now - rec.start > windowMs) {
+      rec = { start: now, count: 0 };
+      RATE_BUCKETS.set(key, rec);
+    }
+    rec.count += 1;
+    res.setHeader('X-RateLimit-Limit', String(max));
+    res.setHeader('X-RateLimit-Remaining', String(Math.max(0, max - rec.count)));
+    if (rec.count > max) {
+      res.setHeader('Retry-After', String(Math.ceil(windowMs / 1000)));
+      return res.status(429).json({ success: false, message: 'Слишком много запросов, подождите' });
+    }
+    next();
+  };
+}
+
+// Buckets grow without bound otherwise; a visitor who never returns would keep
+// their entry forever.
+setInterval(() => {
+  const cutoff = Date.now() - 10 * 60 * 1000;
+  for (const [key, rec] of RATE_BUCKETS) {
+    if (rec.start < cutoff) RATE_BUCKETS.delete(key);
+  }
+}, 5 * 60 * 1000).unref();
+
+// A blanket budget per visitor on top of the per-route ones, so a script
+// spreading its requests across endpoints still runs into a wall.
+app.use(rateLimit({ windowMs: 60000, max: 240 }));
+
 // Boot the storage layer, then start listening. Requests are not served until
 // the database is reachable (or the in-memory fallback is active).
 let storageReady = false;
@@ -101,7 +166,15 @@ app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Headers', '*');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.removeHeader('X-Frame-Options');
+  // The page has to be embeddable in an iframe (that is how the operator runs
+  // it), so frame-ancestors stays open. The rest of the hardening is not
+  // optional: without nosniff a browser will guess a content type and execute
+  // an uploaded file as script, and without a referrer policy every outbound
+  // link carries the full URL.
   res.setHeader('Content-Security-Policy', "frame-ancestors *;");
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
   if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
@@ -451,7 +524,7 @@ async function resolveUser(req) {
 // AUTH REST API Endpoints
 // ----------------------------------------------------
 
-app.post('/api/auth/session', async (req, res) => {
+app.post('/api/auth/session', rateLimit({ windowMs: 60000, max: 30 }), async (req, res) => {
   const incoming = req.body || {};
   if (!incoming.id) return res.status(400).json({ success: false, message: 'Invalid user data' });
 
@@ -506,7 +579,7 @@ app.post('/api/auth/register', async (req, res) => {
   res.json({ success: true, data: user, token: 'token_' + user.id });
 });
 
-app.post('/api/users/balance/topup', async (req, res) => {
+app.post('/api/users/balance/topup', rateLimit({ windowMs: 60000, max: 20 }), async (req, res) => {
   const user = await resolveUser(req);
   // Strict parsing. This used to fall back to a 5000 default, so a request
   // with a missing or malformed amount silently credited 5000 - including
@@ -782,7 +855,7 @@ const handleOpenCase = async (req, res) => {
 };
 
 app.post('/api/game/cases/:slug/open', handleOpenCase);
-app.post('/game/cases/:slug/open', handleOpenCase);
+app.post('/game/cases/:slug/open', rateLimit({ windowMs: 60000, max: 60 }), handleOpenCase);
 
 // ----------------------------------------------------
 // GAME & CONTENT REST API Endpoints
@@ -1761,7 +1834,7 @@ app.get('/api/admin/giveaways', requireAdmin, async (req, res) => {
   res.json({ success: true, items });
 });
 
-app.post('/api/admin/giveaways', requireAdmin, async (req, res) => {
+app.post('/api/admin/giveaways', requireAdmin, rateLimit({ windowMs: 60000, max: 30 }), async (req, res) => {
   const body = req.body || {};
   const hours = clampInt(body.hours, 1, 24 * 30, 3);
   const endsAt = body.endsAt || new Date(Date.now() + hours * 3600 * 1000).toISOString();
@@ -2153,6 +2226,14 @@ app.get(['/profile', '/profile/', '/ru/profile'], (req, res) => {
   sendInjectedHtml(path.join(SITE_DIR, 'ru/inventory/index.html'), res);
 });
 
+// The drop feed links to /ru/profile/<id>, so a public profile has to answer.
+// Without this route the request falls through to the proxy and the page comes
+// back for the wrong document - clicking another player showed your own
+// profile instead of theirs.
+app.get(['/ru/profile/:id', '/profile/:id'], (req, res) => {
+  sendInjectedHtml(path.join(SITE_DIR, 'ru/inventory/index.html'), res);
+});
+
 // The operator panel. Served raw - it has its own token login, so it does not
 // need the in-game session injection the public pages get.
 app.get(['/admin', '/admin/'], (req, res) => {
@@ -2259,7 +2340,7 @@ const redeemPromoHandler = async (req, res) => {
   });
 };
 
-app.post('/api/promo/redeem', redeemPromoHandler);
+app.post('/api/promo/redeem', rateLimit({ windowMs: 60000, max: 60 }), redeemPromoHandler);
 
 /** Codes this account has already used, so the UI can grey them out. */
 app.get('/api/promo/mine', async (req, res) => {

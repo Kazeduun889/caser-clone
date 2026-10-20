@@ -728,6 +728,24 @@
   function isProfileRoute() { return /\/profile/.test(location.pathname); }
   function isInventoryRoute() { return /\/inventory/.test(location.pathname); }
 
+  /** The account named in the URL, when the profile is being viewed by id. */
+  function viewedProfileId() {
+    var m = location.pathname.match(/\/profile(?:\/([^/?#]+))?\/?$/);
+    return m && m[1] ? decodeURIComponent(m[1]) : null;
+  }
+
+  function cookieUserId() {
+    var m = document.cookie.match(/(?:^|;\s*)caser_user_id=([^;]+)/);
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+
+  /** True when the URL is the signed-in player's own profile. */
+  function isOwnProfile() {
+    var id = viewedProfileId();
+    if (!id) return true;
+    return String(cookieUserId() || '') === String(id);
+  }
+
   function setupProfileCards() {
     ensureProfileStrip();
   }
@@ -839,6 +857,21 @@
       root.insertBefore(strip, root.firstChild);
     }
 
+    // Someone else's profile: the rename pencil, the settings gear and the
+    // logout belong to the account owner, and the coupon field is a personal
+    // one. Leaving them on a public page offered actions that would silently
+    // act on the viewer's own account.
+    var viewingOther = !!viewedProfileId() && !isOwnProfile();
+    if (viewingOther) {
+      Array.prototype.forEach.call(
+        strip.querySelectorAll('[data-act="rename"], [data-act="settings"], [data-act="logout"]'),
+        function (b) { b.remove(); }
+      );
+      var otherPromo = strip.querySelector('.caser-promo-block');
+      if (otherPromo) otherPromo.remove();
+      strip.dataset.public = '1';
+    }
+
     strip.addEventListener('click', function (e) {
       var act = e.target.closest('[data-act]');
       if (!act) return;
@@ -881,7 +914,11 @@
       });
     }
 
-    if (profileCache) applyProfile(strip, profileCache);
+    // Re-fill a strip React just rebuilt, but only with the payload for the
+    // account this URL is about.
+    if (profileCache && profileCacheKey === (viewedProfileId() || 'me')) {
+      applyProfile(strip, profileCache);
+    }
     observeStrip(strip);
   }
 
@@ -1077,7 +1114,11 @@
   }
 
   /** Last payload, so a strip React re-created is filled without refetching. */
+  // The strip is rebuilt whenever React re-renders the page, so the payload it
+  // showed has to be kept. Keyed by who it is for: the signed-in player and a
+  // public profile are different documents and must not be mixed up.
   var profileCache = null;
+  var profileCacheKey = null;
 
   // The site's own artwork, served from the same CDN path it uses. Nothing here
   // is drawn by hand: coin, gear, exit, case, upgrade, bolt, the plus inside the
@@ -1152,7 +1193,13 @@
    */
   function observeStrip(strip, attempt) {
     attempt = attempt || 0;
-    return fetch('/api/users/profile', { headers: { 'X-Requested-With': 'fetch' } })
+    var viewed = viewedProfileId();
+    var own = !viewed || String(cookieUserId() || '') === String(viewed);
+    // A public profile is two requests: the account row, then its counters.
+    // The site's own page only ever asked for the signed-in player, which is
+    // why clicking someone in the drop feed showed your own numbers.
+    var url = own ? '/api/users/profile' : '/api/users/' + encodeURIComponent(viewed);
+    return fetch(url, { headers: { 'X-Requested-With': 'fetch' } })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) {
         if (!d || !d.success) {
@@ -1161,8 +1208,35 @@
           });
           return;
         }
-        profileCache = d.data;
-        applyProfile(strip, d.data);
+        if (own) {
+          profileCache = d.data;
+          profileCacheKey = 'me';
+          applyProfile(strip, d.data);
+          return null;
+        }
+        return fetch('/api/users/' + encodeURIComponent(viewed) + '/stats', { headers: { 'X-Requested-With': 'fetch' } })
+          .then(function (r2) { return r2.ok ? r2.json() : null; })
+          .then(function (s) {
+            if (!s || !s.success) return;
+            var bd = s.data.bestDrop || {};
+            var payload = {
+              user: d.data,
+              stats: {
+                casesOpened: s.data.casesOpened,
+                upgradesMade: s.data.upgradesMade,
+                upgradesWon: s.data.upgradesWon || 0,
+                withdrawn: s.data.withdrawnAmount,
+                withdrawnItems: s.data.withdrawnItemsCount,
+                bestDrop: bd.price || 0,
+                bestDropName: bd.marketName || bd.name || null,
+                bestDropImage: bd.image || null,
+                bestDropColor: null
+              }
+            };
+            profileCache = payload;
+            profileCacheKey = viewed;
+            applyProfile(strip, payload);
+          });
       })
       .catch(function () {
         if (attempt < 6) return new Promise(function (res) { setTimeout(res, 700); }).then(function () {
@@ -1522,6 +1596,15 @@
       return;
     }
     document.body.setAttribute('data-caser-page', 'rewards');
+
+    // The column's top padding has to clear the fixed header exactly. A rem
+    // guess drifts because the site rescales the root font with the viewport,
+    // so the real height is measured and handed to the stylesheet.
+    var header = document.querySelector('[data-testid="header-root"]');
+    if (header) {
+      var hh = header.getBoundingClientRect().height;
+      if (hh > 0) document.documentElement.style.setProperty('--caser-header-h', hh + 'px');
+    }
 
     // The banner has to outrank the site's sticky promo sidebar (z-3), or the
     // sidebar paints over it and the giveaway looks empty.
