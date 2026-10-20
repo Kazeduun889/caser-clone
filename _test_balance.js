@@ -68,7 +68,8 @@ async function activeCookieFor(userId, method, p, body) {
 
 /** The numeric account id the server issued for this session. */
 function idOf(userId) {
-  return String(activeCookies.get(userId) || '').replace('caser_user_id=', '');
+  // The cookie is "<id>.<signature>"; only the id half identifies the account.
+  return String(activeCookies.get(userId) || '').replace('caser_user_id=', '').split('.')[0];
 }
 
 /** Opens a socket for a session and records every balance event it receives. */

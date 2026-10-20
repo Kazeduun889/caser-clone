@@ -64,7 +64,8 @@ function call(method, p, body, cookie) {
   // 1. first contact: renumbered, data intact.
   const me = await call('GET', '/api/users/me', undefined, 'caser_user_id=' + slug);
   const newCookie = (me.setCookie || []).find((c) => c.startsWith('caser_user_id='));
-  const newId = newCookie ? newCookie.split('=')[1] : null;
+  // The cookie is "<id>.<signature>" now; the account is the part before the dot.
+  const newId = newCookie ? newCookie.split('=')[1].split('.')[0] : null;
   check('cookie was rewritten to a number', !!newId && /^\d+$/.test(newId), me.setCookie);
   check('nickname survived', me.json.nickname === 'Старый Игрок', me.json.nickname);
   check('balance survived', Math.abs(Number(me.json.balance) - 5000) < 0.01, me.json.balance);
@@ -82,7 +83,7 @@ function call(method, p, body, cookie) {
   const again = await call('GET', '/api/users/me', undefined, 'caser_user_id=' + slug);
   const againCookie = (again.setCookie || []).find((c) => c.startsWith('caser_user_id='));
   check('alias lands on the same account', again.json.id === newId, { got: again.json.id, want: newId });
-  check('cookie still points at the number', !againCookie || againCookie.split('=')[1] === newId, again.setCookie);
+  check('cookie still points at the number', !againCookie || againCookie.split('=')[1].split('.')[0] === newId, again.setCookie);
 
   // 3. the operator slug keeps admin rights after renumbering.
   const admin = await call('GET', '/api/admin/stats', undefined, 'caser_user_id=player_10001');

@@ -20,7 +20,9 @@
   function reconcileSession() {
     try {
       const cookie = document.cookie.match(/(?:^|;\s*)caser_user_id=([^;]+)/);
-      const cookieId = cookie ? decodeURIComponent(cookie[1]) : null;
+      // The cookie carries "<id>.<signature>" once the server signs it; only the
+      // id half is the account, the signature is proof that it is ours.
+      const cookieId = cookie ? decodeURIComponent(cookie[1]).split('.')[0] : null;
 
       let ours = null;
       try { ours = JSON.parse(localStorage.getItem('caser_user') || 'null'); } catch (e) { ours = null; }
@@ -38,12 +40,19 @@
       if (ours && ours.isCreator !== undefined) user.isCreator = ours.isCreator;
 
       localStorage.setItem('caser_user', JSON.stringify(user));
-      localStorage.setItem('auth_token', 'token_' + id);
+      // Keep a signed token if we already have one for this account: it is the
+      // only thing that can restore the session when the cookie is lost.
+      let token = 'token_' + id;
+      try {
+        const stored = localStorage.getItem('auth_token') || '';
+        if (stored.indexOf('token_' + id + '.') === 0) token = stored;
+      } catch (e) { /* private mode */ }
+      localStorage.setItem('auth_token', token);
       localStorage.setItem('refresh_token', 'refresh_' + id);
       localStorage.setItem('user', JSON.stringify({
         state: {
           user: user,
-          token: 'token_' + id,
+          token: token,
           refreshToken: 'refresh_' + id,
           isAuthenticated: true,
           isLoading: false
@@ -117,6 +126,44 @@
         return send.apply(this, arguments);
       };
     }
+  })();
+
+  /**
+   * Upgrades the stored token to the signed one the server issues.
+   *
+   * The token in localStorage used to be "token_<id>" - a guessable string that
+   * only worked while unsigned ids were accepted. /api/users/me now answers with
+   * a signed credential, which is what a browser without cookies presents.
+   *
+   * It runs after attachIdentityHeader so the request already carries the
+   * current token. Without that the call could land with no identity at all,
+   * be handed a throwaway account, and store ITS token - stranding the player
+   * on that account on the next reload.
+   */
+  (function refreshSessionToken() {
+    try {
+      fetch('/api/users/me', { headers: { 'X-Requested-With': 'fetch' } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (u) {
+          if (!u || !u.sessionToken) return;
+          // Never adopt the token of an account other than the one this browser
+          // believes it is.
+          var mine = null;
+          try { mine = JSON.parse(localStorage.getItem('caser_user') || 'null'); } catch (e) { mine = null; }
+          if (mine && mine.id && String(mine.id) !== String(u.id)) return;
+          localStorage.setItem('auth_token', u.sessionToken);
+          var raw = localStorage.getItem('user');
+          if (!raw) return;
+          try {
+            var st = JSON.parse(raw);
+            if (st && st.state) {
+              st.state.token = u.sessionToken;
+              localStorage.setItem('user', JSON.stringify(st));
+            }
+          } catch (e) { /* malformed state, leave it */ }
+        })
+        .catch(function () {});
+    } catch (e) { /* private mode */ }
   })();
 
   // Auto-initialize demo/player session so cases and features are immediately accessible

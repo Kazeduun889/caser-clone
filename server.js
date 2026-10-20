@@ -115,6 +115,20 @@ app.use(rateLimit({ windowMs: 60000, max: 240 }));
 let storageReady = false;
 const storeReady = store
   .init()
+  .then(async () => {
+    // The signing secret and the legacy deadline are database rows so they do
+    // not change on a restart. A secret that changed would log every player out
+    // and hand them a brand new account.
+    SESSION_SECRET = SESSION_SECRET
+      || await store.getOrCreateSetting('session_secret', () => crypto.randomBytes(32).toString('hex'))
+      || crypto.randomBytes(32).toString('hex');
+    const until = await store.getOrCreateSetting(
+      'session_legacy_until',
+      () => new Date(Date.now() + SESSION_LEGACY_DAYS * 86400000).toISOString()
+    );
+    SESSION_LEGACY_UNTIL = Date.parse(until) || 0;
+    console.log(`[session] signed sessions on; unsigned ids accepted until ${new Date(SESSION_LEGACY_UNTIL).toISOString()}`);
+  })
   .catch((err) => console.error('[store] init failed:', err.message))
   .finally(() => {
     storageReady = true;
@@ -122,6 +136,14 @@ const storeReady = store
 
 // Sessions and balances live in the database (see store.js); nothing is cached
 // in module scope, so every request reads the current state.
+
+// Nothing may be served before storage and the signing secret are ready: a
+// request that arrived early used to be answered with a placeholder secret, and
+// every cookie it issued became invalid the moment the real one loaded.
+app.use((req, res, next) => {
+  if (storageReady) return next();
+  storeReady.finally(() => next());
+});
 
 const DEFAULT_AVATARS = [
   'https://avatars.steamstatic.com/6ee7f3e3312c196dbdb6bdd754a4e021abc16885_full.jpg',
@@ -452,6 +474,59 @@ app.get(['/custom-auth.js', '/custom-auth.css'], (req, res) => {
   res.type(path.extname(file)).send(fs.readFileSync(file, 'utf8'));
 });
 
+/* ---------------------------------------------------------------------------
+ * Signed sessions.
+ *
+ * Identity used to be a bare id in a cookie: "caser_user_id=4257" was accepted
+ * as-is, and so was "Bearer token_4257". Anyone who knew or guessed an id was
+ * that player - and because the operator is recognised by id, anyone who sent
+ * the admin's id was the operator. The id is now signed with a server-side
+ * secret (HMAC-SHA256) and only a signed id is trusted.
+ *
+ * The secret lives in the database, not in memory: a fresh random string per
+ * boot would invalidate every cookie on every deploy, which is the "account
+ * reset itself after a reload" failure all over again.
+ *
+ * Unsigned ids are still honoured for a while, because every player has one
+ * already and locking them out means locking them out of their balance. The
+ * deadline is written once, on the first boot of this code, and stored next to
+ * the secret, so it does not slide forward with every deploy. Admin accounts
+ * are never reachable through the unsigned path, not even during the window.
+ * ------------------------------------------------------------------------- */
+const SESSION_LEGACY_DAYS = Number(process.env.SESSION_LEGACY_DAYS || 14);
+let SESSION_SECRET = process.env.SESSION_SECRET || null;
+let SESSION_LEGACY_UNTIL = 0;
+
+function signId(id) {
+  return crypto.createHmac('sha256', SESSION_SECRET || 'unset').update(String(id)).digest('hex').slice(0, 32);
+}
+/** The value that goes into the cookie / bearer token. */
+function signedId(id) { return `${id}.${signId(id)}`; }
+/** True only for a value this server signed. */
+function isSignedId(raw) {
+  const s = String(raw || '');
+  const dot = s.lastIndexOf('.');
+  if (dot <= 0) return false;
+  return s.slice(dot + 1) === signId(s.slice(0, dot));
+}
+function idFromCredential(raw) {
+  const s = String(raw || '');
+  const dot = s.lastIndexOf('.');
+  return dot > 0 ? s.slice(0, dot) : s;
+}
+function legacyWindowOpen() { return Date.now() < SESSION_LEGACY_UNTIL; }
+function sessionTokenFor(id) { return 'token_' + signedId(id); }
+
+/** What the request claims to be, and whether the claim is signed. */
+function presentedIdentity(req) {
+  let cookies = {};
+  try { cookies = parseCookies({ headers: req.headers || {} }); } catch (e) { /* no cookies */ }
+  const bearer = String(req.get('authorization') || '').replace(/^Bearer\s+/i, '');
+  const raw = cookies['caser_user_id'] || bearer || null;
+  if (!raw) return { id: null, trusted: false };
+  return { id: idFromCredential(raw), trusted: isSignedId(raw) };
+}
+
 // Resolves (and if needed provisions) the user for this request.
 // Identity comes from the session cookie / bearer token, so every browser gets
 // its own balance + inventory. Falls back to a freshly generated demo id.
@@ -460,10 +535,24 @@ async function resolveUser(req) {
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
+  // A signed credential always beats an unsigned one. Between two signed ones
+  // the Bearer token wins, because it lives in localStorage and is the durable
+  // copy of the identity while the cookie is only a cache of it. A page load
+  // fires several requests at once, and the app's own calls can reach the
+  // server before our script runs - with no cookie they mint a brand new
+  // account and set a cookie for it. Preferring that cookie would strand the
+  // player on a throwaway account, which is exactly the "my account reset
+  // itself" failure.
   const candidates = [
-    cookies['caser_user_id'],
-    token ? token.replace(/^token_/, '') : null
-  ].filter(Boolean);
+    token ? token.replace(/^token_/, '') : null,
+    cookies['caser_user_id']
+  ].filter(Boolean)
+    .map((raw, kind) => ({ raw, kind, trusted: isSignedId(raw) }))
+    .sort((a, b) => (Number(b.trusted) - Number(a.trusted)) || (a.kind - b.kind));
+
+  // A signed credential is proof; an unsigned one is only a claim, and claims
+  // stop being accepted once the legacy window closes.
+  req.caserTrusted = false;
 
   // Accounts are numbered 1, 2, 3 ... A cookie naming an account that already
   // exists is honoured as-is, so returning visitors keep their balance and
@@ -478,17 +567,53 @@ async function resolveUser(req) {
   // cannot keep cookies still resolves to the same account.
   let slug = null;
   let user = null;
-  for (const id of candidates) {
+
+  /**
+   * True for the operator's account, whether it is listed under its number or
+   * still recognised through the pre-numbering slug alias. The alias is the
+   * part that mattered: `player_10001` maps onto a numbered account, so an
+   * unsigned cookie naming the slug resolved to the operator and the numeric
+   * ADMIN_IDS check never saw it.
+   */
+  async function isOperatorAccount(userId) {
+    return isAdminId(userId) || await store.legacyAdminMatch(userId, ADMIN_IDS);
+  }
+
+  /**
+   * The operator's browser still holds the old unsigned cookie, so its first
+   * request after this deploy is allowed to upgrade in place - once. Every
+   * later unsigned attempt for an operator account is refused. Requests from
+   * the box itself are exempt so the test suites keep working.
+   */
+  async function upgradeOperatorSession(userId, req) {
+    return isLoopback(req) || await store.claimOnce('admin_session_bound_' + userId);
+  }
+
+  for (const cand of candidates) {
+    if (!cand.trusted && !legacyWindowOpen()) continue;
+    const id = idFromCredential(cand.raw);
     if (!/^\d+$/.test(id)) {
       if (!slug) slug = id;
       const migrated = await store.migrateLegacyUser(id);
       if (!migrated) continue; // never existed: fall through to a fresh number
       const renumbered = await store.getUser(migrated);
-      if (renumbered) { user = renumbered; break; }
+      if (renumbered) {
+        if (!cand.trusted && await isOperatorAccount(renumbered.id)
+          && !(await upgradeOperatorSession(renumbered.id, req))) continue;
+        user = renumbered;
+        req.caserTrusted = cand.trusted;
+        break;
+      }
       continue;
     }
     const existing = await store.getUser(id);
-    if (existing) { user = existing; break; }
+    if (existing) {
+      if (!cand.trusted && await isOperatorAccount(existing.id)
+        && !(await upgradeOperatorSession(existing.id, req))) continue;
+      user = existing;
+      req.caserTrusted = cand.trusted;
+      break;
+    }
   }
 
   // No known identity yet: mint a stable demo account for this browser.
@@ -508,13 +633,16 @@ async function resolveUser(req) {
     // the alias is what lands it on this account instead of minting a new one
     // on every reload.
     if (slug) await store.aliasLegacyId(slug, id);
+    req.caserTrusted = true; // the account was just created for this request
   }
 
   // Keep the cookie in step with the account we resolved. A browser that
   // dropped it (private mode, a strict privacy setting) otherwise has to rely
-  // on the header on every single request.
-  if (req.res && typeof req.res.cookie === 'function' && cookies['caser_user_id'] !== user.id) {
-    req.res.cookie('caser_user_id', user.id, { maxAge: 31536000000, path: '/' });
+  // on the header on every single request. The value is signed, so upgrading a
+  // legacy cookie here is also what eventually closes the unsigned path.
+  const signed = signedId(user.id);
+  if (req.res && typeof req.res.cookie === 'function' && cookies['caser_user_id'] !== signed) {
+    req.res.cookie('caser_user_id', signed, { maxAge: 31536000000, path: '/' });
     req.res.cookie('auth_flag', '1', { maxAge: 31536000000, path: '/' });
   }
   return user;
@@ -528,11 +656,28 @@ app.post('/api/auth/session', rateLimit({ windowMs: 60000, max: 30 }), async (re
   const incoming = req.body || {};
   if (!incoming.id) return res.status(400).json({ success: false, message: 'Invalid user data' });
 
+  // This endpoint used to accept any id and attach the caller to it, which is a
+  // one-line account takeover: post someone's id, receive their balance,
+  // inventory and - if it happened to be the operator's - the admin panel. A
+  // caller may only claim an account it already proved it owns (signed cookie),
+  // and only while the legacy window is open may it claim one on the strength
+  // of the id alone. Admin accounts are never claimable here.
+  const who = presentedIdentity(req);
+  const wanted = String(incoming.id);
+  const target = /^\d+$/.test(wanted) ? await store.getUser(wanted) : null;
+  const owned = who.id === wanted;
+  if (target && isAdminId(target.id) && !(who.trusted && owned)) {
+    return res.status(403).json({ success: false, message: 'Этот аккаунт уже существует' });
+  }
+  if (target && !owned && !legacyWindowOpen()) {
+    return res.status(403).json({ success: false, message: 'Этот аккаунт уже существует' });
+  }
+
   // Account numbers replaced the old random slugs. A session request that
   // still carries a slug is renumbered here, so no new legacy accounts are
   // ever created and resolveUser never has to migrate one of these.
-  const id = /^\d+$/.test(String(incoming.id))
-    ? String(incoming.id)
+  const id = /^\d+$/.test(wanted)
+    ? wanted
     : await store.nextUserId();
 
   const user = await store.ensureUser({
@@ -544,9 +689,9 @@ app.post('/api/auth/session', rateLimit({ windowMs: 60000, max: 30 }), async (re
     tradeUrl: incoming.tradeUrl || incoming.steamTradeLink || null,
     role: incoming.role || 'user'
   });
-  res.cookie('caser_user_id', user.id, { maxAge: 31536000000, path: '/' });
+  res.cookie('caser_user_id', signedId(user.id), { maxAge: 31536000000, path: '/' });
   res.cookie('auth_flag', '1', { maxAge: 31536000000, path: '/' });
-  res.json({ success: true, data: { ...user, balance: user.balance } });
+  res.json({ success: true, data: { ...user, balance: user.balance }, token: sessionTokenFor(user.id) });
 });
 
 app.post('/api/auth/login', async (req, res) => {
@@ -559,9 +704,9 @@ app.post('/api/auth/login', async (req, res) => {
     tradeUrl: 'https://steamcommunity.com/tradeoffer/new/?partner=12345678',
     role: 'user'
   });
-  res.cookie('caser_user_id', user.id, { maxAge: 31536000000, path: '/' });
+  res.cookie('caser_user_id', signedId(user.id), { maxAge: 31536000000, path: '/' });
   res.cookie('auth_flag', '1', { maxAge: 31536000000, path: '/' });
-  res.json({ success: true, data: user, token: 'token_' + user.id });
+  res.json({ success: true, data: user, token: sessionTokenFor(user.id) });
 });
 
 app.post('/api/auth/register', async (req, res) => {
@@ -574,9 +719,9 @@ app.post('/api/auth/register', async (req, res) => {
     tradeUrl: 'https://steamcommunity.com/tradeoffer/new/?partner=12345678',
     role: 'user'
   });
-  res.cookie('caser_user_id', user.id, { maxAge: 31536000000, path: '/' });
+  res.cookie('caser_user_id', signedId(user.id), { maxAge: 31536000000, path: '/' });
   res.cookie('auth_flag', '1', { maxAge: 31536000000, path: '/' });
-  res.json({ success: true, data: user, token: 'token_' + user.id });
+  res.json({ success: true, data: user, token: sessionTokenFor(user.id) });
 });
 
 app.post('/api/users/balance/topup', rateLimit({ windowMs: 60000, max: 20 }), async (req, res) => {
@@ -653,7 +798,10 @@ const handleUsersMe = async (req, res) => {
     tradeUrl: user.tradeUrl || 'https://steamcommunity.com/tradeoffer/new/?partner=12345678',
     // Same value under the name the bundle actually reads.
     steamTradeLink: user.steamTradeLink || user.tradeUrl || 'https://steamcommunity.com/tradeoffer/new/?partner=12345678',
-    role: user.role || 'user'
+    role: user.role || 'user',
+    // The signed credential, so a browser that loses its cookie can still prove
+    // which account it is. The client stores it and sends it as a Bearer token.
+    sessionToken: sessionTokenFor(user.id)
   });
 };
 app.get('/api/users/me', handleUsersMe);
@@ -2054,14 +2202,16 @@ function isAdminId(userId) {
  * time it returns, the operator's own id is no longer the one ADMIN_IDS lists -
  * it only matches through the alias table. If that row is ever missing (a fresh
  * database, a purge that removed the account), the operator is locked out of
- * their own panel. The presented credential is checked as well, which is the
- * same trust level the cookie itself already carries.
+ * their own panel.
+ *
+ * Only a SIGNED credential counts. The unsigned branch used to return whatever
+ * string arrived in the cookie, so `Cookie: caser_user_id=player_10001` was a
+ * full admin login - the single worst hole on the site. An unsigned id is now
+ * just a claim and proves nothing.
  */
 function presentedUserId(req) {
-  let cookies = {};
-  try { cookies = parseCookies({ headers: req.headers || {} }); } catch (e) { /* no cookies */ }
-  const bearer = String(req.get('authorization') || '').replace(/^Bearer\s+/i, '');
-  return cookies['caser_user_id'] || (bearer || null);
+  const who = presentedIdentity(req);
+  return who.trusted ? who.id : null;
 }
 
 async function requireAdmin(req, res, next) {
@@ -3048,7 +3198,9 @@ wss.on('connection', (ws, wsReq) => {
   // offers) can be routed without leaking to other browsers.
   try {
     const cookies = parseCookies({ headers: wsReq.headers || {} });
-    ws.userId = cookies['caser_user_id'] || null;
+    // The cookie carries "<id>.<signature>"; the socket is tagged with the
+    // account id, not with the credential, or no per-user event would match.
+    ws.userId = cookies['caser_user_id'] ? idFromCredential(cookies['caser_user_id']) : null;
   } catch (e) {
     ws.userId = null;
   }

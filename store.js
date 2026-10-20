@@ -324,6 +324,16 @@ async function migrate() {
       old_id     TEXT PRIMARY KEY,
       new_id     TEXT NOT NULL,
       created_at TEXT NOT NULL
+    )`,
+
+    // Server-side configuration that has to survive a restart: the cookie
+    // signing secret and the deadline of the legacy-session window. Kept in the
+    // database on purpose - an in-memory secret would change on every deploy and
+    // invalidate every player's session, which is exactly the "my account was
+    // wiped" failure.
+    `CREATE TABLE IF NOT EXISTS app_settings (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
     )`
   ];
   await client.batch(statements.map((sql) => ({ sql })), 'write');
@@ -410,6 +420,57 @@ async function nextUserId() {
 
   // Should not happen; a unique id is better than a failed registration.
   return newId('player');
+}
+
+/**
+ * A named value that must be created once and then never change.
+ *
+ * Used for the session-signing secret and the legacy-session deadline: both
+ * have to be the same on every instance and every restart, so they live in the
+ * database next to the accounts, not in module scope.
+ */
+async function getOrCreateSetting(key, makeValue) {
+  if (mode === 'memory') {
+    mem.settings = mem.settings || {};
+    if (mem.settings[key] === undefined) mem.settings[key] = String(makeValue());
+    return mem.settings[key];
+  }
+
+  const found = await client.execute({
+    sql: 'SELECT value FROM app_settings WHERE key = ?',
+    args: [key]
+  });
+  if (found.rows.length) return String(found.rows[0].value);
+
+  const value = String(makeValue());
+  // INSERT OR IGNORE: two instances booting at once must agree on one value.
+  await client.execute({
+    sql: 'INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)',
+    args: [key, value]
+  });
+  const again = await client.execute({
+    sql: 'SELECT value FROM app_settings WHERE key = ?',
+    args: [key]
+  });
+  return again.rows.length ? String(again.rows[0].value) : value;
+}
+
+/**
+ * Creates a named one-shot marker. Returns true only for the caller that
+ * actually created it, so a flag can be consumed exactly once across processes.
+ */
+async function claimOnce(key) {
+  if (mode === 'memory') {
+    mem.settings = mem.settings || {};
+    if (mem.settings[key] !== undefined) return false;
+    mem.settings[key] = '1';
+    return true;
+  }
+  const res = await client.execute({
+    sql: 'INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)',
+    args: [key, '1']
+  });
+  return !!res.rowsAffected;
 }
 
 /**
@@ -2214,6 +2275,8 @@ module.exports = {
   setInventoryStatus,
   totalInventoryValue,
   nextUserId,
+  getOrCreateSetting,
+  claimOnce,
   migrateLegacyUser,
   legacyAdminMatch,
   findItemByName,
