@@ -981,8 +981,11 @@ const handleOpenCase = async (req, res) => {
 
     await store.recordCaseOpen(user.id, slug, totalCost, wonItems.map((w) => w.marketName));
 
-    // Operation Chicken Farm: every rouble spent is one point of XP.
-    await store.addFarmXp(user.id, Math.round(totalCost));
+    // Operation Chicken Farm: every rouble spent is one point of XP. A failure
+    // here must never fail the case open - the item has already been granted.
+    try { await store.addFarmXp(user.id, Math.round(totalCost)); } catch (e) {
+      console.error('[farm] xp after case open failed:', e.message);
+    }
 
     // Tell the client about the new drops so the sell buttons light up and
     // the header balance refreshes without a reload
@@ -1938,8 +1941,10 @@ const handleUpgradeBet = async (req, res) => {
   if (wonEntry) await publishDrop(user.id, wonEntry.item, wonEntry.price, 'upgrade');
 
   // Operation Chicken Farm: the stake is worth the same XP as a case of the
-  // same price, whether the roll was won or lost.
-  await store.addFarmXp(user.id, Math.round(stake));
+  // same price, whether the roll was won or lost. Never fatal.
+  try { await store.addFarmXp(user.id, Math.round(stake)); } catch (e) {
+    console.error('[farm] xp after upgrade failed:', e.message);
+  }
 
   const stakeFromItems = Number(
     betEntries.reduce((sum, i) => sum + (parseFloat(i.price) || 0), 0).toFixed(2)
